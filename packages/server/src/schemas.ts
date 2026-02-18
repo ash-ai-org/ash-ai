@@ -1,0 +1,80 @@
+import type { FastifyInstance } from 'fastify';
+
+// -- Reusable JSON Schema components ------------------------------------------
+// Each gets a $id so routes can reference via { $ref: 'SchemaName#' }.
+
+const AgentSchema = {
+  $id: 'Agent',
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    version: { type: 'integer' },
+    path: { type: 'string' },
+    createdAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time' },
+  },
+  required: ['name', 'version', 'path', 'createdAt', 'updatedAt'],
+} as const;
+
+const SessionSchema = {
+  $id: 'Session',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    agentName: { type: 'string' },
+    sandboxId: { type: 'string' },
+    status: { type: 'string', enum: ['starting', 'active', 'paused', 'ended', 'error'] },
+    runnerId: { type: ['string', 'null'] },
+    createdAt: { type: 'string', format: 'date-time' },
+    lastActiveAt: { type: 'string', format: 'date-time' },
+  },
+  required: ['id', 'agentName', 'sandboxId', 'status', 'createdAt', 'lastActiveAt'],
+} as const;
+
+const ApiErrorSchema = {
+  $id: 'ApiError',
+  type: 'object',
+  properties: {
+    error: { type: 'string' },
+    statusCode: { type: 'integer' },
+  },
+  required: ['error', 'statusCode'],
+} as const;
+
+const PoolStatsSchema = {
+  $id: 'PoolStats',
+  type: 'object',
+  properties: {
+    total: { type: 'integer' },
+    cold: { type: 'integer' },
+    warming: { type: 'integer' },
+    warm: { type: 'integer' },
+    waiting: { type: 'integer' },
+    running: { type: 'integer' },
+    maxCapacity: { type: 'integer' },
+    resumeWarmHits: { type: 'integer' },
+    resumeColdHits: { type: 'integer' },
+  },
+  required: ['total', 'cold', 'warming', 'warm', 'waiting', 'running', 'maxCapacity', 'resumeWarmHits', 'resumeColdHits'],
+} as const;
+
+const HealthResponseSchema = {
+  $id: 'HealthResponse',
+  type: 'object',
+  properties: {
+    status: { type: 'string', enum: ['ok'] },
+    activeSessions: { type: 'integer' },
+    activeSandboxes: { type: 'integer' },
+    uptime: { type: 'integer', description: 'Seconds since process start' },
+    pool: { $ref: 'PoolStats#' },
+  },
+  required: ['status', 'activeSessions', 'activeSandboxes', 'uptime', 'pool'],
+} as const;
+
+export function registerSchemas(app: FastifyInstance): void {
+  app.addSchema(AgentSchema);
+  app.addSchema(SessionSchema);
+  app.addSchema(ApiErrorSchema);
+  app.addSchema(PoolStatsSchema);
+  app.addSchema(HealthResponseSchema);
+}

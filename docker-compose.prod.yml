@@ -1,0 +1,33 @@
+services:
+  crdb:
+    image: cockroachdb/cockroach:v24.3.0
+    command: start-single-node --insecure
+    ports:
+      - "26257:26257"
+    volumes:
+      - crdb-data:/cockroach/cockroach-data
+
+  crdb-init:
+    image: cockroachdb/cockroach:v24.3.0
+    command: sql --insecure --host=crdb -e "CREATE DATABASE IF NOT EXISTS ash"
+    depends_on:
+      crdb:
+        condition: service_started
+    restart: on-failure  # retry until crdb is ready
+
+  ash:
+    image: ghcr.io/ash-ai/ash:0.1.0
+    ports:
+      - "4100:4100"
+    volumes:
+      - ash-data:/data
+    environment:
+      - ASH_DATABASE_URL=postgresql://root@crdb:26257/ash
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      crdb-init:
+        condition: service_completed_successfully
+
+volumes:
+  crdb-data:
+  ash-data:

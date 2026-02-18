@@ -1,0 +1,112 @@
+# Database: Configurable SQLite + Postgres/CRDB
+
+**Date**: 2026-02-18
+
+## What
+
+Ash supports two database backends:
+
+1. **SQLite** (default) — zero-config, file-based, uses `better-sqlite3`
+2. **Postgres/CRDB** — for multi-machine deployments, uses `pg` (node-postgres)
+
+Both implement the same `Db` interface. All database operations are async (Promises), even SQLite — this keeps the interface uniform and avoids caller-side branching.
+
+## Configuration
+
+Set the `ASH_DATABASE_URL` environment variable:
+
+| Value | Backend |
+|-------|---------|
+| Not set | SQLite at `{dataDir}/ash.db` |
+| `postgresql://host:5432/ash` | Postgres |
+| `postgres://host:5432/ash` | Postgres |
+| `postgresql://host:26257/ash` | CockroachDB (Postgres-compatible) |
+
+## Architecture
+
+```
+db/
+  index.ts      — Db interface, createDb() factory, module-level singleton + async re-exports
+  sqlite.ts     — SqliteDb class (wraps better-sqlite3, sync→Promise)
+  pg.ts         — PgDb class (uses pg.Pool for connection pooling)
+```
+
+### Factory
+
+`initDb({ dataDir, databaseUrl })` creates the appropriate backend:
+- If `databaseUrl` starts with `postgres://` or `postgresql://` → `PgDb`
+- Otherwise → `SqliteDb` with the given `dataDir`
+
+### Re-exports
+
+`db/index.ts` re-exports all query functions (`upsertAgent`, `getSession`, etc.) as async wrappers that delegate to the singleton. This preserves import compatibility — callers import from `db/index.js` and `await` each call.
+
+## SQL Dialect Differences
+
+The schema is simple enough that differences are minimal:
+
+| Concern | SQLite | Postgres/CRDB |
+|---------|--------|---------------|
+| Default timestamp | `datetime('now')` | `CURRENT_TIMESTAMP` |
+| Upsert | `ON CONFLICT DO UPDATE` | Same (standard SQL) |
+| Parameter placeholders | `?` | `$1, $2, ...` |
+| Connection model | In-process file | `pg.Pool` with connection pooling |
+
+## Connection Retry
+
+`PgDb.init()` retries the initial connection with exponential backoff (1s, 2s, 4s, 8s, 16s — 6 attempts, ~31s total). This handles the common case where the database is still starting up (e.g., in `docker-compose.prod.yml` where CRDB and Ash start together).
+
+If all retries are exhausted, the server fails with a clear error message including the underlying connection error.
+
+## Production Deployment
+
+See [Getting Started — Production Deployment](../getting-started.md#production-deployment) for setup guides (managed CockroachDB, self-hosted, bring-your-own Postgres).
+
+A ready-to-use `docker-compose.prod.yml` in the repo root starts CockroachDB + Ash together:
+
+```bash
+export ANTHROPIC_API_KEY=sk-...
+docker compose -f docker-compose.prod.yml up -d
+```
+
+The CLI also supports `--database-url` to pass the connection URL to Docker:
+
+```bash
+ash start --database-url "postgresql://host:26257/ash"
+```
+
+## Known Limitations
+
+- SQLite uses in-process sync calls wrapped as Promises (negligible overhead)
+- Postgres schema creation happens on startup (`PgDb.init()`) — no migration system yet
+
+## How to Test
+
+SQLite is exercised automatically by `pnpm test` (the default when no `ASH_DATABASE_URL` is set).
+
+### Integration testing (automated)
+
+The CRDB integration test starts a real CockroachDB container in Docker, points the Ash server at it, and runs the full agent/session lifecycle:
+
+```bash
+pnpm test:integration:crdb
+```
+
+Requires Docker. Skips gracefully if Docker is not available.
+
+The test lives at `test/integration/crdb.test.ts` and uses `test/helpers/crdb-launcher.ts` to manage the CRDB container lifecycle (pinned to `cockroachdb/cockroach:v24.3.0`).
+
+### Manual testing
+
+To test Postgres manually:
+
+```bash
+# Start a local CockroachDB (or Postgres)
+cockroach start-single-node --insecure --listen-addr=localhost:26257
+
+# Create the database
+cockroach sql --insecure -e "CREATE DATABASE ash"
+
+# Run the server with Postgres backend
+ASH_DATABASE_URL=postgresql://localhost:26257/ash pnpm --filter '@ash-ai/server' dev
+```

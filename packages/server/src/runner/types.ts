@@ -1,0 +1,46 @@
+import type { BridgeCommand, BridgeEvent, PoolStats, SandboxLimits } from '@ash-ai/shared';
+
+export interface CreateSandboxRequest {
+  sessionId: string;
+  agentDir: string;
+  agentName: string;
+  sandboxId?: string;
+  skipAgentCopy?: boolean;
+  limits?: Partial<SandboxLimits>;
+  onOomKill?: (sandboxId: string) => void;
+}
+
+export interface SandboxHandle {
+  sandboxId: string;
+  workspaceDir: string;
+}
+
+/**
+ * Abstraction over sandbox management. Routes and the coordinator
+ * program against this interface — LocalRunnerBackend wraps SandboxPool
+ * for single-machine mode, RemoteRunnerBackend talks to a runner over HTTP/2.
+ */
+export interface RunnerBackend {
+  createSandbox(opts: CreateSandboxRequest): Promise<SandboxHandle>;
+  destroySandbox(sandboxId: string): Promise<void>;
+  destroyAll(): Promise<void>;
+
+  sendCommand(sandboxId: string, cmd: BridgeCommand): AsyncGenerator<BridgeEvent>;
+
+  /** Returns sandbox info if alive, undefined if not found or dead. */
+  getSandbox(sandboxId: string): SandboxHandle | undefined;
+
+  /** Check if the sandbox process is still alive. */
+  isSandboxAlive(sandboxId: string): boolean;
+
+  markRunning(sandboxId: string): void;
+  markWaiting(sandboxId: string): void;
+
+  recordWarmHit(): void;
+  recordColdHit(): void;
+
+  persistState(sandboxId: string, sessionId: string, agentName: string): boolean;
+
+  getStats(): Promise<PoolStats>;
+  readonly activeCount: number;
+}

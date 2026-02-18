@@ -1,0 +1,37 @@
+{
+  "name": "@ash-ai/runner",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ash-ai/ash.git",
+    "directory": "packages/runner"
+  },
+  "license": "MIT",
+  "description": "Ash runner process — manages sandboxes and exposes them over HTTP/2",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@ash-ai/sandbox": "workspace:*",
+    "@ash-ai/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.700.0",
+    "better-sqlite3": "^11.0.0",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@ash-ai/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ash": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ash-ai/ash.git",
+    "directory": "packages/cli"
+  },
+  "license": "MIT",
+  "description": "CLI for deploying and managing Ash AI agents",
+  "keywords": [
+    "ash",
+    "ai",
+    "agent",
+    "cli",
+    "claude"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ash-ai/shared": "workspace:*",
+    "commander": "^13.0.0"
+  }
+}

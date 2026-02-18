@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+.next/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Data (SQLite, sockets, etc.)
+data/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# pnpm
+.pnpm-debug.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.pytest_cache/
+packages/sdk-python/generated/
+
+# OpenAPI (generated)
+packages/server/openapi.json
+docs/openapi.json
+
+# Cloud deployment state
+.ec2-instance
+.gce-instance
+
+# Test / coverage
+coverage/

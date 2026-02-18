@@ -1,0 +1,38 @@
+{
+  "name": "ash",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent orchestration system - deploy, manage, and interact with hosted AI agents",
+  "scripts": {
+    "build": "pnpm --filter '@ash-ai/shared' build && pnpm --filter '!@ash-ai/shared' -r build",
+    "dev": "pnpm --filter '@ash-ai/server' dev",
+    "clean": "pnpm -r clean",
+    "test": "pnpm -r --workspace-concurrency=4 test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:crdb": "vitest run --config vitest.integration.config.ts test/integration/crdb.test.ts",
+    "test:real-sdk": "vitest run --config vitest.integration.config.ts test/integration/real-sdk.test.ts",
+    "test:all": "pnpm test && pnpm test:integration",
+    "bench": "tsx test/bench/message-overhead.ts",
+    "bench:sandbox": "tsx test/bench/sandbox-startup.ts",
+    "bench:sandbox:crdb": "tsx test/bench/sandbox-startup.ts --db crdb",
+    "bench:all": "pnpm bench && pnpm bench:sandbox && pnpm bench:sandbox:crdb",
+    "docker:build": "docker build -t ash-dev .",
+    "typecheck": "pnpm -r typecheck",
+    "openapi": "pnpm --filter '@ash-ai/server' openapi"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.16.0",
+    "pg": "^8.18.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.45"
+  }
+}

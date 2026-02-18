@@ -1,0 +1,42 @@
+{
+  "name": "@ash-ai/sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ash-ai/ash.git",
+    "directory": "packages/sdk"
+  },
+  "license": "MIT",
+  "description": "TypeScript SDK for interacting with Ash agent servers",
+  "keywords": [
+    "ash",
+    "ai",
+    "agent",
+    "sdk",
+    "claude"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@ash-ai/shared": "workspace:*"
+  }
+}

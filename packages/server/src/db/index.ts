@@ -1,0 +1,147 @@
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState } from '@ash-ai/shared';
+
+export interface Db {
+  // Agents
+  upsertAgent(name: string, path: string): Promise<Agent>;
+  getAgent(name: string): Promise<Agent | null>;
+  listAgents(): Promise<Agent[]>;
+  deleteAgent(name: string): Promise<boolean>;
+  // Sessions
+  insertSession(id: string, agentName: string, sandboxId: string): Promise<Session>;
+  updateSessionStatus(id: string, status: SessionStatus): Promise<void>;
+  updateSessionSandbox(id: string, sandboxId: string): Promise<void>;
+  updateSessionRunner(id: string, runnerId: string | null): Promise<void>;
+  getSession(id: string): Promise<Session | null>;
+  listSessions(agent?: string): Promise<Session[]>;
+  listSessionsByRunner(runnerId: string): Promise<Session[]>;
+  touchSession(id: string): Promise<void>;
+  // Sandboxes
+  insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string): Promise<void>;
+  updateSandboxState(id: string, state: SandboxState): Promise<void>;
+  updateSandboxSession(id: string, sessionId: string | null): Promise<void>;
+  touchSandbox(id: string): Promise<void>;
+  getSandbox(id: string): Promise<SandboxRecord | null>;
+  countSandboxes(): Promise<number>;
+  getBestEvictionCandidate(): Promise<SandboxRecord | null>;
+  getIdleSandboxes(olderThan: string): Promise<SandboxRecord[]>;
+  deleteSandbox(id: string): Promise<void>;
+  markAllSandboxesCold(): Promise<number>;
+  // Lifecycle
+  close(): Promise<void>;
+}
+
+let db: Db;
+
+function getDb(): Db {
+  if (!db) throw new Error('Database not initialized — call initDb first');
+  return db;
+}
+
+export async function initDb(opts: { dataDir: string; databaseUrl?: string }): Promise<Db> {
+  if (opts.databaseUrl && /^postgres(ql)?:\/\//.test(opts.databaseUrl)) {
+    const { PgDb } = await import('./pg.js');
+    const pgDb = new PgDb(opts.databaseUrl);
+    await pgDb.init();
+    db = pgDb;
+  } else {
+    const { SqliteDb } = await import('./sqlite.js');
+    db = new SqliteDb(opts.dataDir);
+  }
+  return db;
+}
+
+// -- Async re-exports (preserve call-site compatibility) ----------------------
+
+export async function upsertAgent(name: string, path: string): Promise<Agent> {
+  return getDb().upsertAgent(name, path);
+}
+
+export async function getAgent(name: string): Promise<Agent | null> {
+  return getDb().getAgent(name);
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  return getDb().listAgents();
+}
+
+export async function deleteAgent(name: string): Promise<boolean> {
+  return getDb().deleteAgent(name);
+}
+
+export async function insertSession(id: string, agentName: string, sandboxId: string): Promise<Session> {
+  return getDb().insertSession(id, agentName, sandboxId);
+}
+
+export async function updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
+  return getDb().updateSessionStatus(id, status);
+}
+
+export async function updateSessionSandbox(id: string, sandboxId: string): Promise<void> {
+  return getDb().updateSessionSandbox(id, sandboxId);
+}
+
+export async function updateSessionRunner(id: string, runnerId: string | null): Promise<void> {
+  return getDb().updateSessionRunner(id, runnerId);
+}
+
+export async function getSession(id: string): Promise<Session | null> {
+  return getDb().getSession(id);
+}
+
+export async function listSessions(agent?: string): Promise<Session[]> {
+  return getDb().listSessions(agent);
+}
+
+export async function listSessionsByRunner(runnerId: string): Promise<Session[]> {
+  return getDb().listSessionsByRunner(runnerId);
+}
+
+export async function touchSession(id: string): Promise<void> {
+  return getDb().touchSession(id);
+}
+
+// -- Sandboxes ----------------------------------------------------------------
+
+export async function insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string): Promise<void> {
+  return getDb().insertSandbox(id, agentName, workspaceDir, sessionId);
+}
+
+export async function updateSandboxState(id: string, state: SandboxState): Promise<void> {
+  return getDb().updateSandboxState(id, state);
+}
+
+export async function updateSandboxSession(id: string, sessionId: string | null): Promise<void> {
+  return getDb().updateSandboxSession(id, sessionId);
+}
+
+export async function touchSandbox(id: string): Promise<void> {
+  return getDb().touchSandbox(id);
+}
+
+export async function getSandbox(id: string): Promise<SandboxRecord | null> {
+  return getDb().getSandbox(id);
+}
+
+export async function countSandboxes(): Promise<number> {
+  return getDb().countSandboxes();
+}
+
+export async function getBestEvictionCandidate(): Promise<SandboxRecord | null> {
+  return getDb().getBestEvictionCandidate();
+}
+
+export async function getIdleSandboxes(olderThan: string): Promise<SandboxRecord[]> {
+  return getDb().getIdleSandboxes(olderThan);
+}
+
+export async function deleteSandbox(id: string): Promise<void> {
+  return getDb().deleteSandbox(id);
+}
+
+export async function markAllSandboxesCold(): Promise<number> {
+  return getDb().markAllSandboxesCold();
+}
+
+export async function closeDb(): Promise<void> {
+  return getDb().close();
+}
