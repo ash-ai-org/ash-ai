@@ -152,14 +152,14 @@ Target overhead (Ash's portion, excluding SDK latency): 1-3ms.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> starting: POST /api/sessions
-    starting --> active: Sandbox ready
-    starting --> error: Sandbox failed
-    active --> active: Send messages
-    active --> paused: POST .../pause or runner died
-    active --> ended: DELETE /api/sessions/:id
-    active --> error: Sandbox crashed
-    paused --> active: POST .../resume
+    [*] --> starting : POST /api/sessions
+    starting --> active : Sandbox ready
+    starting --> error : Sandbox failed
+    active --> active : Send messages
+    active --> paused : POST pause or runner died
+    active --> ended : DELETE /api/sessions/id
+    active --> error : Sandbox crashed
+    paused --> active : POST resume
     error --> [*]
     ended --> [*]
 ```
