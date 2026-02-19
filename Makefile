@@ -4,7 +4,7 @@
        docker-build docker-start docker-stop docker-status docker-logs \
        ec2-deploy ec2-teardown ec2-smoke-test \
        gce-deploy gce-teardown gce-smoke-test \
-       publish publish-dry-run \
+       changeset changeset-status version-packages publish publish-dry-run \
        openapi sdk-python
 
 # -- Setup --------------------------------------------------------------------
@@ -160,21 +160,26 @@ openapi: build
 sdk-python: openapi
 	cd packages/sdk-python && ./generate.sh
 
-# -- Publish ------------------------------------------------------------------
+# -- Publish (Changesets) -----------------------------------------------------
 
-# Dry run: see what would be published without actually publishing
-publish-dry-run: build
-	cd packages/shared && npm publish --dry-run
-	cd packages/bridge && npm publish --dry-run
-	cd packages/server && npm publish --dry-run
-	cd packages/sdk && npm publish --dry-run
-	cd packages/cli && npm publish --dry-run
+# Add a changeset (interactive: pick packages + bump type + summary)
+changeset:
+	pnpm changeset
 
-# Publish all packages to npm (shared first since others depend on it)
-# Requires NPM_TOKEN in env or ~/.npmrc with auth configured
+# Preview what changesets will do (which packages bump, to what version)
+changeset-status:
+	pnpm changeset status
+
+# Apply pending changesets: bump versions in package.json, generate CHANGELOGs
+# (Normally done by CI via the "Version Packages" PR, but can be run locally)
+version-packages:
+	pnpm version-packages
+
+# Publish all bumped packages to npm (requires NPM_TOKEN or ~/.npmrc auth)
+# In normal workflow, CI does this automatically when the Version Packages PR merges.
 publish: build
-	cd packages/shared && npm publish --access public
-	cd packages/bridge && npm publish --access public
-	cd packages/server && npm publish --access public
-	cd packages/sdk && npm publish --access public
-	cd packages/cli && npm publish --access public
+	pnpm release
+
+# Dry run: build + see what changeset publish would do
+publish-dry-run: build
+	pnpm release --no-git-tag

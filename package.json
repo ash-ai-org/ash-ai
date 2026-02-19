@@ -18,9 +18,14 @@
     "bench:all": "pnpm bench && pnpm bench:sandbox && pnpm bench:sandbox:crdb",
     "docker:build": "docker build -t ash-dev .",
     "typecheck": "pnpm -r typecheck",
-    "openapi": "pnpm --filter '@ash-ai/server' openapi"
+    "openapi": "pnpm --filter '@ash-ai/server' openapi",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.0",
+    "@changesets/cli": "^2.29.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.16.0",
     "pg": "^8.18.0",

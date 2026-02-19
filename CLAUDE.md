@@ -236,6 +236,40 @@ The testing strategy is at `docs/jeff-dean-plan/testing/00-strategy.md`.
 - **State persistence**: SQLite with WAL mode (after step 02)
 - **Agent SDK**: @anthropic-ai/claude-code (peer dependency, mocked in tests)
 
+## Changesets (Required for Every PR)
+
+Every PR that changes package behavior must include a changeset. This is how we version packages and generate release notes.
+
+### Adding a changeset
+
+Run `/changeset` (Claude Code skill) or `pnpm changeset` (interactive CLI). Either way, the result is a small markdown file in `.changeset/`:
+
+```markdown
+---
+"@ash-ai/shared": patch
+"@ash-ai/server": patch
+---
+
+Fix session timeout when bridge disconnects unexpectedly.
+```
+
+### Rules
+
+- **One changeset per PR.** If a PR does one thing, one changeset. If it does two unrelated things, split the PR.
+- **Only include packages that changed.** Check which `packages/*/` directories your diff touches.
+- **Bump types:**
+  - `patch` — bug fixes, internal refactors, dependency updates
+  - `minor` — new features, new API endpoints, new CLI commands
+  - `major` — breaking API changes, removed features, changed wire formats
+- **Description is user-facing.** Write what changed from the consumer's perspective, not implementation details. One sentence. These become CHANGELOG entries and GitHub Release notes.
+- **Internal packages count.** Changes to `@ash-ai/shared`, `@ash-ai/sandbox`, `@ash-ai/bridge` still need changesets — the config auto-bumps their dependents.
+- **No changeset needed for:** docs-only changes, CI config, test-only changes, anything that doesn't affect published package behavior.
+
+### What happens after merge
+
+1. Push to `main` → CI opens a "Version Packages" PR (bumps `package.json` versions, generates `CHANGELOG.md` entries)
+2. Merge that PR → CI publishes bumped packages to npm and creates GitHub Releases with release notes
+
 ## Anti-Patterns
 
 - **Don't spread `...process.env` into sandbox processes.** Use an explicit allowlist. See `04b-sandbox-isolation.md`.
