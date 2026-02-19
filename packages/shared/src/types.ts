@@ -72,6 +72,27 @@ export interface SandboxLimits {
   maxProcesses: number;  // Max PIDs (fork bomb protection)
 }
 
+// -- Files --------------------------------------------------------------------
+
+export interface FileEntry {
+  path: string;       // Relative to workspace root, e.g. "src/index.ts"
+  size: number;       // Bytes
+  modifiedAt: string; // ISO 8601
+}
+
+export interface ListFilesResponse {
+  files: FileEntry[];
+  /** Where the file listing was read from: 'sandbox' (live) or 'snapshot' (persisted). */
+  source: 'sandbox' | 'snapshot';
+}
+
+export interface GetFileResponse {
+  path: string;
+  content: string;
+  size: number;
+  source: 'sandbox' | 'snapshot';
+}
+
 // -- API request/response -----------------------------------------------------
 
 export interface CreateSessionRequest {

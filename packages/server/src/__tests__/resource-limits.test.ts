@@ -34,7 +34,7 @@ describe('resource limits', () => {
 
   describe('DEFAULT_SANDBOX_LIMITS', () => {
     it('has sane defaults', () => {
-      expect(DEFAULT_SANDBOX_LIMITS.memoryMb).toBe(512);
+      expect(DEFAULT_SANDBOX_LIMITS.memoryMb).toBe(2048);
       expect(DEFAULT_SANDBOX_LIMITS.cpuPercent).toBe(100);
       expect(DEFAULT_SANDBOX_LIMITS.diskMb).toBe(1024);
       expect(DEFAULT_SANDBOX_LIMITS.maxProcesses).toBe(64);

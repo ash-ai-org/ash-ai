@@ -14,6 +14,7 @@ import { agentRoutes } from './routes/agents.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { healthRoutes } from './routes/health.js';
 import { runnerRoutes } from './routes/runners.js';
+import { fileRoutes } from './routes/files.js';
 
 // Config from env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +101,7 @@ registerAuth(app, process.env.ASH_API_KEY);
 // Routes
 agentRoutes(app, dataDir);
 sessionRoutes(app, coordinator, dataDir);
+fileRoutes(app, coordinator, dataDir);
 healthRoutes(app, coordinator, pool);
 runnerRoutes(app, coordinator);
 

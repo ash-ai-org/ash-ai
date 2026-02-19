@@ -20,4 +20,7 @@ export type {
   AshStreamEvent,
   DisplayItem,
   DisplayItemType,
+  FileEntry,
+  ListFilesResponse,
+  GetFileResponse,
 } from '@ash-ai/shared';

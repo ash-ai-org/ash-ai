@@ -4,6 +4,7 @@ import swagger from '@fastify/swagger';
 import { registerSchemas } from '../schemas.js';
 import { agentRoutes } from '../routes/agents.js';
 import { sessionRoutes } from '../routes/sessions.js';
+import { fileRoutes } from '../routes/files.js';
 import { healthRoutes } from '../routes/health.js';
 
 describe('OpenAPI spec generation', () => {
@@ -23,6 +24,7 @@ describe('OpenAPI spec generation', () => {
     const nullCoordinator = {} as any;
     agentRoutes(app, '/tmp/unused');
     sessionRoutes(app, nullCoordinator, '/tmp/unused');
+    fileRoutes(app, nullCoordinator, '/tmp/unused');
     healthRoutes(app, nullCoordinator, null);
 
     await app.ready();
@@ -56,9 +58,12 @@ describe('OpenAPI spec generation', () => {
     expect(pathKeys).toContain('/api/sessions/{id}/messages');
     expect(pathKeys).toContain('/api/sessions/{id}/pause');
     expect(pathKeys).toContain('/api/sessions/{id}/resume');
+    expect(pathKeys).toContain('/api/sessions/{id}/files');
+    // Wildcard route: Fastify may render it as /api/sessions/{id}/files/{*} or similar
+    expect(pathKeys.some((p: string) => p.startsWith('/api/sessions/{id}/files/') && p !== '/api/sessions/{id}/files')).toBe(true);
   });
 
-  it('has 12 operations total', () => {
+  it('has 14 operations total', () => {
     const paths = spec.paths as Record<string, Record<string, unknown>>;
     let count = 0;
     for (const path of Object.values(paths)) {
@@ -66,7 +71,7 @@ describe('OpenAPI spec generation', () => {
         if (path[method]) count++;
       }
     }
-    expect(count).toBe(12);
+    expect(count).toBe(14);
   });
 
   it('has component schemas for Agent, Session, ApiError, HealthResponse', () => {

@@ -5,6 +5,8 @@ import type {
   ListSessionsResponse,
   HealthResponse,
   AshStreamEvent,
+  ListFilesResponse,
+  GetFileResponse,
 } from '@ash-ai/shared';
 import { parseSSEStream } from './sse.js';
 
@@ -129,6 +131,18 @@ export class AshClient {
   async endSession(id: string): Promise<Session> {
     const res = await this.request<{ session: Session }>('DELETE', `/api/sessions/${id}`);
     return res.session;
+  }
+
+  // -- Files ------------------------------------------------------------------
+
+  /** List files in the session's workspace. Works on active, paused, and ended sessions. */
+  async getSessionFiles(sessionId: string): Promise<ListFilesResponse> {
+    return this.request<ListFilesResponse>('GET', `/api/sessions/${sessionId}/files`);
+  }
+
+  /** Read a single file from the session's workspace. */
+  async getSessionFile(sessionId: string, path: string): Promise<GetFileResponse> {
+    return this.request<GetFileResponse>('GET', `/api/sessions/${sessionId}/files/${path}`);
   }
 
   // -- Health -----------------------------------------------------------------
