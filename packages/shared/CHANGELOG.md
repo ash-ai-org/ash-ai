@@ -1,5 +1,12 @@
 # @ash-ai/shared
 
+## 0.0.2 - 2026-02-19
+
+### Added
+
+- Multi-tenant types: `tenantId` field on `Agent`, `Session`, and `SandboxRecord`
+- New `ApiKey` type for multi-tenant API key management
+
 ## 0.0.1
 
 ### Patch Changes

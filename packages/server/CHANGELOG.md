@@ -1,5 +1,22 @@
 # @ash-ai/server
 
+## 0.0.2 - 2026-02-19
+
+### Added
+
+- Multi-tenant API key authentication with hashed key lookup from database
+- Tenant isolation on all routes: agents, sessions, sandboxes, and files scoped by `tenantId`
+- `api_keys` table in SQLite and Postgres for storing tenant API keys
+- `tenant_id` columns on agents, sessions, and sandboxes tables
+- `dump-schema` script for exporting database schema
+- Database schema reference file (`schema.sql`)
+
+### Changed
+
+- Auth hook resolves tenant identity from Bearer tokens, with backward compatibility for `ASH_API_KEY`
+- Session and file access checks verify tenant ownership (returns 404 for cross-tenant access)
+- Updated dependencies: @ash-ai/shared@0.0.2, @ash-ai/sandbox@0.0.2
+
 ## 0.0.1
 
 ### Patch Changes
