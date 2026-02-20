@@ -49,3 +49,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Set package visibility to public
+        if: github.event_name == 'push'
+        run: gh api orgs/ash-ai-org/packages/container/ash/versions --jq '.[0].id' > /dev/null 2>&1 && gh api --method PUT orgs/ash-ai-org/packages/container/ash -f visibility=public || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

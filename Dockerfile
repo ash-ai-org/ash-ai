@@ -1,5 +1,9 @@
 FROM node:20-slim
 
+LABEL org.opencontainers.image.source=https://github.com/ash-ai-org/ash-ai
+LABEL org.opencontainers.image.description="Ash server — deploy and orchestrate hosted AI agents"
+LABEL org.opencontainers.image.licenses=MIT
+
 # bubblewrap for sandbox isolation, procps for ps/kill utilities
 RUN apt-get update && \
     apt-get install -y --no-install-recommends bubblewrap procps && \
