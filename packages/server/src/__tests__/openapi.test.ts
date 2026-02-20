@@ -71,7 +71,7 @@ describe('OpenAPI spec generation', () => {
         if (path[method]) count++;
       }
     }
-    expect(count).toBe(14);
+    expect(count).toBe(16);
   });
 
   it('has component schemas for Agent, Session, ApiError, HealthResponse', () => {

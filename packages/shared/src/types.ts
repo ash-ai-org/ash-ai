@@ -55,6 +55,96 @@ export interface SandboxRecord {
   lastUsedAt: string;
 }
 
+// -- Messages -----------------------------------------------------------------
+
+export interface Message {
+  id: string;
+  sessionId: string;
+  tenantId?: string;
+  role: 'user' | 'assistant';
+  content: string; // JSON string of SDK message content (passthrough)
+  sequence: number;
+  createdAt: string;
+}
+
+export interface ListMessagesResponse {
+  messages: Message[];
+}
+
+// -- Session Events (Timeline) ------------------------------------------------
+
+export type SessionEventType =
+  | 'text'           // Assistant text content block
+  | 'tool_start'     // Tool use started (name + input)
+  | 'tool_result'    // Tool result returned (output)
+  | 'reasoning'      // Extended thinking / chain-of-thought
+  | 'error'          // Error during execution
+  | 'turn_complete'  // Agent turn finished (result message)
+  | 'lifecycle';     // Session state change (created, paused, resumed, ended)
+
+export interface SessionEvent {
+  id: string;
+  sessionId: string;
+  tenantId?: string;
+  type: SessionEventType;
+  data: string | null;  // JSON payload (event-type-specific)
+  sequence: number;
+  createdAt: string;
+}
+
+export interface ListSessionEventsResponse {
+  events: SessionEvent[];
+}
+
+/**
+ * Classify a raw SDK message (from bridge) into session events.
+ * A single SDK message can produce multiple events (e.g. an assistant message
+ * with text + tool_use blocks yields both a 'text' and 'tool_start' event).
+ */
+export function classifyBridgeMessage(data: Record<string, any>): Array<{ type: SessionEventType; data: Record<string, any> }> {
+  const events: Array<{ type: SessionEventType; data: Record<string, any> }> = [];
+
+  // Assistant message with content blocks
+  if (data.type === 'assistant' && data.message?.content && Array.isArray(data.message.content)) {
+    for (const block of data.message.content) {
+      if (block.type === 'text') {
+        events.push({ type: 'text', data: { text: block.text } });
+      } else if (block.type === 'tool_use') {
+        events.push({
+          type: 'tool_start',
+          data: { toolName: block.name, toolId: block.id, input: block.input },
+        });
+      } else if (block.type === 'thinking') {
+        events.push({ type: 'reasoning', data: { thinking: block.thinking } });
+      }
+    }
+  }
+
+  // Tool result message
+  if (data.type === 'user' && data.tool_use_result) {
+    const r = data.tool_use_result;
+    events.push({
+      type: 'tool_result',
+      data: {
+        toolName: r.tool_name,
+        toolId: r.tool_use_id,
+        stdout: r.stdout,
+        stderr: r.stderr,
+      },
+    });
+  }
+
+  // Result / turn complete
+  if (data.type === 'result') {
+    events.push({
+      type: 'turn_complete',
+      data: { numTurns: data.num_turns, result: data.result },
+    });
+  }
+
+  return events;
+}
+
 // -- API Keys -----------------------------------------------------------------
 
 export interface ApiKey {

@@ -21,7 +21,12 @@
     "openapi": "pnpm --filter '@ash-ai/server' openapi",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "release:list": "./scripts/release/list-packages.sh",
+    "release:bump": "./scripts/release/bump-versions.sh",
+    "release:tag": "./scripts/release/tag-packages.sh",
+    "release:gh": "./scripts/release/gh-releases.sh",
+    "release:all": "./scripts/release/release-all.sh"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.0",

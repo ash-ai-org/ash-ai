@@ -48,3 +48,6 @@ docs/openapi.json
 
 # Test / coverage
 coverage/
+
+# Local Claude config
+.claude/*.local.md

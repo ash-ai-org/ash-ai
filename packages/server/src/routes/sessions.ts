@@ -4,7 +4,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming } from '@ash-ai/shared';
-import { getAgent, insertSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner } from '../db/index.js';
+import { getAgent, insertSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
+import { classifyBridgeMessage } from '@ash-ai/shared';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import { restoreSessionState, hasPersistedState, restoreStateFromCloud } from '@ash-ai/sandbox';
 
@@ -110,6 +111,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       await updateSessionRunner(sessionId, effectiveRunnerId);
       await updateSessionStatus(sessionId, 'active');
 
+      // Record lifecycle event
+      insertSessionEvent(sessionId, 'lifecycle', JSON.stringify({ action: 'created', agentName: agentRecord.name }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+
       return reply.status(201).send({ session: { ...session, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -161,6 +165,77 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
     return reply.send({ session });
+  });
+
+  // List messages for a session
+  app.get<{ Params: { id: string } }>('/api/sessions/:id/messages', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      querystring: {
+        type: 'object',
+        properties: {
+          limit: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
+          after: { type: 'integer', minimum: 0, default: 0, description: 'Return messages after this sequence number' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            messages: { type: 'array', items: { $ref: 'Message#' } },
+          },
+          required: ['messages'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+    const { limit, after } = req.query as { limit?: number; after?: number };
+    const messages = await listMessages(session.id, req.tenantId, { limit, afterSequence: after });
+    return reply.send({ messages });
+  });
+
+  // List session events (timeline)
+  app.get<{ Params: { id: string } }>('/api/sessions/:id/events', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      querystring: {
+        type: 'object',
+        properties: {
+          limit: { type: 'integer', minimum: 1, maximum: 1000, default: 200 },
+          after: { type: 'integer', minimum: 0, default: 0, description: 'Return events after this sequence number' },
+          type: { type: 'string', description: 'Filter by event type' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            events: { type: 'array', items: { $ref: 'SessionEvent#' } },
+          },
+          required: ['events'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+    const { limit, after, type } = req.query as { limit?: number; after?: number; type?: string };
+    const events = await listSessionEvents(session.id, req.tenantId, {
+      limit,
+      afterSequence: after,
+      type: type as any,
+    });
+    return reply.send({ events });
   });
 
   // Send message — routes to the correct runner for the session
@@ -221,6 +296,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     await touchSession(session.id);
 
+    // Persist user message
+    insertMessage(session.id, 'user', JSON.stringify({ type: 'user', content }), req.tenantId).catch((err) =>
+      console.error(`Failed to persist user message: ${err}`)
+    );
+
     // SSE response
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -246,9 +326,34 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         }
 
         if (event.ev === 'message') {
-          await writeSSE(reply.raw, `event: message\ndata: ${JSON.stringify(event.data)}\n\n`);
+          const data = event.data as Record<string, any>;
+          await writeSSE(reply.raw, `event: message\ndata: ${JSON.stringify(data)}\n\n`);
+
+          // Persist complete assistant messages (not partial stream events)
+          if (data.type === 'assistant' || data.type === 'result') {
+            insertMessage(session.id, 'assistant', JSON.stringify(data), req.tenantId).catch((err) =>
+              console.error(`Failed to persist assistant message: ${err}`)
+            );
+          }
+
+          // Classify and persist timeline events (non-blocking)
+          const classified = classifyBridgeMessage(data);
+          if (classified.length > 0) {
+            insertSessionEvents(
+              classified.map((c) => ({
+                sessionId: session.id,
+                type: c.type,
+                data: JSON.stringify(c.data),
+                tenantId: req.tenantId,
+              }))
+            ).catch((err) => console.error(`Failed to persist session events: ${err}`));
+          }
         } else if (event.ev === 'error') {
           await writeSSE(reply.raw, `event: error\ndata: ${JSON.stringify({ error: event.error })}\n\n`);
+          // Persist error as timeline event
+          insertSessionEvent(session.id, 'error', JSON.stringify({ error: event.error }), req.tenantId).catch((err) =>
+            console.error(`Failed to persist error event: ${err}`)
+          );
         } else if (event.ev === 'done') {
           await writeSSE(reply.raw, `event: done\ndata: ${JSON.stringify({ sessionId: event.sessionId })}\n\n`);
           // Best-effort state persistence after each completed turn
@@ -307,6 +412,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     } catch { /* runner may be gone */ }
 
     await updateSessionStatus(session.id, 'paused');
+    insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'paused' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
     return reply.send({ session: { ...session, status: 'paused' } });
   });
 
@@ -348,6 +454,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         oldBackend.recordWarmHit();
         logResume('warm', session.id, session.agentName);
         await updateSessionStatus(session.id, 'active');
+        insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'warm' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
         return reply.send({ session: { ...session, status: 'active' } });
       }
     } catch { /* runner gone — cold path */ }
@@ -391,6 +498,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       await updateSessionSandbox(session.id, handle.sandboxId);
       await updateSessionRunner(session.id, effectiveRunnerId);
       await updateSessionStatus(session.id, 'active');
+      insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'cold' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
 
       return reply.send({ session: { ...session, sandboxId: handle.sandboxId, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {
@@ -426,6 +534,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     } catch { /* runner may be gone */ }
 
     await updateSessionStatus(session.id, 'ended');
+    insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'ended' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
     return reply.send({ session: { ...session, status: 'ended' } });
   });
 }

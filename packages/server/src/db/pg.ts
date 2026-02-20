@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 export class PgDb implements Db {
@@ -87,6 +87,39 @@ export class PgDb implements Db {
     `);
     await this.pool.query('CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)');
     await this.pool.query('CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)');
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (now()::TEXT),
+        UNIQUE(tenant_id, session_id, sequence)
+      )
+    `);
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(tenant_id, session_id, sequence)');
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS session_events (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        session_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data TEXT,
+        sequence INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (now()::TEXT),
+        UNIQUE(tenant_id, session_id, sequence)
+      )
+    `);
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events(tenant_id, session_id, sequence)');
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_session_events_type ON session_events(tenant_id, session_id, type)');
+
+    // Add UNIQUE constraints for existing tables (idempotent)
+    try { await this.pool.query('ALTER TABLE messages ADD CONSTRAINT uq_messages_session_seq UNIQUE(tenant_id, session_id, sequence)'); } catch { /* already exists */ }
+    try { await this.pool.query('ALTER TABLE session_events ADD CONSTRAINT uq_session_events_session_seq UNIQUE(tenant_id, session_id, sequence)'); } catch { /* already exists */ }
 
     // Agent UUID migration: change PK from name to UUID id, add UNIQUE(tenant_id, name), drop FK from sessions
     const agentCols = await this.pool.query(
@@ -279,6 +312,116 @@ export class PgDb implements Db {
       "UPDATE sandboxes SET state = 'cold' WHERE state != 'cold'"
     );
     return result.rowCount ?? 0;
+  }
+
+  // -- Messages --------------------------------------------------------------
+
+  async insertMessage(sessionId: string, role: 'user' | 'assistant', content: string, tenantId: string = 'default'): Promise<Message> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    // Atomic sequence assignment — no TOCTOU race under concurrent writes
+    const result = await this.pool.query(`
+      INSERT INTO messages (id, tenant_id, session_id, role, content, sequence, created_at)
+      VALUES ($1, $2, $3, $4, $5, COALESCE((SELECT MAX(sequence) FROM messages WHERE tenant_id = $2 AND session_id = $3), 0) + 1, $6)
+      RETURNING sequence
+    `, [id, tenantId, sessionId, role, content, now]);
+
+    return { id, sessionId, tenantId, role, content, sequence: result.rows[0].sequence, createdAt: now };
+  }
+
+  async listMessages(sessionId: string, tenantId: string = 'default', opts?: { limit?: number; afterSequence?: number }): Promise<Message[]> {
+    const limit = opts?.limit ?? 100;
+    const afterSeq = opts?.afterSequence ?? 0;
+
+    const result = await this.pool.query(
+      'SELECT * FROM messages WHERE tenant_id = $1 AND session_id = $2 AND sequence > $3 ORDER BY sequence ASC LIMIT $4',
+      [tenantId, sessionId, afterSeq, limit]
+    );
+
+    return result.rows.map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      tenantId: r.tenant_id,
+      role: r.role,
+      content: r.content,
+      sequence: r.sequence,
+      createdAt: r.created_at,
+    }));
+  }
+
+  // -- Session Events ---------------------------------------------------------
+
+  async insertSessionEvent(sessionId: string, type: SessionEventType, data: string | null, tenantId: string = 'default'): Promise<SessionEvent> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    // Atomic sequence assignment — no TOCTOU race under concurrent writes
+    const result = await this.pool.query(`
+      INSERT INTO session_events (id, tenant_id, session_id, type, data, sequence, created_at)
+      VALUES ($1, $2, $3, $4, $5, COALESCE((SELECT MAX(sequence) FROM session_events WHERE tenant_id = $2 AND session_id = $3), 0) + 1, $6)
+      RETURNING sequence
+    `, [id, tenantId, sessionId, type, data, now]);
+
+    return { id, sessionId, tenantId, type, data, sequence: result.rows[0].sequence, createdAt: now };
+  }
+
+  async insertSessionEvents(events: Array<{ sessionId: string; type: SessionEventType; data: string | null; tenantId?: string }>): Promise<SessionEvent[]> {
+    if (events.length === 0) return [];
+    if (events.length === 1) return [await this.insertSessionEvent(events[0].sessionId, events[0].type, events[0].data, events[0].tenantId)];
+
+    // All events in a single transaction with sequential sequence numbers
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const results: SessionEvent[] = [];
+      for (const ev of events) {
+        const id = randomUUID();
+        const now = new Date().toISOString();
+        const tenantId = ev.tenantId ?? 'default';
+        const result = await client.query(`
+          INSERT INTO session_events (id, tenant_id, session_id, type, data, sequence, created_at)
+          VALUES ($1, $2, $3, $4, $5, COALESCE((SELECT MAX(sequence) FROM session_events WHERE tenant_id = $2 AND session_id = $3), 0) + 1, $6)
+          RETURNING sequence
+        `, [id, tenantId, ev.sessionId, ev.type, ev.data, now]);
+        results.push({ id, sessionId: ev.sessionId, tenantId, type: ev.type, data: ev.data, sequence: result.rows[0].sequence, createdAt: now });
+      }
+      await client.query('COMMIT');
+      return results;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listSessionEvents(sessionId: string, tenantId: string = 'default', opts?: { limit?: number; afterSequence?: number; type?: SessionEventType }): Promise<SessionEvent[]> {
+    const limit = opts?.limit ?? 200;
+    const afterSeq = opts?.afterSequence ?? 0;
+
+    let result;
+    if (opts?.type) {
+      result = await this.pool.query(
+        'SELECT * FROM session_events WHERE tenant_id = $1 AND session_id = $2 AND sequence > $3 AND type = $4 ORDER BY sequence ASC LIMIT $5',
+        [tenantId, sessionId, afterSeq, opts.type, limit]
+      );
+    } else {
+      result = await this.pool.query(
+        'SELECT * FROM session_events WHERE tenant_id = $1 AND session_id = $2 AND sequence > $3 ORDER BY sequence ASC LIMIT $4',
+        [tenantId, sessionId, afterSeq, limit]
+      );
+    }
+
+    return result.rows.map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      tenantId: r.tenant_id,
+      type: r.type,
+      data: r.data,
+      sequence: r.sequence,
+      createdAt: r.created_at,
+    }));
   }
 
   // -- API Keys --------------------------------------------------------------

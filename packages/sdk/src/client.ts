@@ -1,8 +1,13 @@
 import type {
   Agent,
   Session,
+  Message,
+  SessionEvent,
+  SessionEventType,
   ListAgentsResponse,
   ListSessionsResponse,
+  ListMessagesResponse,
+  ListSessionEventsResponse,
   HealthResponse,
   AshStreamEvent,
   ListFilesResponse,
@@ -131,6 +136,33 @@ export class AshClient {
   async endSession(id: string): Promise<Session> {
     const res = await this.request<{ session: Session }>('DELETE', `/api/sessions/${id}`);
     return res.session;
+  }
+
+  // -- Messages ---------------------------------------------------------------
+
+  /** List persisted messages for a session. */
+  async listMessages(sessionId: string, opts?: { limit?: number; afterSequence?: number }): Promise<Message[]> {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.afterSequence) params.set('after', String(opts.afterSequence));
+    const qs = params.toString();
+    const path = `/api/sessions/${sessionId}/messages${qs ? `?${qs}` : ''}`;
+    const res = await this.request<ListMessagesResponse>('GET', path);
+    return res.messages;
+  }
+
+  // -- Session Events ---------------------------------------------------------
+
+  /** List timeline events for a session. Filterable by type, supports cursor pagination. */
+  async listSessionEvents(sessionId: string, opts?: { limit?: number; afterSequence?: number; type?: SessionEventType }): Promise<SessionEvent[]> {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.afterSequence) params.set('after', String(opts.afterSequence));
+    if (opts?.type) params.set('type', opts.type);
+    const qs = params.toString();
+    const path = `/api/sessions/${sessionId}/events${qs ? `?${qs}` : ''}`;
+    const res = await this.request<ListSessionEventsResponse>('GET', path);
+    return res.events;
   }
 
   // -- Files ------------------------------------------------------------------
