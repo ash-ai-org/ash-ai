@@ -1,5 +1,18 @@
 # @ash-ai/shared
 
+## 0.0.3 - 2026-02-20
+
+### Added
+
+- `SessionEvent` type for session event timeline (#5)
+- `MessageRecord` type for message persistence (#5)
+
+### Changed
+
+- Removed hardcoded `ASH_DOCKER_TAG` constant; CLI now derives tag from package version at runtime (#6)
+- Fixed Docker image reference to correct org (`ghcr.io/ash-ai-org/ash`) (#6)
+- Updated dependencies: @ash-ai/shared@0.0.3
+
 ## 0.0.2 - 2026-02-19
 
 ### Added

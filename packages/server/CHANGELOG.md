@@ -1,5 +1,17 @@
 # @ash-ai/server
 
+## 0.0.3 - 2026-02-20
+
+### Added
+
+- Message persistence: store and retrieve session messages via `GET /sessions/:id/messages` (#5)
+- Session events timeline: track session lifecycle events (created, message sent/received, ended) (#5)
+- `GET /sessions/:id/events` endpoint for session event history (#5)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.3, @ash-ai/sandbox@0.0.3
+
 ## 0.0.2 - 2026-02-19
 
 ### Added

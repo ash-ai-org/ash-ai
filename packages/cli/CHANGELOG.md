@@ -1,5 +1,17 @@
 # @ash-ai/cli
 
+## 0.0.3 - 2026-02-20
+
+### Added
+
+- `ash-dev` bin entry for local development; `make link` installs it globally (#6)
+- Dev mode: `ash-dev start` auto-builds local Docker image instead of pulling from registry (#7)
+
+### Changed
+
+- Docker image tag derived from `package.json` version at runtime instead of hardcoded constant (#6)
+- Updated dependencies: @ash-ai/shared@0.0.3
+
 ## 0.0.2 - 2026-02-19
 
 ### Changed
