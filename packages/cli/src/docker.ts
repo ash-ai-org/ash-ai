@@ -2,15 +2,22 @@ import { execSync, execFileSync, spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import {
   ASH_CONTAINER_NAME,
   ASH_DOCKER_IMAGE,
-  ASH_DOCKER_TAG,
   ASH_AGENTS_SUBDIR,
   ASH_HEALTH_POLL_INTERVAL_MS,
   ASH_HEALTH_POLL_TIMEOUT_MS,
   DEFAULT_PORT,
 } from '@ash-ai/shared';
+
+// Derive Docker tag from CLI package version — stays in sync automatically on release
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
+const ASH_DOCKER_TAG = pkg.version as string;
 
 export function ashDataDir(): string {
   return join(homedir(), '.ash');
