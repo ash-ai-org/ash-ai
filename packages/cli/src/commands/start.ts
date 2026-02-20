@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { Command } from 'commander';
 import { DEFAULT_PORT } from '@ash-ai/shared';
 import {
@@ -11,6 +12,7 @@ import {
   ensureDataDir,
   ashDataDir,
 } from '../docker.js';
+import { isDevMode } from '../index.js';
 
 function collectEnv(value: string, previous: string[]): string[] {
   return previous.concat([value]);
@@ -74,6 +76,19 @@ export function startCommand(): Command {
         const val = entry.slice(eqIdx + 1);
         process.env[key] = val;
         envPassthrough.push(key);
+      }
+
+      // Dev mode: build local Docker image and use it
+      if (isDevMode && !opts.image) {
+        console.log('Dev mode: building local Docker image (ash-dev)...');
+        try {
+          execSync('docker build -t ash-dev .', { stdio: 'inherit' });
+        } catch {
+          console.error('Docker build failed.');
+          process.exit(1);
+        }
+        opts.image = 'ash-dev';
+        opts.pull = false;
       }
 
       // Pull image (skip if using a local image via --image or --no-pull)
