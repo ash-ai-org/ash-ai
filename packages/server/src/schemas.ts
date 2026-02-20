@@ -44,6 +44,36 @@ const ApiErrorSchema = {
   required: ['error', 'statusCode'],
 } as const;
 
+const MessageSchema = {
+  $id: 'Message',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    sessionId: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    role: { type: 'string', enum: ['user', 'assistant'] },
+    content: { type: 'string', description: 'JSON-encoded message content (SDK passthrough)' },
+    sequence: { type: 'integer' },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+  required: ['id', 'sessionId', 'role', 'content', 'sequence', 'createdAt'],
+} as const;
+
+const SessionEventSchema = {
+  $id: 'SessionEvent',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    sessionId: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    type: { type: 'string', enum: ['text', 'tool_start', 'tool_result', 'reasoning', 'error', 'turn_complete', 'lifecycle'] },
+    data: { type: ['string', 'null'], description: 'JSON-encoded event payload' },
+    sequence: { type: 'integer' },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+  required: ['id', 'sessionId', 'type', 'sequence', 'createdAt'],
+} as const;
+
 const PoolStatsSchema = {
   $id: 'PoolStats',
   type: 'object',
@@ -77,6 +107,8 @@ const HealthResponseSchema = {
 export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(AgentSchema);
   app.addSchema(SessionSchema);
+  app.addSchema(MessageSchema);
+  app.addSchema(SessionEventSchema);
   app.addSchema(ApiErrorSchema);
   app.addSchema(PoolStatsSchema);
   app.addSchema(HealthResponseSchema);

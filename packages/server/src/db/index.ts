@@ -1,4 +1,4 @@
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
 
 /**
  * Database interface for Ash persistence.
@@ -33,6 +33,13 @@ export interface Db {
   getIdleSandboxes(olderThan: string): Promise<SandboxRecord[]>;
   deleteSandbox(id: string): Promise<void>;
   markAllSandboxesCold(): Promise<number>;
+  // Messages (tenant-scoped)
+  insertMessage(sessionId: string, role: 'user' | 'assistant', content: string, tenantId?: string): Promise<Message>;
+  listMessages(sessionId: string, tenantId?: string, opts?: { limit?: number; afterSequence?: number }): Promise<Message[]>;
+  // Session Events (tenant-scoped)
+  insertSessionEvent(sessionId: string, type: SessionEventType, data: string | null, tenantId?: string): Promise<SessionEvent>;
+  insertSessionEvents(events: Array<{ sessionId: string; type: SessionEventType; data: string | null; tenantId?: string }>): Promise<SessionEvent[]>;
+  listSessionEvents(sessionId: string, tenantId?: string, opts?: { limit?: number; afterSequence?: number; type?: SessionEventType }): Promise<SessionEvent[]>;
   // API Keys
   getApiKeyByHash(keyHash: string): Promise<ApiKey | null>;
   insertApiKey(id: string, tenantId: string, keyHash: string, label: string): Promise<ApiKey>;
@@ -153,6 +160,30 @@ export async function deleteSandbox(id: string): Promise<void> {
 
 export async function markAllSandboxesCold(): Promise<number> {
   return getDb().markAllSandboxesCold();
+}
+
+// -- Messages -----------------------------------------------------------------
+
+export async function insertMessage(sessionId: string, role: 'user' | 'assistant', content: string, tenantId?: string): Promise<Message> {
+  return getDb().insertMessage(sessionId, role, content, tenantId);
+}
+
+export async function listMessages(sessionId: string, tenantId?: string, opts?: { limit?: number; afterSequence?: number }): Promise<Message[]> {
+  return getDb().listMessages(sessionId, tenantId, opts);
+}
+
+// -- Session Events -----------------------------------------------------------
+
+export async function insertSessionEvent(sessionId: string, type: SessionEventType, data: string | null, tenantId?: string): Promise<SessionEvent> {
+  return getDb().insertSessionEvent(sessionId, type, data, tenantId);
+}
+
+export async function insertSessionEvents(events: Array<{ sessionId: string; type: SessionEventType; data: string | null; tenantId?: string }>): Promise<SessionEvent[]> {
+  return getDb().insertSessionEvents(events);
+}
+
+export async function listSessionEvents(sessionId: string, tenantId?: string, opts?: { limit?: number; afterSequence?: number; type?: SessionEventType }): Promise<SessionEvent[]> {
+  return getDb().listSessionEvents(sessionId, tenantId, opts);
 }
 
 // -- API Keys -----------------------------------------------------------------

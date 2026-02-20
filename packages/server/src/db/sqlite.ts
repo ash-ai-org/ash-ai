@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 export class SqliteDb implements Db {
@@ -73,6 +73,31 @@ export class SqliteDb implements Db {
       );
       CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);
       CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        sequence INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(tenant_id, session_id, sequence)
+      );
+      CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(tenant_id, session_id, sequence);
+
+      CREATE TABLE IF NOT EXISTS session_events (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL DEFAULT 'default',
+        session_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data TEXT,
+        sequence INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(tenant_id, session_id, sequence)
+      );
+      CREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events(tenant_id, session_id, sequence);
+      CREATE INDEX IF NOT EXISTS idx_session_events_type ON session_events(tenant_id, session_id, type);
     `);
 
     // Agent UUID migration: change PK from name to UUID id, add UNIQUE(tenant_id, name), drop FK from sessions
@@ -302,6 +327,121 @@ export class SqliteDb implements Db {
       "UPDATE sandboxes SET state = 'cold' WHERE state != 'cold'"
     ).run();
     return result.changes;
+  }
+
+  // -- Messages --------------------------------------------------------------
+
+  async insertMessage(sessionId: string, role: 'user' | 'assistant', content: string, tenantId: string = 'default'): Promise<Message> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    // Get next sequence number for this session
+    const last = this.db.prepare(
+      'SELECT MAX(sequence) as max_seq FROM messages WHERE tenant_id = ? AND session_id = ?'
+    ).get(tenantId, sessionId) as { max_seq: number | null } | undefined;
+    const sequence = (last?.max_seq ?? 0) + 1;
+
+    this.db.prepare(`
+      INSERT INTO messages (id, tenant_id, session_id, role, content, sequence, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, tenantId, sessionId, role, content, sequence, now);
+
+    return { id, sessionId, tenantId, role, content, sequence, createdAt: now };
+  }
+
+  async listMessages(sessionId: string, tenantId: string = 'default', opts?: { limit?: number; afterSequence?: number }): Promise<Message[]> {
+    const limit = opts?.limit ?? 100;
+    const afterSeq = opts?.afterSequence ?? 0;
+
+    const rows = this.db.prepare(
+      'SELECT * FROM messages WHERE tenant_id = ? AND session_id = ? AND sequence > ? ORDER BY sequence ASC LIMIT ?'
+    ).all(tenantId, sessionId, afterSeq, limit) as any[];
+
+    return rows.map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      tenantId: r.tenant_id,
+      role: r.role,
+      content: r.content,
+      sequence: r.sequence,
+      createdAt: r.created_at,
+    }));
+  }
+
+  // -- Session Events ---------------------------------------------------------
+
+  async insertSessionEvent(sessionId: string, type: SessionEventType, data: string | null, tenantId: string = 'default'): Promise<SessionEvent> {
+    const id = randomUUID();
+    const now = new Date().toISOString();
+
+    const last = this.db.prepare(
+      'SELECT MAX(sequence) as max_seq FROM session_events WHERE tenant_id = ? AND session_id = ?'
+    ).get(tenantId, sessionId) as { max_seq: number | null } | undefined;
+    const sequence = (last?.max_seq ?? 0) + 1;
+
+    this.db.prepare(`
+      INSERT INTO session_events (id, tenant_id, session_id, type, data, sequence, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, tenantId, sessionId, type, data, sequence, now);
+
+    return { id, sessionId, tenantId, type, data, sequence, createdAt: now };
+  }
+
+  async insertSessionEvents(events: Array<{ sessionId: string; type: SessionEventType; data: string | null; tenantId?: string }>): Promise<SessionEvent[]> {
+    if (events.length === 0) return [];
+    const results: SessionEvent[] = [];
+    const txn = this.db.transaction(() => {
+      // Group by (tenantId, sessionId) to compute starting sequence once per group
+      const groups = new Map<string, number>();
+      for (const ev of events) {
+        const tenantId = ev.tenantId ?? 'default';
+        const key = `${tenantId}:${ev.sessionId}`;
+        if (!groups.has(key)) {
+          const last = this.db.prepare(
+            'SELECT MAX(sequence) as max_seq FROM session_events WHERE tenant_id = ? AND session_id = ?'
+          ).get(tenantId, ev.sessionId) as { max_seq: number | null } | undefined;
+          groups.set(key, last?.max_seq ?? 0);
+        }
+        const sequence = groups.get(key)! + 1;
+        groups.set(key, sequence);
+
+        const id = randomUUID();
+        const now = new Date().toISOString();
+        this.db.prepare(`
+          INSERT INTO session_events (id, tenant_id, session_id, type, data, sequence, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(id, tenantId, ev.sessionId, ev.type, ev.data, sequence, now);
+        results.push({ id, sessionId: ev.sessionId, tenantId, type: ev.type, data: ev.data, sequence, createdAt: now });
+      }
+    });
+    txn();
+    return results;
+  }
+
+  async listSessionEvents(sessionId: string, tenantId: string = 'default', opts?: { limit?: number; afterSequence?: number; type?: SessionEventType }): Promise<SessionEvent[]> {
+    const limit = opts?.limit ?? 200;
+    const afterSeq = opts?.afterSequence ?? 0;
+
+    let sql: string;
+    let params: any[];
+    if (opts?.type) {
+      sql = 'SELECT * FROM session_events WHERE tenant_id = ? AND session_id = ? AND sequence > ? AND type = ? ORDER BY sequence ASC LIMIT ?';
+      params = [tenantId, sessionId, afterSeq, opts.type, limit];
+    } else {
+      sql = 'SELECT * FROM session_events WHERE tenant_id = ? AND session_id = ? AND sequence > ? ORDER BY sequence ASC LIMIT ?';
+      params = [tenantId, sessionId, afterSeq, limit];
+    }
+
+    const rows = this.db.prepare(sql).all(...params) as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      tenantId: r.tenant_id,
+      type: r.type,
+      data: r.data,
+      sequence: r.sequence,
+      createdAt: r.created_at,
+    }));
   }
 
   // -- API Keys --------------------------------------------------------------
