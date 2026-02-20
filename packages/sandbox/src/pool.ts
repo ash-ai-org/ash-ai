@@ -11,7 +11,7 @@ export type LiveSandboxState = 'warming' | 'warm' | 'waiting' | 'running';
  * This narrower type avoids a circular dependency.
  */
 export interface SandboxDb {
-  insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string): Promise<void>;
+  insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string, tenantId?: string): Promise<void>;
   updateSandboxState(id: string, state: SandboxState): Promise<void>;
   updateSandboxSession(id: string, sessionId: string | null): Promise<void>;
   touchSandbox(id: string): Promise<void>;

@@ -6,7 +6,9 @@
 // -- Agents -------------------------------------------------------------------
 
 export interface Agent {
+  id: string;
   name: string;
+  tenantId?: string;
   version: number;
   path: string;
   createdAt: string;
@@ -19,6 +21,7 @@ export type SessionStatus = 'starting' | 'active' | 'paused' | 'ended' | 'error'
 
 export interface Session {
   id: string;
+  tenantId?: string;
   agentName: string;
   sandboxId: string;
   status: SessionStatus;
@@ -43,12 +46,23 @@ export interface SandboxInfo {
 
 export interface SandboxRecord {
   id: string;
+  tenantId?: string;
   sessionId: string | null;
   agentName: string;
   state: SandboxState;
   workspaceDir: string;
   createdAt: string;
   lastUsedAt: string;
+}
+
+// -- API Keys -----------------------------------------------------------------
+
+export interface ApiKey {
+  id: string;
+  tenantId: string;
+  keyHash: string;
+  label: string;
+  createdAt: string;
 }
 
 export interface PoolStats {

@@ -54,6 +54,9 @@ describe('file routes', () => {
 
   async function buildApp(coordinator: RunnerCoordinator) {
     const app = Fastify();
+    // Simulate auth middleware setting tenantId
+    app.decorateRequest('tenantId', '');
+    app.addHook('onRequest', async (req) => { req.tenantId = 'default'; });
     registerSchemas(app);
     fileRoutes(app, coordinator, dataDir);
     await app.ready();

@@ -120,7 +120,7 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
     },
   }, async (req, reply) => {
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
 
@@ -162,7 +162,7 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
     },
   }, async (req, reply) => {
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
 

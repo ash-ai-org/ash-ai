@@ -1,5 +1,6 @@
 import pg from 'pg';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState } from '@ash-ai/shared';
+import { randomUUID } from 'node:crypto';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 export class PgDb implements Db {
@@ -65,52 +66,88 @@ export class PgDb implements Db {
     await this.pool.query('CREATE INDEX IF NOT EXISTS idx_sandboxes_state ON sandboxes(state)');
     await this.pool.query('CREATE INDEX IF NOT EXISTS idx_sandboxes_session ON sandboxes(session_id)');
     await this.pool.query('CREATE INDEX IF NOT EXISTS idx_sandboxes_last_used ON sandboxes(last_used_at)');
+
+    // Multi-tenancy migration: add tenant_id columns (idempotent via IF NOT EXISTS)
+    await this.pool.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'default'");
+    await this.pool.query("ALTER TABLE sessions ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'default'");
+    await this.pool.query("ALTER TABLE sandboxes ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'default'");
+
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)');
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)');
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_sandboxes_tenant ON sandboxes(tenant_id)');
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        key_hash TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (now()::TEXT)
+      )
+    `);
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id)');
+    await this.pool.query('CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)');
+
+    // Agent UUID migration: change PK from name to UUID id, add UNIQUE(tenant_id, name), drop FK from sessions
+    const agentCols = await this.pool.query(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'agents' AND column_name = 'id'"
+    );
+    if (agentCols.rows.length === 0) {
+      await this.pool.query("ALTER TABLE agents ADD COLUMN id TEXT");
+      await this.pool.query("UPDATE agents SET id = gen_random_uuid()::TEXT WHERE id IS NULL");
+      await this.pool.query("ALTER TABLE agents ALTER COLUMN id SET NOT NULL");
+      await this.pool.query("ALTER TABLE agents DROP CONSTRAINT agents_pkey");
+      await this.pool.query("ALTER TABLE agents ADD PRIMARY KEY (id)");
+      await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_tenant_name ON agents(tenant_id, name)");
+      try { await this.pool.query("ALTER TABLE sessions DROP CONSTRAINT sessions_agent_name_fkey"); } catch { /* already dropped */ }
+    }
   }
 
   // -- Agents -----------------------------------------------------------------
 
-  async upsertAgent(name: string, path: string): Promise<Agent> {
-    const existing = await this.pool.query('SELECT version FROM agents WHERE name = $1', [name]);
+  async upsertAgent(name: string, path: string, tenantId: string = 'default'): Promise<Agent> {
+    const existing = await this.pool.query('SELECT id, version FROM agents WHERE tenant_id = $1 AND name = $2', [tenantId, name]);
     const version = existing.rows.length > 0 ? existing.rows[0].version + 1 : 1;
+    const id = existing.rows.length > 0 ? existing.rows[0].id : randomUUID();
     const now = new Date().toISOString();
 
     await this.pool.query(`
-      INSERT INTO agents (name, version, path, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT(name) DO UPDATE SET version = $2, path = $3, updated_at = $5
-    `, [name, version, path, now, now]);
+      INSERT INTO agents (id, tenant_id, name, version, path, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT(tenant_id, name) DO UPDATE SET version = $4, path = $5, updated_at = $7
+    `, [id, tenantId, name, version, path, now, now]);
 
-    return { name, version, path, createdAt: now, updatedAt: now };
+    return { id, name, tenantId, version, path, createdAt: now, updatedAt: now };
   }
 
-  async getAgent(name: string): Promise<Agent | null> {
-    const result = await this.pool.query('SELECT * FROM agents WHERE name = $1', [name]);
+  async getAgent(name: string, tenantId: string = 'default'): Promise<Agent | null> {
+    const result = await this.pool.query('SELECT * FROM agents WHERE tenant_id = $1 AND name = $2', [tenantId, name]);
     const row = result.rows[0];
     if (!row) return null;
-    return { name: row.name, version: row.version, path: row.path, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, tenantId: row.tenant_id, version: row.version, path: row.path, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
-  async listAgents(): Promise<Agent[]> {
-    const result = await this.pool.query('SELECT * FROM agents ORDER BY name');
-    return result.rows.map((r) => ({ name: r.name, version: r.version, path: r.path, createdAt: r.created_at, updatedAt: r.updated_at }));
+  async listAgents(tenantId: string = 'default'): Promise<Agent[]> {
+    const result = await this.pool.query('SELECT * FROM agents WHERE tenant_id = $1 ORDER BY name', [tenantId]);
+    return result.rows.map((r) => ({ id: r.id, name: r.name, tenantId: r.tenant_id, version: r.version, path: r.path, createdAt: r.created_at, updatedAt: r.updated_at }));
   }
 
-  async deleteAgent(name: string): Promise<boolean> {
-    await this.pool.query('DELETE FROM sessions WHERE agent_name = $1', [name]);
-    const result = await this.pool.query('DELETE FROM agents WHERE name = $1', [name]);
+  async deleteAgent(name: string, tenantId: string = 'default'): Promise<boolean> {
+    await this.pool.query('DELETE FROM sessions WHERE agent_name = $1 AND tenant_id = $2', [name, tenantId]);
+    const result = await this.pool.query('DELETE FROM agents WHERE name = $1 AND tenant_id = $2', [name, tenantId]);
     return (result.rowCount ?? 0) > 0;
   }
 
   // -- Sessions ---------------------------------------------------------------
 
-  async insertSession(id: string, agentName: string, sandboxId: string): Promise<Session> {
+  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default'): Promise<Session> {
     const now = new Date().toISOString();
     await this.pool.query(`
-      INSERT INTO sessions (id, agent_name, sandbox_id, status, created_at, last_active_at)
-      VALUES ($1, $2, $3, 'starting', $4, $5)
-    `, [id, agentName, sandboxId, now, now]);
+      INSERT INTO sessions (id, tenant_id, agent_name, sandbox_id, status, created_at, last_active_at)
+      VALUES ($1, $2, $3, $4, 'starting', $5, $6)
+    `, [id, tenantId, agentName, sandboxId, now, now]);
 
-    return { id, agentName, sandboxId, status: 'starting', createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName, sandboxId, status: 'starting', createdAt: now, lastActiveAt: now };
   }
 
   async updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
@@ -132,19 +169,19 @@ export class PgDb implements Db {
     const result = await this.pool.query('SELECT * FROM sessions WHERE id = $1', [id]);
     const row = result.rows[0];
     if (!row) return null;
-    return { id: row.id, agentName: row.agent_name, sandboxId: row.sandbox_id, status: row.status, runnerId: row.runner_id ?? null, createdAt: row.created_at, lastActiveAt: row.last_active_at };
+    return { id: row.id, tenantId: row.tenant_id, agentName: row.agent_name, sandboxId: row.sandbox_id, status: row.status, runnerId: row.runner_id ?? null, createdAt: row.created_at, lastActiveAt: row.last_active_at };
   }
 
-  async listSessions(agent?: string): Promise<Session[]> {
+  async listSessions(tenantId: string = 'default', agent?: string): Promise<Session[]> {
     const result = agent
-      ? await this.pool.query('SELECT * FROM sessions WHERE agent_name = $1 ORDER BY created_at DESC', [agent])
-      : await this.pool.query('SELECT * FROM sessions ORDER BY created_at DESC');
-    return result.rows.map((r) => ({ id: r.id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
+      ? await this.pool.query('SELECT * FROM sessions WHERE tenant_id = $1 AND agent_name = $2 ORDER BY created_at DESC', [tenantId, agent])
+      : await this.pool.query('SELECT * FROM sessions WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]);
+    return result.rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
   }
 
   async listSessionsByRunner(runnerId: string): Promise<Session[]> {
     const result = await this.pool.query('SELECT * FROM sessions WHERE runner_id = $1 ORDER BY created_at DESC', [runnerId]);
-    return result.rows.map((r) => ({ id: r.id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
+    return result.rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
   }
 
   async touchSession(id: string): Promise<void> {
@@ -154,12 +191,12 @@ export class PgDb implements Db {
 
   // -- Sandboxes --------------------------------------------------------------
 
-  async insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string): Promise<void> {
+  async insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string, tenantId: string = 'default'): Promise<void> {
     const now = new Date().toISOString();
     await this.pool.query(`
-      INSERT INTO sandboxes (id, agent_name, workspace_dir, session_id, state, created_at, last_used_at)
-      VALUES ($1, $2, $3, $4, 'warming', $5, $6)
-    `, [id, agentName, workspaceDir, sessionId ?? null, now, now]);
+      INSERT INTO sandboxes (id, tenant_id, agent_name, workspace_dir, session_id, state, created_at, last_used_at)
+      VALUES ($1, $2, $3, $4, $5, 'warming', $6, $7)
+    `, [id, tenantId, agentName, workspaceDir, sessionId ?? null, now, now]);
   }
 
   async updateSandboxState(id: string, state: SandboxState): Promise<void> {
@@ -242,6 +279,34 @@ export class PgDb implements Db {
       "UPDATE sandboxes SET state = 'cold' WHERE state != 'cold'"
     );
     return result.rowCount ?? 0;
+  }
+
+  // -- API Keys --------------------------------------------------------------
+
+  async getApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+    const result = await this.pool.query('SELECT * FROM api_keys WHERE key_hash = $1', [keyHash]);
+    const row = result.rows[0];
+    if (!row) return null;
+    return { id: row.id, tenantId: row.tenant_id, keyHash: row.key_hash, label: row.label, createdAt: row.created_at };
+  }
+
+  async insertApiKey(id: string, tenantId: string, keyHash: string, label: string): Promise<ApiKey> {
+    const now = new Date().toISOString();
+    await this.pool.query(`
+      INSERT INTO api_keys (id, tenant_id, key_hash, label, created_at)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [id, tenantId, keyHash, label, now]);
+    return { id, tenantId, keyHash, label, createdAt: now };
+  }
+
+  async listApiKeysByTenant(tenantId: string): Promise<ApiKey[]> {
+    const result = await this.pool.query('SELECT * FROM api_keys WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]);
+    return result.rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, keyHash: r.key_hash, label: r.label, createdAt: r.created_at }));
+  }
+
+  async deleteApiKey(id: string): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM api_keys WHERE id = $1', [id]);
+    return (result.rowCount ?? 0) > 0;
   }
 
   // -- Lifecycle --------------------------------------------------------------

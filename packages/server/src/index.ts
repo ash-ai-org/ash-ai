@@ -95,8 +95,8 @@ await app.register(swagger, {
 await app.register(swaggerUi, { routePrefix: '/docs' });
 registerSchemas(app);
 
-// Auth (enabled when ASH_API_KEY is set, disabled otherwise)
-registerAuth(app, process.env.ASH_API_KEY);
+// Auth: multi-tenant API key resolution with ASH_API_KEY fallback
+registerAuth(app, process.env.ASH_API_KEY, db);
 
 // Routes
 agentRoutes(app, dataDir);

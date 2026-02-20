@@ -48,7 +48,7 @@ describe('API key auth middleware', () => {
         headers: { authorization: `Basic ${API_KEY}` },
       });
       expect(res.statusCode).toBe(401);
-      expect(res.json().error).toBe('Invalid API key');
+      expect(res.json().error).toBe('Invalid Authorization header format');
     });
 
     it('allows requests with correct API key', async () => {

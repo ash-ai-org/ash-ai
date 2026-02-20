@@ -48,8 +48,16 @@ interface StateMetadata {
   persistedAt: string;
 }
 
-function sessionStateDir(dataDir: string, sessionId: string): string {
-  return join(dataDir, SESSIONS_SUBDIR, sessionId);
+/**
+ * Resolve the persisted state directory for a session.
+ * - 'default' tenant (backward compat): dataDir/sessions/{id}/
+ * - Other tenants: dataDir/tenants/{tenantId}/sessions/{id}/
+ */
+function sessionStateDir(dataDir: string, sessionId: string, tenantId: string = 'default'): string {
+  if (tenantId === 'default') {
+    return join(dataDir, SESSIONS_SUBDIR, sessionId);
+  }
+  return join(dataDir, 'tenants', tenantId, SESSIONS_SUBDIR, sessionId);
 }
 
 /**
@@ -62,13 +70,14 @@ export function persistSessionState(
   sessionId: string,
   workspaceDir: string,
   agentName: string,
+  tenantId: string = 'default',
 ): boolean {
   try {
     if (!existsSync(workspaceDir)) {
       return false;
     }
 
-    const destDir = sessionStateDir(dataDir, sessionId);
+    const destDir = sessionStateDir(dataDir, sessionId, tenantId);
     const destWorkspace = join(destDir, WORKSPACE_DIR);
 
     // Remove previous backup, then copy fresh (skipping node_modules, .git, etc.)
@@ -98,9 +107,10 @@ export function restoreSessionState(
   dataDir: string,
   sessionId: string,
   workspaceDir: string,
+  tenantId: string = 'default',
 ): boolean {
   try {
-    const srcDir = sessionStateDir(dataDir, sessionId);
+    const srcDir = sessionStateDir(dataDir, sessionId, tenantId);
     const srcWorkspace = join(srcDir, WORKSPACE_DIR);
 
     if (!existsSync(srcWorkspace)) {
@@ -120,25 +130,25 @@ export function restoreSessionState(
 /**
  * Check if persisted state exists for a session.
  */
-export function hasPersistedState(dataDir: string, sessionId: string): boolean {
-  const srcWorkspace = join(sessionStateDir(dataDir, sessionId), WORKSPACE_DIR);
+export function hasPersistedState(dataDir: string, sessionId: string, tenantId: string = 'default'): boolean {
+  const srcWorkspace = join(sessionStateDir(dataDir, sessionId, tenantId), WORKSPACE_DIR);
   return existsSync(srcWorkspace);
 }
 
 /**
  * Delete persisted state for a session.
  */
-export function deleteSessionState(dataDir: string, sessionId: string): void {
-  const dir = sessionStateDir(dataDir, sessionId);
+export function deleteSessionState(dataDir: string, sessionId: string, tenantId: string = 'default'): void {
+  const dir = sessionStateDir(dataDir, sessionId, tenantId);
   rmSync(dir, { recursive: true, force: true });
 }
 
 /**
  * Read metadata for a persisted session state.
  */
-export function getStateMetadata(dataDir: string, sessionId: string): StateMetadata | null {
+export function getStateMetadata(dataDir: string, sessionId: string, tenantId: string = 'default'): StateMetadata | null {
   try {
-    const metaPath = join(sessionStateDir(dataDir, sessionId), METADATA_FILE);
+    const metaPath = join(sessionStateDir(dataDir, sessionId, tenantId), METADATA_FILE);
     if (!existsSync(metaPath)) return null;
     return JSON.parse(readFileSync(metaPath, 'utf-8')) as StateMetadata;
   } catch {
@@ -153,15 +163,15 @@ export function getStateMetadata(dataDir: string, sessionId: string): StateMetad
  * Returns true on success, false if no store configured or upload fails.
  * Best-effort: logs errors, doesn't throw.
  */
-export async function syncStateToCloud(dataDir: string, sessionId: string): Promise<boolean> {
+export async function syncStateToCloud(dataDir: string, sessionId: string, tenantId: string = 'default'): Promise<boolean> {
   try {
     const store = await getSnapshotStore();
     if (!store) return false;
 
-    const srcDir = join(sessionStateDir(dataDir, sessionId), WORKSPACE_DIR);
+    const srcDir = join(sessionStateDir(dataDir, sessionId, tenantId), WORKSPACE_DIR);
     if (!existsSync(srcDir)) return false;
 
-    const tarPath = join(sessionStateDir(dataDir, sessionId), 'workspace.tar.gz');
+    const tarPath = join(sessionStateDir(dataDir, sessionId, tenantId), 'workspace.tar.gz');
     try {
       execSync(`tar czf ${JSON.stringify(tarPath)} -C ${JSON.stringify(srcDir)} .`, {
         stdio: 'pipe',
@@ -183,12 +193,12 @@ export async function syncStateToCloud(dataDir: string, sessionId: string): Prom
  * Download workspace tarball from cloud storage and extract into the local persist directory.
  * Returns true if state was restored, false if store not configured or key not found.
  */
-export async function restoreStateFromCloud(dataDir: string, sessionId: string): Promise<boolean> {
+export async function restoreStateFromCloud(dataDir: string, sessionId: string, tenantId: string = 'default'): Promise<boolean> {
   try {
     const store = await getSnapshotStore();
     if (!store) return false;
 
-    const stateDir = sessionStateDir(dataDir, sessionId);
+    const stateDir = sessionStateDir(dataDir, sessionId, tenantId);
     const tarPath = join(stateDir, 'workspace.tar.gz');
     const destDir = join(stateDir, WORKSPACE_DIR);
 

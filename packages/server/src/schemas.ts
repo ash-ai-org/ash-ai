@@ -7,13 +7,15 @@ const AgentSchema = {
   $id: 'Agent',
   type: 'object',
   properties: {
+    id: { type: 'string', format: 'uuid' },
     name: { type: 'string' },
+    tenantId: { type: 'string' },
     version: { type: 'integer' },
     path: { type: 'string' },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' },
   },
-  required: ['name', 'version', 'path', 'createdAt', 'updatedAt'],
+  required: ['id', 'name', 'version', 'path', 'createdAt', 'updatedAt'],
 } as const;
 
 const SessionSchema = {
@@ -21,6 +23,7 @@ const SessionSchema = {
   type: 'object',
   properties: {
     id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
     agentName: { type: 'string' },
     sandboxId: { type: 'string' },
     status: { type: 'string', enum: ['starting', 'active', 'paused', 'ended', 'error'] },
