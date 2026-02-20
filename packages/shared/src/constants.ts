@@ -30,8 +30,7 @@ export const SANDBOX_DOCKER_IMAGE = 'node:20-slim';
 
 // Docker lifecycle (ash start/stop)
 export const ASH_CONTAINER_NAME = 'ash-server';
-export const ASH_DOCKER_IMAGE = 'ghcr.io/ash-ai/ash';
-export const ASH_DOCKER_TAG = '0.1.0';
+export const ASH_DOCKER_IMAGE = 'ghcr.io/ash-ai-org/ash';
 export const ASH_DATA_DIR_CONTAINER = '/data';
 export const ASH_AGENTS_SUBDIR = 'agents';
 export const ASH_HEALTH_POLL_INTERVAL_MS = 500;

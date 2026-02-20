@@ -1,4 +1,5 @@
 .PHONY: install build clean test test-integration test-cli test-restore typecheck bench bench-sandbox bench-sandbox-crdb bench-all \
+       link \
        server qa-bot deploy-qa-bot \
        dev dev-no-sandbox kill logs \
        docker-build docker-start docker-stop docker-status docker-logs \
@@ -14,6 +15,10 @@ install:
 
 build:
 	pnpm build
+
+# Build and link the CLI globally so `ash-dev` runs from source
+link: build
+	cd packages/cli && pnpm link --global
 
 clean:
 	pnpm clean
