@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { basename } from 'node:path';
 import { Command } from 'commander';
 import { deployCommand } from './commands/deploy.js';
 import { sessionCommand } from './commands/session.js';
@@ -10,9 +11,11 @@ import { stopCommand } from './commands/stop.js';
 import { statusCommand } from './commands/status.js';
 import { logsCommand } from './commands/logs.js';
 
+export const isDevMode = basename(process.argv[1] ?? '').startsWith('ash-dev');
+
 const program = new Command()
-  .name('ash')
-  .description('Agent orchestration CLI')
+  .name(isDevMode ? 'ash-dev' : 'ash')
+  .description(isDevMode ? 'Agent orchestration CLI (dev mode — uses local Docker build)' : 'Agent orchestration CLI')
   .version('0.1.0');
 
 program.addCommand(startCommand());
