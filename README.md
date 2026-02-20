@@ -2,20 +2,30 @@
   <img src=".github/banner.png" alt="Ash — Vercel for AI agents" width="100%" />
 </p>
 
-<p align="center">
+<h3 align="center">
   Deploy Claude agents as production APIs — with sessions, streaming, sandboxing, and persistence handled for you.
+</h3>
+
+<p align="center">
+  <a href="https://github.com/ash-ai-org/ash-ai/actions/workflows/ci.yml"><img src="https://github.com/ash-ai-org/ash-ai/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://www.npmjs.com/package/@ash-ai/cli"><img src="https://img.shields.io/npm/v/@ash-ai/cli?label=%40ash-ai%2Fcli&color=cb3837" alt="npm @ash-ai/cli" /></a>
+  <a href="https://www.npmjs.com/package/@ash-ai/sdk"><img src="https://img.shields.io/npm/v/@ash-ai/sdk?label=%40ash-ai%2Fsdk&color=cb3837" alt="npm @ash-ai/sdk" /></a>
+  <a href="https://www.npmjs.com/package/@ash-ai/cli"><img src="https://img.shields.io/npm/dm/@ash-ai/cli?label=downloads" alt="npm downloads" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/ash-ai-org/ash-ai" alt="License" /></a>
+  <a href="https://github.com/ash-ai-org/ash-ai/stargazers"><img src="https://img.shields.io/github/stars/ash-ai-org/ash-ai?style=social" alt="GitHub stars" /></a>
 </p>
 
-<!-- TODO: Add demo GIF here (record with VHS or asciinema) -->
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green)](https://nodejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org)
-<!-- [![CI](https://github.com/YOUR_ORG/ash/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_ORG/ash/actions/workflows/ci.yml) -->
-<!-- [![npm](https://img.shields.io/npm/v/@ash-ai/cli)](https://www.npmjs.com/package/@ash-ai/cli) -->
-<!-- [![Discord](https://img.shields.io/discord/DISCORD_ID?label=Discord)](https://discord.gg/INVITE) -->
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="docs/INDEX.md">Docs</a> &middot;
+  <a href="#examples">Examples</a> &middot;
+  <a href="#architecture">Architecture</a> &middot;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
 ---
+
+> **If you find Ash useful, consider giving it a star.** It helps others discover the project.
 
 ## The Problem
 
@@ -221,10 +231,20 @@ Full docs index: [docs/INDEX.md](docs/INDEX.md)
 | [hosted-agent](examples/hosted-agent) | Research agent with skills, MCP tools, and interactive CLI demo |
 | [python-bot](examples/python-bot) | Multi-turn conversation using the Python SDK |
 
+## Star History
+
+<a href="https://star-history.com/#ash-ai-org/ash-ai&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ash-ai-org/ash-ai&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ash-ai-org/ash-ai&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ash-ai-org/ash-ai&type=Date" width="100%" />
+ </picture>
+</a>
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and building from source.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and building from source.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — built by the [Ash](https://github.com/ash-ai-org) team and contributors.

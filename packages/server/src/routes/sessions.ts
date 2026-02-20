@@ -83,7 +83,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
   }, async (req, reply) => {
     const { agent } = req.body as { agent: string };
 
-    const agentRecord = await getAgent(agent);
+    const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
       return reply.status(404).send({ error: `Agent "${agent}" not found`, statusCode: 404 });
     }
@@ -96,7 +96,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       const handle = await backend.createSandbox({
         sessionId,
         agentDir: agentRecord.path,
-        agentName: agent,
+        agentName: agentRecord.name,
         sandboxId: sessionId,
         onOomKill: () => {
           updateSessionStatus(sessionId, 'paused').catch((err) =>
@@ -105,7 +105,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         },
       });
 
-      const session = await insertSession(sessionId, agent, handle.sandboxId);
+      const session = await insertSession(sessionId, agentRecord.name, handle.sandboxId, req.tenantId);
       const effectiveRunnerId = runnerId === '__local__' ? null : runnerId;
       await updateSessionRunner(sessionId, effectiveRunnerId);
       await updateSessionStatus(sessionId, 'active');
@@ -142,7 +142,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     },
   }, async (req, reply) => {
     const { agent } = req.query as { agent?: string };
-    return reply.send({ sessions: await listSessions(agent || undefined) });
+    return reply.send({ sessions: await listSessions(req.tenantId, agent || undefined) });
   });
 
   // Get session
@@ -157,7 +157,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     },
   }, async (req, reply) => {
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
     return reply.send({ session });
@@ -191,7 +191,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     const elapsed = timing ? startTimer() : null;
 
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
     if (session.status !== 'active') {
@@ -293,7 +293,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     },
   }, async (req, reply) => {
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
     if (session.status !== 'active') {
@@ -325,7 +325,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     },
   }, async (req, reply) => {
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
     if (session.status === 'ended') {
@@ -336,7 +336,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     }
 
     // Resumable statuses: 'paused', 'error', 'starting'
-    const agentRecord = await getAgent(session.agentName);
+    const agentRecord = await getAgent(session.agentName, req.tenantId);
     if (!agentRecord) {
       return reply.status(404).send({ error: `Agent "${session.agentName}" not found`, statusCode: 404 });
     }
@@ -358,13 +358,13 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       const workspaceExists = existsSync(oldWorkspaceDir);
 
       if (!workspaceExists) {
-        if (hasPersistedState(dataDir, session.id)) {
-          restoreSessionState(dataDir, session.id, oldWorkspaceDir);
+        if (hasPersistedState(dataDir, session.id, session.tenantId)) {
+          restoreSessionState(dataDir, session.id, oldWorkspaceDir, session.tenantId);
         } else {
           // Fall back to cloud storage
-          const restored = await restoreStateFromCloud(dataDir, session.id);
+          const restored = await restoreStateFromCloud(dataDir, session.id, session.tenantId);
           if (restored) {
-            restoreSessionState(dataDir, session.id, oldWorkspaceDir);
+            restoreSessionState(dataDir, session.id, oldWorkspaceDir, session.tenantId);
           }
         }
       }
@@ -414,7 +414,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     },
   }, async (req, reply) => {
     const session = await getSession(req.params.id);
-    if (!session) {
+    if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
 

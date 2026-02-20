@@ -42,7 +42,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string): void {
       return reply.status(400).send({ error: 'Agent directory must contain CLAUDE.md', statusCode: 400 });
     }
 
-    const agent = await upsertAgent(name, resolvedPath);
+    const agent = await upsertAgent(name, resolvedPath, req.tenantId);
     return reply.status(201).send({ agent });
   });
 
@@ -60,8 +60,8 @@ export function agentRoutes(app: FastifyInstance, dataDir: string): void {
         },
       },
     },
-  }, async (_req, reply) => {
-    const agents = await listAgents();
+  }, async (req, reply) => {
+    const agents = await listAgents(req.tenantId);
     return reply.send({ agents });
   });
 
@@ -80,7 +80,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string): void {
       },
     },
   }, async (req, reply) => {
-    const agent = await getAgent(req.params.name);
+    const agent = await getAgent(req.params.name, req.tenantId);
     if (!agent) {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
@@ -102,7 +102,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string): void {
       },
     },
   }, async (req, reply) => {
-    const deleted = await deleteAgent(req.params.name);
+    const deleted = await deleteAgent(req.params.name, req.tenantId);
     if (!deleted) {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }

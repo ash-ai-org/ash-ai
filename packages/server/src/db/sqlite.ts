@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState } from '@ash-ai/shared';
+import { randomUUID } from 'node:crypto';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 export class SqliteDb implements Db {
@@ -47,51 +48,133 @@ export class SqliteDb implements Db {
       CREATE INDEX IF NOT EXISTS idx_sandboxes_session ON sandboxes(session_id);
       CREATE INDEX IF NOT EXISTS idx_sandboxes_last_used ON sandboxes(last_used_at);
     `);
+
+    // Multi-tenancy migration: add tenant_id columns (idempotent via try/catch since SQLite lacks IF NOT EXISTS for columns)
+    const migrations = [
+      "ALTER TABLE agents ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'",
+      "ALTER TABLE sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'",
+      "ALTER TABLE sandboxes ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'",
+    ];
+    for (const sql of migrations) {
+      try { this.db.exec(sql); } catch { /* column already exists */ }
+    }
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_sandboxes_tenant ON sandboxes(tenant_id);
+
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        key_hash TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+    `);
+
+    // Agent UUID migration: change PK from name to UUID id, add UNIQUE(tenant_id, name), drop FK from sessions
+    const agentCols = this.db.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
+    const needsAgentIdMigration = !agentCols.some((c) => c.name === 'id');
+    if (needsAgentIdMigration) {
+      this.db.pragma('foreign_keys = OFF');
+      this.db.transaction(() => {
+        this.db.exec(`
+          CREATE TABLE agents_new (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL DEFAULT 'default',
+            name TEXT NOT NULL,
+            version INTEGER NOT NULL DEFAULT 1,
+            path TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(tenant_id, name)
+          )
+        `);
+
+        const oldRows = this.db.prepare('SELECT * FROM agents').all() as any[];
+        const insert = this.db.prepare(
+          'INSERT INTO agents_new (id, tenant_id, name, version, path, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        for (const row of oldRows) {
+          insert.run(randomUUID(), row.tenant_id, row.name, row.version, row.path, row.created_at, row.updated_at);
+        }
+
+        this.db.exec('DROP TABLE agents');
+        this.db.exec('ALTER TABLE agents_new RENAME TO agents');
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_agents_tenant ON agents(tenant_id)');
+
+        // Recreate sessions without FK to agents(name)
+        this.db.exec(`
+          CREATE TABLE sessions_new (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL DEFAULT 'default',
+            agent_name TEXT NOT NULL,
+            sandbox_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'starting',
+            runner_id TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            last_active_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `);
+        this.db.exec(`
+          INSERT INTO sessions_new (id, tenant_id, agent_name, sandbox_id, status, runner_id, created_at, last_active_at)
+          SELECT id, tenant_id, agent_name, sandbox_id, status, runner_id, created_at, last_active_at FROM sessions
+        `);
+        this.db.exec('DROP TABLE sessions');
+        this.db.exec('ALTER TABLE sessions_new RENAME TO sessions');
+        this.db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id)');
+      })();
+      this.db.pragma('foreign_keys = ON');
+    }
   }
 
   // -- Agents -----------------------------------------------------------------
 
-  async upsertAgent(name: string, path: string): Promise<Agent> {
-    const existing = this.db.prepare('SELECT version FROM agents WHERE name = ?').get(name) as { version: number } | undefined;
+  async upsertAgent(name: string, path: string, tenantId: string = 'default'): Promise<Agent> {
+    const existing = this.db.prepare('SELECT id, version FROM agents WHERE tenant_id = ? AND name = ?').get(tenantId, name) as { id: string; version: number } | undefined;
     const version = existing ? existing.version + 1 : 1;
+    const id = existing?.id ?? randomUUID();
     const now = new Date().toISOString();
 
     this.db.prepare(`
-      INSERT INTO agents (name, version, path, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(name) DO UPDATE SET version = ?, path = ?, updated_at = ?
-    `).run(name, version, path, now, now, version, path, now);
+      INSERT INTO agents (id, tenant_id, name, version, path, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tenant_id, name) DO UPDATE SET version = ?, path = ?, updated_at = ?
+    `).run(id, tenantId, name, version, path, now, now, version, path, now);
 
-    return { name, version, path, createdAt: now, updatedAt: now };
+    return { id, name, tenantId, version, path, createdAt: now, updatedAt: now };
   }
 
-  async getAgent(name: string): Promise<Agent | null> {
-    const row = this.db.prepare('SELECT * FROM agents WHERE name = ?').get(name) as any;
+  async getAgent(name: string, tenantId: string = 'default'): Promise<Agent | null> {
+    const row = this.db.prepare('SELECT * FROM agents WHERE tenant_id = ? AND name = ?').get(tenantId, name) as any;
     if (!row) return null;
-    return { name: row.name, version: row.version, path: row.path, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { id: row.id, name: row.name, tenantId: row.tenant_id, version: row.version, path: row.path, createdAt: row.created_at, updatedAt: row.updated_at };
   }
 
-  async listAgents(): Promise<Agent[]> {
-    const rows = this.db.prepare('SELECT * FROM agents ORDER BY name').all() as any[];
-    return rows.map((r) => ({ name: r.name, version: r.version, path: r.path, createdAt: r.created_at, updatedAt: r.updated_at }));
+  async listAgents(tenantId: string = 'default'): Promise<Agent[]> {
+    const rows = this.db.prepare('SELECT * FROM agents WHERE tenant_id = ? ORDER BY name').all(tenantId) as any[];
+    return rows.map((r) => ({ id: r.id, name: r.name, tenantId: r.tenant_id, version: r.version, path: r.path, createdAt: r.created_at, updatedAt: r.updated_at }));
   }
 
-  async deleteAgent(name: string): Promise<boolean> {
-    this.db.prepare('DELETE FROM sessions WHERE agent_name = ?').run(name);
-    const result = this.db.prepare('DELETE FROM agents WHERE name = ?').run(name);
+  async deleteAgent(name: string, tenantId: string = 'default'): Promise<boolean> {
+    this.db.prepare('DELETE FROM sessions WHERE agent_name = ? AND tenant_id = ?').run(name, tenantId);
+    const result = this.db.prepare('DELETE FROM agents WHERE name = ? AND tenant_id = ?').run(name, tenantId);
     return result.changes > 0;
   }
 
   // -- Sessions ---------------------------------------------------------------
 
-  async insertSession(id: string, agentName: string, sandboxId: string): Promise<Session> {
+  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default'): Promise<Session> {
     const now = new Date().toISOString();
     this.db.prepare(`
-      INSERT INTO sessions (id, agent_name, sandbox_id, status, created_at, last_active_at)
-      VALUES (?, ?, ?, 'starting', ?, ?)
-    `).run(id, agentName, sandboxId, now, now);
+      INSERT INTO sessions (id, tenant_id, agent_name, sandbox_id, status, created_at, last_active_at)
+      VALUES (?, ?, ?, ?, 'starting', ?, ?)
+    `).run(id, tenantId, agentName, sandboxId, now, now);
 
-    return { id, agentName, sandboxId, status: 'starting', createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName, sandboxId, status: 'starting', createdAt: now, lastActiveAt: now };
   }
 
   async updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
@@ -112,19 +195,19 @@ export class SqliteDb implements Db {
   async getSession(id: string): Promise<Session | null> {
     const row = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as any;
     if (!row) return null;
-    return { id: row.id, agentName: row.agent_name, sandboxId: row.sandbox_id, status: row.status, runnerId: row.runner_id ?? null, createdAt: row.created_at, lastActiveAt: row.last_active_at };
+    return { id: row.id, tenantId: row.tenant_id, agentName: row.agent_name, sandboxId: row.sandbox_id, status: row.status, runnerId: row.runner_id ?? null, createdAt: row.created_at, lastActiveAt: row.last_active_at };
   }
 
-  async listSessions(agent?: string): Promise<Session[]> {
+  async listSessions(tenantId: string = 'default', agent?: string): Promise<Session[]> {
     const rows = agent
-      ? this.db.prepare('SELECT * FROM sessions WHERE agent_name = ? ORDER BY created_at DESC').all(agent) as any[]
-      : this.db.prepare('SELECT * FROM sessions ORDER BY created_at DESC').all() as any[];
-    return rows.map((r) => ({ id: r.id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
+      ? this.db.prepare('SELECT * FROM sessions WHERE tenant_id = ? AND agent_name = ? ORDER BY created_at DESC').all(tenantId, agent) as any[]
+      : this.db.prepare('SELECT * FROM sessions WHERE tenant_id = ? ORDER BY created_at DESC').all(tenantId) as any[];
+    return rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
   }
 
   async listSessionsByRunner(runnerId: string): Promise<Session[]> {
     const rows = this.db.prepare('SELECT * FROM sessions WHERE runner_id = ? ORDER BY created_at DESC').all(runnerId) as any[];
-    return rows.map((r) => ({ id: r.id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
+    return rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, agentName: r.agent_name, sandboxId: r.sandbox_id, status: r.status, runnerId: r.runner_id ?? null, createdAt: r.created_at, lastActiveAt: r.last_active_at }));
   }
 
   async touchSession(id: string): Promise<void> {
@@ -134,12 +217,12 @@ export class SqliteDb implements Db {
 
   // -- Sandboxes --------------------------------------------------------------
 
-  async insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string): Promise<void> {
+  async insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string, tenantId: string = 'default'): Promise<void> {
     const now = new Date().toISOString();
     this.db.prepare(`
-      INSERT INTO sandboxes (id, agent_name, workspace_dir, session_id, state, created_at, last_used_at)
-      VALUES (?, ?, ?, ?, 'warming', ?, ?)
-    `).run(id, agentName, workspaceDir, sessionId ?? null, now, now);
+      INSERT INTO sandboxes (id, tenant_id, agent_name, workspace_dir, session_id, state, created_at, last_used_at)
+      VALUES (?, ?, ?, ?, ?, 'warming', ?, ?)
+    `).run(id, tenantId, agentName, workspaceDir, sessionId ?? null, now, now);
   }
 
   async updateSandboxState(id: string, state: SandboxState): Promise<void> {
@@ -219,6 +302,33 @@ export class SqliteDb implements Db {
       "UPDATE sandboxes SET state = 'cold' WHERE state != 'cold'"
     ).run();
     return result.changes;
+  }
+
+  // -- API Keys --------------------------------------------------------------
+
+  async getApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+    const row = this.db.prepare('SELECT * FROM api_keys WHERE key_hash = ?').get(keyHash) as any;
+    if (!row) return null;
+    return { id: row.id, tenantId: row.tenant_id, keyHash: row.key_hash, label: row.label, createdAt: row.created_at };
+  }
+
+  async insertApiKey(id: string, tenantId: string, keyHash: string, label: string): Promise<ApiKey> {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO api_keys (id, tenant_id, key_hash, label, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, tenantId, keyHash, label, now);
+    return { id, tenantId, keyHash, label, createdAt: now };
+  }
+
+  async listApiKeysByTenant(tenantId: string): Promise<ApiKey[]> {
+    const rows = this.db.prepare('SELECT * FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC').all(tenantId) as any[];
+    return rows.map((r) => ({ id: r.id, tenantId: r.tenant_id, keyHash: r.key_hash, label: r.label, createdAt: r.created_at }));
+  }
+
+  async deleteApiKey(id: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM api_keys WHERE id = ?').run(id);
+    return result.changes > 0;
   }
 
   // -- Lifecycle --------------------------------------------------------------

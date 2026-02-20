@@ -1,6 +1,6 @@
 {
   "name": "@ash-ai/server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -25,7 +25,8 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
-    "openapi": "tsx scripts/export-openapi.ts"
+    "openapi": "tsx scripts/export-openapi.ts",
+    "dump-schema": "tsx scripts/dump-schema.ts"
   },
   "dependencies": {
     "@ash-ai/sandbox": "workspace:*",
