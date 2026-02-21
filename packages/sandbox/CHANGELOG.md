@@ -1,5 +1,20 @@
 # @ash-ai/sandbox
 
+## 0.0.4 - 2026-02-21
+
+### Added
+
+- Workspace bundle support: create and extract agent workspace snapshots
+- Bundle size limits (100MB) and path traversal protection
+
+### Fixed
+
+- Queue processor and workspace bundle edge cases
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.4
+
 ## 0.0.3 - 2026-02-20
 
 ### Changed

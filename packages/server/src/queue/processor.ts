@@ -1,5 +1,5 @@
 import type { QueueItem } from '@ash-ai/shared';
-import { getNextPendingQueueItem, updateQueueItemStatus, incrementQueueItemRetry, getQueueItem } from '../db/index.js';
+import { getNextPendingQueueItem, claimQueueItem, updateQueueItemStatus, incrementQueueItemRetry, getQueueItem } from '../db/index.js';
 
 export interface QueueProcessorConfig {
   /** Milliseconds between poll cycles (default: 1000). */
@@ -28,9 +28,11 @@ export interface QueueProcessorCallbacks {
  * via a user-supplied callback. It handles retries with exponential backoff
  * and lifecycle status transitions (pending → processing → completed/failed).
  *
- * Design notes (Jeff Dean review):
- * - Single-row SELECT … ORDER BY priority DESC, created_at ASC with LIMIT 1
- *   acts as a distributed-safe dequeue when combined with optimistic status CAS.
+ * Design notes:
+ * - Atomic claim: SELECT candidate, then UPDATE ... WHERE status='pending'
+ *   with affected-row check. If another processor claimed it first, we skip.
+ * - Backoff via retryAfter timestamp on the DB row. Items with a future
+ *   retryAfter are invisible to getNextPendingQueueItem until the time passes.
  * - Backoff is capped at 5 minutes to prevent unbounded delays.
  * - The processor is intentionally single-threaded per instance — horizontal
  *   scaling is achieved by running multiple server instances (DB serializes).
@@ -38,6 +40,7 @@ export interface QueueProcessorCallbacks {
 export class QueueProcessor {
   private timer: ReturnType<typeof setInterval> | null = null;
   private processing = false;
+  private stopped = false;
 
   private readonly pollIntervalMs: number;
   private readonly maxRetries: number;
@@ -56,12 +59,14 @@ export class QueueProcessor {
 
   start(): void {
     if (this.timer) return;
+    this.stopped = false;
     this.timer = setInterval(() => this.poll(), this.pollIntervalMs);
     // Immediately attempt a poll on start
     this.poll();
   }
 
   stop(): void {
+    this.stopped = true;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
@@ -73,39 +78,41 @@ export class QueueProcessor {
   }
 
   private async poll(): Promise<void> {
-    // Guard against overlapping polls
-    if (this.processing) return;
+    // Guard against overlapping polls and post-stop execution
+    if (this.processing || this.stopped) return;
     this.processing = true;
 
     try {
       const item = await getNextPendingQueueItem(this.tenantId);
       if (!item) return;
 
-      // Mark processing — this is our claim on the item
-      await updateQueueItemStatus(item.id, 'processing');
+      // Atomic claim: only one processor can transition pending → processing
+      const claimed = await claimQueueItem(item.id);
+      if (!claimed) return; // Another processor got it first
 
       try {
         await this.callbacks.process(item);
         await updateQueueItemStatus(item.id, 'completed');
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        await incrementQueueItemRetry(item.id);
 
         // Re-read to get the updated retryCount
         const updated = await getQueueItem(item.id);
-        const retryCount = updated?.retryCount ?? item.retryCount + 1;
+        const retryCount = (updated?.retryCount ?? item.retryCount) + 1;
         const maxRetries = item.maxRetries ?? this.maxRetries;
 
         if (retryCount >= maxRetries) {
-          // Permanently failed
+          // Permanently failed — increment retry count and mark failed
+          await incrementQueueItemRetry(item.id);
           await updateQueueItemStatus(item.id, 'failed', errorMsg);
           this.callbacks.onFailed?.(item, errorMsg);
         } else {
-          // Return to pending for retry — processor will pick it up after backoff
+          // Compute backoff delay and set retryAfter timestamp on the DB row
+          const delay = Math.min(this.retryDelayMs * Math.pow(2, retryCount - 1), 5 * 60 * 1000);
+          const retryAfter = new Date(Date.now() + delay).toISOString();
+          await incrementQueueItemRetry(item.id, retryAfter);
+          // Return to pending — it won't be picked up until retryAfter has passed
           await updateQueueItemStatus(item.id, 'pending', errorMsg);
-          // Schedule backoff: delay before the item becomes eligible again
-          const delay = Math.min(this.retryDelayMs * Math.pow(2, retryCount), 5 * 60 * 1000);
-          setTimeout(() => this.poll(), delay);
         }
       }
     } catch (err) {

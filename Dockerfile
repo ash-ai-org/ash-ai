@@ -23,6 +23,7 @@ COPY packages/bridge/package.json packages/bridge/tsconfig.json packages/bridge/
 COPY packages/sandbox/package.json packages/sandbox/tsconfig.json packages/sandbox/
 COPY packages/server/package.json packages/server/tsconfig.json packages/server/
 COPY packages/cli/package.json packages/cli/tsconfig.json packages/cli/
+COPY packages/runner/package.json packages/runner/tsconfig.json packages/runner/
 COPY packages/sdk/package.json packages/sdk/tsconfig.json packages/sdk/
 
 # Install dependencies (cached unless package.json or lockfile changes)
@@ -33,7 +34,9 @@ COPY packages/shared/src/ packages/shared/src/
 COPY packages/bridge/src/ packages/bridge/src/
 COPY packages/sandbox/src/ packages/sandbox/src/
 COPY packages/server/src/ packages/server/src/
+COPY packages/server/drizzle/ packages/server/drizzle/
 COPY packages/cli/src/ packages/cli/src/
+COPY packages/runner/src/ packages/runner/src/
 COPY packages/sdk/src/ packages/sdk/src/
 
 # Build

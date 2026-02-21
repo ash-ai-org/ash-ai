@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync, readFileSync, unlinkSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, relative, dirname } from 'node:path';
+import { join, relative, dirname, resolve, normalize } from 'node:path';
 import type { FileStore, FileMetadata } from './file-store.js';
 
 /**
@@ -7,14 +7,21 @@ import type { FileStore, FileMetadata } from './file-store.js';
  * Stores files under a root directory using the key as the relative path.
  */
 export class LocalFileStore implements FileStore {
+  private normalizedRoot: string;
+
   constructor(private rootDir: string) {
     mkdirSync(rootDir, { recursive: true });
+    // Ensure the root ends with a separator for safe prefix comparison
+    this.normalizedRoot = resolve(rootDir) + '/';
   }
 
   private resolve(key: string): string {
-    // Prevent path traversal
-    const resolved = join(this.rootDir, key);
-    if (!resolved.startsWith(this.rootDir)) {
+    if (!key || key.includes('\0')) {
+      throw new Error('Invalid key: empty or contains null bytes');
+    }
+    // Resolve to absolute path and check it stays under the root
+    const resolved = resolve(join(this.rootDir, key));
+    if (!resolved.startsWith(this.normalizedRoot)) {
       throw new Error('Invalid key: path traversal detected');
     }
     return resolved;

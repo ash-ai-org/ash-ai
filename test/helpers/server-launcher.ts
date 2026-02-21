@@ -172,8 +172,10 @@ export async function launchServer(opts: {
   port: number;
   testRoot: string;
   extraEnv?: Record<string, string>;
+  /** Force direct mode (no Docker). Use for coordinator-only servers that don't need cgroups/bwrap. */
+  forceDirect?: boolean;
 }): Promise<ServerHandle> {
-  if (shouldUseDocker()) {
+  if (!opts.forceDirect && shouldUseDocker()) {
     return launchInDocker(opts.port, opts.testRoot, opts.extraEnv);
   }
   return launchDirect(opts.port, opts.testRoot, opts.extraEnv);

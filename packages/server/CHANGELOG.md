@@ -1,5 +1,31 @@
 # @ash-ai/server
 
+## 0.0.4 - 2026-02-21
+
+### Added
+
+- Credential management: encrypted agent secrets with CRUD API
+- Queue system: task queue with atomic claim, retry with exponential backoff
+- Attachment system: file upload/download with sanitized filenames and RFC 5987 headers
+- Usage tracking: per-session token and cost tracking with time-range filters
+- Workspace bundles: snapshot and restore agent workspaces
+- Structured message support for rich content types
+- Multi-coordinator support for distributed server coordination
+- Drizzle ORM migration from raw SQL (#10)
+- Multi-runner integration tests and benchmarks
+
+### Fixed
+
+- Queue item claim race condition (atomic UPDATE WHERE)
+- Usage extractor content path resolution
+- Usage message double-counting (only record on `result` type)
+- Coordinator hot path optimization for multi-runner
+
+### Changed
+
+- Database layer migrated to Drizzle ORM with generated migrations
+- Updated dependencies: @ash-ai/shared@0.0.4, @ash-ai/sandbox@0.0.4
+
 ## 0.0.3 - 2026-02-20
 
 ### Added

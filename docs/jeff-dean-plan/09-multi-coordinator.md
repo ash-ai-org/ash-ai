@@ -109,13 +109,14 @@ No session migration needed. The runner is still running the sandbox. Only the S
 
 | File | What |
 |------|------|
-| `packages/server/src/runner/coordinator.ts` | DB-backed `RunnerCoordinator` |
+| `packages/server/src/runner/coordinator.ts` | DB-backed `RunnerCoordinator` with bulk ops, sweep jitter, stale cache cleanup |
 | `packages/server/src/db/schema.sqlite.ts` | `runners` table (SQLite) |
 | `packages/server/src/db/schema.pg.ts` | `runners` table (Postgres/CRDB) |
-| `packages/server/src/db/drizzle-db.ts` | Runner CRUD methods |
-| `packages/server/src/routes/runners.ts` | Registration/heartbeat/list endpoints |
+| `packages/server/src/db/drizzle-db.ts` | Runner CRUD + `bulkPauseSessionsByRunner` + `listDeadRunners` |
+| `packages/server/src/routes/runners.ts` | Registration/heartbeat/deregister/list endpoints with shared secret auth |
 | `packages/server/src/routes/sessions.ts` | All routes use `getBackendForRunnerAsync()` |
-| `packages/server/src/__tests__/coordinator.test.ts` | 11 tests including multi-coordinator consistency |
+| `packages/server/src/routes/health.ts` | Health endpoint with coordinator ID for debugging |
+| `packages/server/src/__tests__/coordinator.test.ts` | 13 tests: registration, heartbeat, selection, deregistration, bulk pause, multi-coordinator consistency |
 
 ## Load Balancer Configuration
 
@@ -163,6 +164,31 @@ Per coordinator (c5.xlarge, 4 vCPU, 8GB RAM):
 | CRDB queries/sec | ~1,000 | Mostly reads, well within single-node CRDB |
 
 Three coordinators behind a load balancer handles ~30,000 concurrent SSE streams. You'll run out of runner capacity long before coordinator capacity.
+
+## Operational Improvements
+
+These were added after the initial implementation to handle real-world failure modes:
+
+### Graceful Deregistration
+Runners call `POST /api/internal/runners/deregister` during shutdown. Sessions are paused immediately instead of waiting 30s for the liveness sweep.
+
+### Bulk Session Pause
+Dead runner handling uses `UPDATE sessions SET status='paused' WHERE runner_id=? AND status IN ('active','starting')` — one query instead of N+1. At 100 sessions per runner, this is 100x fewer DB round-trips.
+
+### Sweep Jitter
+Each coordinator adds 0-5s random jitter to its liveness sweep interval. With 10 coordinators, this prevents 10 identical queries hitting the DB at the same instant every 30 seconds.
+
+### Single-Query Dead Runner Detection
+`checkLiveness` queries `WHERE last_heartbeat_at <= cutoff` directly instead of listing ALL runners and filtering in JS. This is O(dead) not O(total).
+
+### Stale Cache Cleanup
+After processing dead runners, each coordinator purges its local `backends` Map of entries for runners that another coordinator removed. Prevents unbounded memory growth during runner churn.
+
+### Internal Endpoint Auth
+When `ASH_INTERNAL_SECRET` is set, all `/api/internal/*` endpoints require `Authorization: Bearer <secret>`. Prevents unauthorized runner registration in multi-machine deployments.
+
+### Coordinator Identity
+Each coordinator reports its ID (`hostname-PID`) in the health endpoint and startup log. Essential for debugging which coordinator handled a request when running behind a load balancer.
 
 ## Non-Goals
 

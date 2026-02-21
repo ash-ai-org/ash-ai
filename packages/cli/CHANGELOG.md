@@ -1,5 +1,16 @@
 # @ash-ai/cli
 
+## 0.0.4 - 2026-02-21
+
+### Fixed
+
+- CLI login flow fixes
+- Drizzle ORM compatibility updates (#10)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.4
+
 ## 0.0.3 - 2026-02-20
 
 ### Added

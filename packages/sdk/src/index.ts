@@ -1,16 +1,33 @@
 export { AshClient } from './client.js';
-export type { SendMessageOptions } from './client.js';
+export type { AshClientOptions, SendMessageOptions } from './client.js';
 export { parseSSEStream } from './sse.js';
 export { extractTextFromEvent, extractStreamDelta, extractDisplayItems } from '@ash-ai/shared';
 export type {
   Agent,
   Session,
   SessionStatus,
+  Message,
+  SessionEvent,
+  SessionEventType,
+  Credential,
+  Attachment,
+  QueueItem,
+  QueueItemStatus,
+  QueueStats,
+  UsageEvent,
+  UsageEventType,
+  UsageStats,
   CreateSessionRequest,
   SendMessageRequest,
   DeployAgentRequest,
   ListAgentsResponse,
   ListSessionsResponse,
+  ListMessagesResponse,
+  ListSessionEventsResponse,
+  ListCredentialsResponse,
+  ListAttachmentsResponse,
+  ListUsageResponse,
+  ListQueueResponse,
   HealthResponse,
   ApiError,
   AshSSEEventType,

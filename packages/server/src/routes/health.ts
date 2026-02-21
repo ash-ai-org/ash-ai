@@ -1,3 +1,4 @@
+import { hostname } from 'node:os';
 import type { FastifyInstance } from 'fastify';
 import type { SandboxPool } from '@ash-ai/sandbox';
 import type { PoolStats } from '@ash-ai/shared';
@@ -5,6 +6,9 @@ import type { RunnerCoordinator } from '../runner/coordinator.js';
 import { listSessions } from '../db/index.js';
 
 const startTime = Date.now();
+/** Unique coordinator ID: hostname + PID. Useful for identifying which coordinator
+ *  handles which requests in multi-coordinator deployments. */
+const coordinatorId = `${hostname()}-${process.pid}`;
 
 const EMPTY_POOL: PoolStats = {
   total: 0, cold: 0, warming: 0, warm: 0, waiting: 0, running: 0,
@@ -12,6 +16,8 @@ const EMPTY_POOL: PoolStats = {
 };
 
 export function healthRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, localPool: SandboxPool | null): void {
+  console.log(`[coordinator] Starting with ID: ${coordinatorId}`);
+
   app.get('/health', {
     schema: {
       tags: ['health'],
@@ -22,11 +28,14 @@ export function healthRoutes(app: FastifyInstance, coordinator: RunnerCoordinato
   }, async (_req, reply) => {
     const sessions = (await listSessions()).filter((s) => s.status === 'active');
     const poolStats = localPool ? await localPool.statsAsync() : EMPTY_POOL;
+    const runners = await coordinator.getRunnerInfoFromDb();
 
     return reply.send({
       status: 'ok',
+      coordinatorId,
       activeSessions: sessions.length,
       activeSandboxes: localPool?.activeCount ?? 0,
+      remoteRunners: runners.length,
       uptime: Math.floor((Date.now() - startTime) / 1000),
       pool: poolStats,
     });
@@ -43,7 +52,7 @@ export function healthRoutes(app: FastifyInstance, coordinator: RunnerCoordinato
     const lines = [
       '# HELP ash_up Whether the Ash server is up (always 1 if reachable).',
       '# TYPE ash_up gauge',
-      'ash_up 1',
+      `ash_up{coordinator="${coordinatorId}"} 1`,
       '',
       '# HELP ash_uptime_seconds Seconds since server start.',
       '# TYPE ash_uptime_seconds gauge',

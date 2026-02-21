@@ -73,13 +73,30 @@ export class DrizzleDb implements Db {
     }));
   }
 
-  async selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
+  async listDeadRunners(cutoffIso: string): Promise<RunnerRecord[]> {
     const { runners } = this.schema;
     const rows = await this.drizzle
       .select()
       .from(runners)
-      .where(gt(runners.lastHeartbeatAt, cutoffIso))
-      .orderBy(desc(sql`${runners.maxSandboxes} - ${runners.activeCount} - ${runners.warmingCount}`))
+      .where(sql`${runners.lastHeartbeatAt} <= ${cutoffIso}`);
+    return rows.map((r: any) => ({
+      id: r.id, host: r.host, port: r.port, maxSandboxes: r.maxSandboxes,
+      activeCount: r.activeCount, warmingCount: r.warmingCount,
+      lastHeartbeatAt: r.lastHeartbeatAt, registeredAt: r.registeredAt,
+    }));
+  }
+
+  async selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
+    const { runners } = this.schema;
+    const available = sql`${runners.maxSandboxes} - ${runners.activeCount} - ${runners.warmingCount}`;
+    const rows = await this.drizzle
+      .select()
+      .from(runners)
+      .where(and(
+        gt(runners.lastHeartbeatAt, cutoffIso),
+        gt(available, 0),  // Only runners with spare capacity
+      ))
+      .orderBy(desc(available))
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0];
@@ -284,6 +301,19 @@ export class DrizzleDb implements Db {
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
       status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
+  }
+
+  async bulkPauseSessionsByRunner(runnerId: string): Promise<number> {
+    const { sessions } = this.schema;
+    const now = new Date().toISOString();
+    const result = await this.drizzle
+      .update(sessions)
+      .set({ status: 'paused', lastActiveAt: now })
+      .where(and(
+        eq(sessions.runnerId, runnerId),
+        inArray(sessions.status, ['active', 'starting']),
+      ));
+    return result.changes ?? result.rowCount ?? 0;
   }
 
   async touchSession(id: string): Promise<void> {
@@ -677,11 +707,30 @@ export class DrizzleDb implements Db {
 
   async getNextPendingQueueItem(tenantId?: string): Promise<QueueItem | null> {
     const { queueItems } = this.schema;
-    const conditions = [eq(queueItems.status, 'pending')];
+    const now = new Date().toISOString();
+    const conditions: any[] = [
+      eq(queueItems.status, 'pending'),
+      // Only return items that are eligible (no retryAfter or retryAfter has passed)
+      sql`(${queueItems.retryAfter} IS NULL OR ${queueItems.retryAfter} <= ${now})`,
+    ];
     if (tenantId) conditions.push(eq(queueItems.tenantId, tenantId));
     const rows = await this.drizzle.select().from(queueItems).where(and(...conditions)).orderBy(desc(queueItems.priority), asc(queueItems.createdAt)).limit(1);
     if (rows.length === 0) return null;
     return rows[0] as QueueItem;
+  }
+
+  /**
+   * Atomically claim a queue item by setting status to 'processing'
+   * only if it is still 'pending'. Returns true if the claim succeeded.
+   */
+  async claimQueueItem(id: string): Promise<boolean> {
+    const { queueItems } = this.schema;
+    const now = new Date().toISOString();
+    const result = await this.drizzle
+      .update(queueItems)
+      .set({ status: 'processing', startedAt: now })
+      .where(and(eq(queueItems.id, id), eq(queueItems.status, 'pending')));
+    return (result.changes ?? result.rowCount ?? 0) > 0;
   }
 
   async updateQueueItemStatus(id: string, status: QueueItemStatus, error?: string): Promise<void> {
@@ -694,11 +743,13 @@ export class DrizzleDb implements Db {
     await this.drizzle.update(queueItems).set(set).where(eq(queueItems.id, id));
   }
 
-  async incrementQueueItemRetry(id: string): Promise<void> {
+  async incrementQueueItemRetry(id: string, retryAfter?: string): Promise<void> {
     const { queueItems } = this.schema;
+    const set: Record<string, unknown> = { retryCount: sql`${queueItems.retryCount} + 1` };
+    if (retryAfter) set.retryAfter = retryAfter;
     await this.drizzle
       .update(queueItems)
-      .set({ retryCount: sql`${queueItems.retryCount} + 1` })
+      .set(set)
       .where(eq(queueItems.id, id));
   }
 
@@ -718,7 +769,7 @@ export class DrizzleDb implements Db {
       .where(eq(queueItems.tenantId, tenantId))
       .groupBy(queueItems.status);
 
-    const stats: QueueStats = { pending: 0, processing: 0, completed: 0, failed: 0 };
+    const stats: QueueStats = { pending: 0, processing: 0, completed: 0, failed: 0, cancelled: 0 };
     for (const r of rows) {
       const s = r.status as keyof QueueStats;
       if (s in stats) stats[s] = Number(r.count);
@@ -762,7 +813,7 @@ export class DrizzleDb implements Db {
   async deleteAttachment(id: string): Promise<boolean> {
     const { attachments } = this.schema;
     const result = await this.drizzle.delete(attachments).where(eq(attachments.id, id));
-    return (result?.rowsAffected ?? result?.changes ?? 1) > 0;
+    return (result?.rowsAffected ?? result?.changes ?? 0) > 0;
   }
 
   // -- Usage ------------------------------------------------------------------
@@ -782,21 +833,25 @@ export class DrizzleDb implements Db {
     await this.drizzle.insert(usageEvents).values(events.map(e => ({ ...e, createdAt: now })));
   }
 
-  async listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]> {
+  async listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number }): Promise<UsageEvent[]> {
     const { usageEvents } = this.schema;
-    const conditions = [eq(usageEvents.tenantId, tenantId)];
+    const conditions: any[] = [eq(usageEvents.tenantId, tenantId)];
     if (opts?.sessionId) conditions.push(eq(usageEvents.sessionId, opts.sessionId));
     if (opts?.agentName) conditions.push(eq(usageEvents.agentName, opts.agentName));
+    if (opts?.after) conditions.push(sql`${usageEvents.createdAt} >= ${opts.after}`);
+    if (opts?.before) conditions.push(sql`${usageEvents.createdAt} <= ${opts.before}`);
     const limit = opts?.limit ?? 100;
     const rows = await this.drizzle.select().from(usageEvents).where(and(...conditions)).orderBy(desc(usageEvents.createdAt)).limit(limit);
     return rows as UsageEvent[];
   }
 
-  async getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats> {
+  async getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats> {
     const { usageEvents } = this.schema;
-    const conditions = [eq(usageEvents.tenantId, tenantId)];
+    const conditions: any[] = [eq(usageEvents.tenantId, tenantId)];
     if (opts?.sessionId) conditions.push(eq(usageEvents.sessionId, opts.sessionId));
     if (opts?.agentName) conditions.push(eq(usageEvents.agentName, opts.agentName));
+    if (opts?.after) conditions.push(sql`${usageEvents.createdAt} >= ${opts.after}`);
+    if (opts?.before) conditions.push(sql`${usageEvents.createdAt} <= ${opts.before}`);
 
     const rows = await this.drizzle
       .select({ eventType: usageEvents.eventType, total: sql<number>`sum(${usageEvents.value})` })

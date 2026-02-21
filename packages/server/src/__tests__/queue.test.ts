@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { initDb, closeDb, insertQueueItem, getQueueItem, getNextPendingQueueItem, updateQueueItemStatus, incrementQueueItemRetry, listQueueItems, getQueueStats } from '../db/index.js';
+import { initDb, closeDb, insertQueueItem, getQueueItem, getNextPendingQueueItem, claimQueueItem, updateQueueItemStatus, incrementQueueItemRetry, listQueueItems, getQueueStats } from '../db/index.js';
 import { QueueProcessor } from '../queue/processor.js';
 
 const tenant = 'queue-test';
@@ -116,6 +116,7 @@ describe('queue', () => {
       expect(stats.processing).toBe(1);
       expect(stats.completed).toBe(1);
       expect(stats.failed).toBe(0);
+      expect(stats.cancelled).toBe(0);
     });
   });
 

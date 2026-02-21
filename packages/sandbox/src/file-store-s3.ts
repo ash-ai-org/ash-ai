@@ -89,8 +89,12 @@ export class S3FileStore implements FileStore {
         Key: this.fullKey(key),
       }));
       return true;
-    } catch {
-      return false;
+    } catch (err: unknown) {
+      // Only return false for "not found" — re-throw other errors
+      if (err instanceof Error && (err.name === 'NotFound' || err.name === 'NoSuchKey' || (err as any).$metadata?.httpStatusCode === 404)) {
+        return false;
+      }
+      throw err;
     }
   }
 }

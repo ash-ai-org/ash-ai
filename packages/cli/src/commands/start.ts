@@ -13,6 +13,7 @@ import {
   ashDataDir,
 } from '../docker.js';
 import { isDevMode } from '../index.js';
+import { getCredentials } from './login.js';
 
 function collectEnv(value: string, previous: string[]): string[] {
   return previous.concat([value]);
@@ -26,8 +27,10 @@ export function startCommand(): Command {
     .option('--image <image>', 'Full Docker image name (overrides default + tag)')
     .option('--no-pull', 'Skip pulling the image (use local build)')
     .option('--database-url <url>', 'PostgreSQL/CockroachDB connection URL')
+    .option('--api-key <key>', 'Ash Cloud API key (or set ASH_API_KEY, or use `ash login`)')
+    .option('--cloud-url <url>', 'Ash Cloud URL (default: https://ash-cloud.ai)')
     .option('-e, --env <KEY=VALUE>', 'Extra env vars to pass to the container', collectEnv, [])
-    .action(async (opts: { port: string; tag?: string; image?: string; pull: boolean; databaseUrl?: string; env: string[] }) => {
+    .action(async (opts: { port: string; tag?: string; image?: string; pull: boolean; databaseUrl?: string; apiKey?: string; cloudUrl?: string; env: string[] }) => {
       const port = parseInt(opts.port, 10);
 
       // Check Docker is available
@@ -78,6 +81,20 @@ export function startCommand(): Command {
         envPassthrough.push(key);
       }
 
+      // Cloud telemetry: flag > env var > ~/.ash/credentials.json
+      const credentials = getCredentials();
+      const apiKey = opts.apiKey || process.env.ASH_API_KEY || credentials?.api_key;
+      const cloudUrl = opts.cloudUrl || process.env.ASH_CLOUD_URL || credentials?.cloud_url;
+
+      if (apiKey) {
+        process.env.ASH_API_KEY = apiKey;
+        envPassthrough.push('ASH_API_KEY');
+        if (cloudUrl) {
+          process.env.ASH_CLOUD_URL = cloudUrl;
+          envPassthrough.push('ASH_CLOUD_URL');
+        }
+      }
+
       // Dev mode: build local Docker image and use it
       if (isDevMode && !opts.image) {
         console.log('Dev mode: building local Docker image (ash-dev)...');
@@ -124,6 +141,9 @@ export function startCommand(): Command {
       console.log(`  URL:      http://localhost:${port}`);
       if (opts.databaseUrl) {
         console.log(`  Database: ${opts.databaseUrl}`);
+      }
+      if (apiKey) {
+        console.log(`  Cloud:    ${cloudUrl || 'https://ash-cloud.ai'}`);
       }
       console.log(`  Data dir: ${ashDataDir()}`);
     });

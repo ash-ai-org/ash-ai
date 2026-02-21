@@ -363,6 +363,10 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
             // Extract and record usage metrics (non-blocking)
             recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
           }
+          // Extract and record usage metrics once per turn (result has the usage summary)
+          if (data.type === 'result') {
+            recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
+          }
 
           // Classify and persist timeline events (non-blocking)
           const classified = classifyBridgeMessage(data);

@@ -22,6 +22,8 @@ export interface Db {
   heartbeatRunner(id: string, activeCount: number, warmingCount: number): Promise<void>;
   getRunner(id: string): Promise<RunnerRecord | null>;
   listHealthyRunners(cutoffIso: string): Promise<RunnerRecord[]>;
+  /** List runners whose last heartbeat is at or before the cutoff. */
+  listDeadRunners(cutoffIso: string): Promise<RunnerRecord[]>;
   selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null>;
   deleteRunner(id: string): Promise<void>;
   listAllRunners(): Promise<RunnerRecord[]>;
@@ -39,6 +41,8 @@ export interface Db {
   getSession(id: string): Promise<Session | null>;
   listSessions(tenantId?: string, agent?: string): Promise<Session[]>;
   listSessionsByRunner(runnerId: string): Promise<Session[]>;
+  /** Bulk-pause all active/starting sessions on a runner. Returns count of paused sessions. */
+  bulkPauseSessionsByRunner(runnerId: string): Promise<number>;
   touchSession(id: string): Promise<void>;
   // Sandboxes (insertSandbox is tenant-scoped)
   insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string, tenantId?: string): Promise<void>;
@@ -67,8 +71,9 @@ export interface Db {
   insertQueueItem(id: string, tenantId: string, agentName: string, prompt: string, sessionId?: string, priority?: number, maxRetries?: number): Promise<QueueItem>;
   getQueueItem(id: string): Promise<QueueItem | null>;
   getNextPendingQueueItem(tenantId?: string): Promise<QueueItem | null>;
+  claimQueueItem(id: string): Promise<boolean>;
   updateQueueItemStatus(id: string, status: QueueItemStatus, error?: string): Promise<void>;
-  incrementQueueItemRetry(id: string): Promise<void>;
+  incrementQueueItemRetry(id: string, retryAfter?: string): Promise<void>;
   listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]>;
   getQueueStats(tenantId: string): Promise<QueueStats>;
   // Credentials (tenant-scoped)
@@ -86,8 +91,8 @@ export interface Db {
   // Usage (tenant-scoped)
   insertUsageEvent(id: string, tenantId: string, sessionId: string, agentName: string, eventType: UsageEventType, value: number): Promise<UsageEvent>;
   insertUsageEvents(events: Array<{ id: string; tenantId: string; sessionId: string; agentName: string; eventType: UsageEventType; value: number }>): Promise<void>;
-  listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]>;
-  getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats>;
+  listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number }): Promise<UsageEvent[]>;
+  getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats>;
   // Lifecycle
   close(): Promise<void>;
 }
@@ -200,6 +205,10 @@ export async function listSessionsByRunner(runnerId: string): Promise<Session[]>
   return getDb().listSessionsByRunner(runnerId);
 }
 
+export async function bulkPauseSessionsByRunner(runnerId: string): Promise<number> {
+  return getDb().bulkPauseSessionsByRunner(runnerId);
+}
+
 export async function touchSession(id: string): Promise<void> {
   return getDb().touchSession(id);
 }
@@ -307,6 +316,10 @@ export async function listHealthyRunners(cutoffIso: string): Promise<RunnerRecor
   return getDb().listHealthyRunners(cutoffIso);
 }
 
+export async function listDeadRunners(cutoffIso: string): Promise<RunnerRecord[]> {
+  return getDb().listDeadRunners(cutoffIso);
+}
+
 export async function selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
   return getDb().selectBestRunner(cutoffIso);
 }
@@ -337,8 +350,12 @@ export async function updateQueueItemStatus(id: string, status: QueueItemStatus,
   return getDb().updateQueueItemStatus(id, status, error);
 }
 
-export async function incrementQueueItemRetry(id: string): Promise<void> {
-  return getDb().incrementQueueItemRetry(id);
+export async function claimQueueItem(id: string): Promise<boolean> {
+  return getDb().claimQueueItem(id);
+}
+
+export async function incrementQueueItemRetry(id: string, retryAfter?: string): Promise<void> {
+  return getDb().incrementQueueItemRetry(id, retryAfter);
 }
 
 export async function listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]> {
@@ -403,11 +420,11 @@ export async function insertUsageEvents(events: Array<{ id: string; tenantId: st
   return getDb().insertUsageEvents(events);
 }
 
-export async function listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]> {
+export async function listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number }): Promise<UsageEvent[]> {
   return getDb().listUsageEvents(tenantId, opts);
 }
 
-export async function getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats> {
+export async function getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats> {
   return getDb().getUsageStats(tenantId, opts);
 }
 

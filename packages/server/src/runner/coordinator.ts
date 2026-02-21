@@ -2,7 +2,7 @@ import type { PoolStats, RunnerRecord } from '@ash-ai/shared';
 import { RUNNER_LIVENESS_TIMEOUT_MS } from '@ash-ai/shared';
 import type { RunnerBackend } from './types.js';
 import { RemoteRunnerBackend } from './remote-backend.js';
-import { updateSessionStatus, listSessionsByRunner, upsertRunner, heartbeatRunner, selectBestRunner, deleteRunner, listAllRunners, getRunner } from '../db/index.js';
+import { bulkPauseSessionsByRunner, upsertRunner, heartbeatRunner, selectBestRunner, deleteRunner, listAllRunners, listDeadRunners, getRunner } from '../db/index.js';
 
 /**
  * Coordinates multiple runners. Routes session creation to the least-loaded runner.
@@ -56,6 +56,16 @@ export class RunnerCoordinator {
   }
 
   /**
+   * Graceful deregistration. Called when a runner shuts down cleanly.
+   * Immediately pauses its sessions and removes it from the registry,
+   * rather than waiting 30s for the liveness sweep to notice.
+   */
+  async deregisterRunner(runnerId: string): Promise<void> {
+    console.log(`[coordinator] Runner ${runnerId} deregistering gracefully`);
+    await this.handleDeadRunner(runnerId);
+  }
+
+  /**
    * Select the best backend for a new session.
    * Reads from DB to discover all healthy runners (multi-coordinator safe).
    * Falls back to local backend if no remote runners available.
@@ -65,11 +75,10 @@ export class RunnerCoordinator {
     const bestRunner = await selectBestRunner(cutoff);
 
     if (bestRunner) {
-      const available = bestRunner.maxSandboxes - bestRunner.activeCount - bestRunner.warmingCount;
-      if (available > 0) {
-        const backend = this.getOrCreateBackend(bestRunner);
-        return { backend, runnerId: bestRunner.id };
-      }
+      // selectBestRunner() already orders by available capacity DESC and only
+      // returns healthy runners. Trust the query — no redundant capacity check.
+      const backend = this.getOrCreateBackend(bestRunner);
+      return { backend, runnerId: bestRunner.id };
     }
 
     // Fall back to local backend (standalone mode)
@@ -147,15 +156,23 @@ export class RunnerCoordinator {
    * Start periodic liveness checks for remote runners.
    * Safe to run on multiple coordinators — all operations are idempotent.
    * Each coordinator runs independently; no leader election needed.
+   *
+   * Uses random jitter (0-5s) on each interval to prevent thundering herd
+   * when multiple coordinators run the same sweep at the same time.
    */
   startLivenessSweep(): void {
     if (this.livenessSweepTimer) return;
-    this.livenessSweepTimer = setInterval(() => {
-      this.checkLiveness().catch((err) =>
-        console.error('[coordinator] Liveness sweep error:', err)
-      );
-    }, RUNNER_LIVENESS_TIMEOUT_MS);
-    this.livenessSweepTimer.unref();
+    const scheduleNext = () => {
+      // Add 0-5s random jitter to prevent thundering herd across coordinators
+      const jitter = Math.floor(Math.random() * 5000);
+      this.livenessSweepTimer = setTimeout(() => {
+        this.checkLiveness()
+          .catch((err) => console.error('[coordinator] Liveness sweep error:', err))
+          .finally(() => scheduleNext());
+      }, RUNNER_LIVENESS_TIMEOUT_MS + jitter);
+      this.livenessSweepTimer.unref();
+    };
+    scheduleNext();
   }
 
   stopLivenessSweep(): void {
@@ -165,29 +182,33 @@ export class RunnerCoordinator {
     }
   }
 
+  /**
+   * Single-query dead runner detection. Queries directly for runners past
+   * the heartbeat cutoff instead of listing ALL runners then filtering in JS.
+   *
+   * Cache cleanup: stale backend cache entries are cleaned up in handleDeadRunner()
+   * (for this coordinator's kills) and lazily on next use via getOrCreateBackend()
+   * (for kills by other coordinators). No need to list all runners every sweep.
+   */
   private async checkLiveness(): Promise<void> {
     const cutoff = new Date(Date.now() - RUNNER_LIVENESS_TIMEOUT_MS).toISOString();
-    const allRunners = await listAllRunners();
-    for (const runner of allRunners) {
-      if (runner.lastHeartbeatAt <= cutoff) {
-        console.warn(`[coordinator] Runner ${runner.id} missed heartbeat — marking sessions paused`);
-        await this.handleDeadRunner(runner.id);
-      }
+    const deadRunners = await listDeadRunners(cutoff);
+    for (const runner of deadRunners) {
+      console.warn(`[coordinator] Runner ${runner.id} missed heartbeat — marking sessions paused`);
+      await this.handleDeadRunner(runner.id);
     }
   }
 
   /**
    * Handle a dead runner: pause its sessions and remove from registry.
-   * Idempotent — safe to call from multiple coordinators.
+   * Idempotent — safe to call from multiple coordinators concurrently.
+   * Uses a single bulk UPDATE instead of per-session queries.
    */
   async handleDeadRunner(runnerId: string): Promise<void> {
-    // Mark all active/starting sessions on this runner as paused
-    const sessions = await listSessionsByRunner(runnerId);
-    for (const session of sessions) {
-      if (session.status === 'active' || session.status === 'starting') {
-        await updateSessionStatus(session.id, 'paused');
-        console.log(`[coordinator] Paused session ${session.id} (runner ${runnerId} dead)`);
-      }
+    // Single bulk UPDATE — no N+1
+    const pausedCount = await bulkPauseSessionsByRunner(runnerId);
+    if (pausedCount > 0) {
+      console.log(`[coordinator] Paused ${pausedCount} session(s) on runner ${runnerId}`);
     }
 
     // Remove from DB (all coordinators will see this)
@@ -225,22 +246,8 @@ export class RunnerCoordinator {
     }));
   }
 
-  /**
-   * Legacy sync method — returns info from local cache only.
-   * Prefer getRunnerInfoFromDb() for monitoring.
-   */
-  getRunnerInfo(): Array<{ runnerId: string; host: string; port: number; active: number; max: number; lastHeartbeat: number }> {
-    const result = [];
-    for (const [runnerId, backend] of this.backends) {
-      result.push({
-        runnerId,
-        host: '',
-        port: 0,
-        active: backend.activeCount,
-        max: 0,
-        lastHeartbeat: Date.now(),
-      });
-    }
-    return result;
+  /** Number of locally cached backend connections. */
+  get cachedBackendCount(): number {
+    return this.backends.size;
   }
 }
