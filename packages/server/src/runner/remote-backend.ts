@@ -46,6 +46,11 @@ export class RemoteRunnerBackend implements RunnerBackend {
     yield* this.client.sendCommand(sandboxId, cmd);
   }
 
+  interrupt(sandboxId: string): void {
+    // Fire-and-forget to runner
+    this.client.interrupt(sandboxId).catch(() => {});
+  }
+
   getSandbox(sandboxId: string): SandboxHandle | undefined {
     return this.sandboxes.get(sandboxId);
   }
@@ -92,6 +97,10 @@ export class RemoteRunnerBackend implements RunnerBackend {
   /** Expose the underlying RunnerClient for health checks. */
   getClient(): RunnerClient {
     return this.client;
+  }
+
+  get closed(): boolean {
+    return this.client.closed;
   }
 
   close(): void {

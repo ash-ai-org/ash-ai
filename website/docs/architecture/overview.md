@@ -55,6 +55,33 @@ graph LR
 
 Runners register with the server via heartbeat. The server routes sessions to the runner with the most available capacity.
 
+## Multi-Coordinator Mode
+
+For high availability and horizontal scaling of the control plane, run multiple coordinators behind a load balancer with a shared database (Postgres or CockroachDB).
+
+```mermaid
+graph LR
+    Client["Client"]
+    LB["Load Balancer"]
+    C1["Coordinator 1"]
+    C2["Coordinator 2"]
+    R1["Runner 1"]
+    R2["Runner 2"]
+    DB["CRDB"]
+
+    Client -->|HTTPS| LB
+    LB --> C1
+    LB --> C2
+    C1 --> DB
+    C2 --> DB
+    C1 -->|HTTP| R1
+    C1 -->|HTTP| R2
+    C2 -->|HTTP| R1
+    C2 -->|HTTP| R2
+```
+
+Coordinators are stateless — the runner registry and session routing state live in the database. Any coordinator can route to any runner. SSE reconnection handles coordinator failover transparently. See [Scaling Architecture](./scaling) for details.
+
 ## Components
 
 | Package | Description |

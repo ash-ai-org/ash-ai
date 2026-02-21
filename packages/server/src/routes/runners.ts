@@ -4,6 +4,10 @@ import type { RunnerCoordinator } from '../runner/coordinator.js';
 /**
  * Internal endpoints for runner registration and heartbeat.
  * These are called by runner processes, not by clients.
+ *
+ * In multi-coordinator mode, all coordinators accept registration/heartbeat
+ * calls because they all write to the same shared database. The load balancer
+ * can route any runner's traffic to any coordinator — it doesn't matter.
  */
 export function runnerRoutes(app: FastifyInstance, coordinator: RunnerCoordinator): void {
   // Register a runner
@@ -19,7 +23,7 @@ export function runnerRoutes(app: FastifyInstance, coordinator: RunnerCoordinato
       return reply.status(400).send({ error: 'Missing required fields: runnerId, host, port' });
     }
 
-    coordinator.registerRunner({ runnerId, host, port, maxSandboxes: maxSandboxes ?? 100 });
+    await coordinator.registerRunner({ runnerId, host, port, maxSandboxes: maxSandboxes ?? 100 });
     return reply.send({ ok: true });
   });
 
@@ -34,15 +38,16 @@ export function runnerRoutes(app: FastifyInstance, coordinator: RunnerCoordinato
       return reply.status(400).send({ error: 'Missing runnerId' });
     }
 
-    coordinator.heartbeat(runnerId, stats);
+    await coordinator.heartbeat(runnerId, stats);
     return reply.send({ ok: true });
   });
 
-  // List runners (for monitoring)
+  // List runners (for monitoring) — reads from DB, not just local cache
   app.get('/api/internal/runners', async (_req, reply) => {
+    const runners = await coordinator.getRunnerInfoFromDb();
     return reply.send({
-      runners: coordinator.getRunnerInfo(),
-      count: coordinator.runnerCount,
+      runners,
+      count: runners.length,
       hasLocal: coordinator.hasLocalBackend,
     });
   });

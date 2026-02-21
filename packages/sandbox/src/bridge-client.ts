@@ -56,6 +56,15 @@ export class BridgeClient {
   }
 
   /**
+   * Fire-and-forget: write a command to the bridge without waiting for events.
+   * Used for interrupt — the running sendCommand generator will receive the result.
+   */
+  writeCommand(cmd: BridgeCommand): void {
+    if (!this.socket) throw new Error('Not connected');
+    this.socket.write(encode(cmd));
+  }
+
+  /**
    * Send a command and return an async iterable of events until 'done' or 'error'.
    */
   async *sendCommand(cmd: BridgeCommand): AsyncGenerator<BridgeEvent> {

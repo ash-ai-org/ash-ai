@@ -1,6 +1,6 @@
 # Plan 07: FileStore Interface (individual file ops)
 
-## Status: Partially Done
+## Status: Done
 ## Priority: Medium (downgraded — snapshot storage already works)
 ## Effort: Small
 

@@ -4,11 +4,14 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming } from '@ash-ai/shared';
-import { getAgent, insertSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
-import { classifyBridgeMessage } from '@ash-ai/shared';
+import { getAgent, insertSession, insertForkedSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
+import { classifyBridgeMessage, classifyToStreamEvents } from '@ash-ai/shared';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import type { TelemetryExporter } from '../telemetry/exporter.js';
 import { restoreSessionState, hasPersistedState, restoreStateFromCloud } from '@ash-ai/sandbox';
+import { decryptCredential } from './credentials.js';
+import { touchCredentialUsed } from '../db/index.js';
+import { recordUsageFromMessage } from '../usage/extractor.js';
 
 /** Structured log line for every resume — always on, not gated by ASH_DEBUG_TIMING. */
 function logResume(path: 'warm' | 'cold', sessionId: string, agentName: string): void {
@@ -71,6 +74,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         type: 'object',
         properties: {
           agent: { type: 'string' },
+          credentialId: { type: 'string' },
         },
         required: ['agent'],
       },
@@ -83,23 +87,36 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent } = req.body as { agent: string };
+    const { agent, credentialId } = req.body as { agent: string; credentialId?: string };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
       return reply.status(404).send({ error: `Agent "${agent}" not found`, statusCode: 404 });
     }
 
+    // Resolve credential to env vars if provided
+    let extraEnv: Record<string, string> | undefined;
+    if (credentialId) {
+      const cred = await decryptCredential(credentialId, req.tenantId);
+      if (!cred) {
+        return reply.status(400).send({ error: 'Invalid or inaccessible credential', statusCode: 400 });
+      }
+      const envKey = cred.type === 'anthropic' ? 'ANTHROPIC_API_KEY' : cred.type === 'openai' ? 'OPENAI_API_KEY' : 'ASH_CUSTOM_API_KEY';
+      extraEnv = { [envKey]: cred.key };
+      touchCredentialUsed(credentialId).catch(() => {});
+    }
+
     const sessionId = randomUUID();
 
     try {
-      const { backend, runnerId } = coordinator.selectBackend();
+      const { backend, runnerId } = await coordinator.selectBackend();
 
       const handle = await backend.createSandbox({
         sessionId,
         agentDir: agentRecord.path,
         agentName: agentRecord.name,
         sandboxId: sessionId,
+        extraEnv,
         onOomKill: () => {
           updateSessionStatus(sessionId, 'paused').catch((err) =>
             console.error(`Failed to update session status on OOM: ${err}`)
@@ -279,7 +296,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     let backend;
     try {
-      backend = coordinator.getBackendForRunner(session.runnerId);
+      backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
     } catch {
       await updateSessionStatus(session.id, 'error');
       return reply.status(500).send({ error: 'Runner not available', statusCode: 500 });
@@ -330,7 +347,12 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
         if (event.ev === 'message') {
           const data = event.data as Record<string, any>;
-          await writeSSE(reply.raw, `event: message\ndata: ${JSON.stringify(data)}\n\n`);
+
+          // Emit granular SSE events (text_delta, tool_use, etc.) + raw message in one pass
+          const streamEvents = classifyToStreamEvents(data);
+          for (const se of streamEvents) {
+            await writeSSE(reply.raw, `event: ${se.type}\ndata: ${JSON.stringify(se.data)}\n\n`);
+          }
 
           // Persist complete assistant messages (not partial stream events)
           if (data.type === 'assistant' || data.type === 'result') {
@@ -338,6 +360,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
               console.error(`Failed to persist assistant message: ${err}`)
             );
             telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'message', data: { role: 'assistant', messageType: data.type } });
+            // Extract and record usage metrics (non-blocking)
+            recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
           }
 
           // Classify and persist timeline events (non-blocking)
@@ -416,7 +440,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     // Best-effort persist state before pausing
     try {
-      const backend = coordinator.getBackendForRunner(session.runnerId);
+      const backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
       backend.persistState(session.sandboxId, session.id, session.agentName);
     } catch { /* runner may be gone */ }
 
@@ -424,6 +448,109 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'paused' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
     telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'paused' } });
     return reply.send({ session: { ...session, status: 'paused' } });
+  });
+
+  // Stop session — explicit user action (distinct from pause which is idle-based)
+  app.post<{ Params: { id: string } }>('/api/sessions/:id/stop', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      response: {
+        200: sessionResponse,
+        400: { $ref: 'ApiError#' },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+    if (session.status !== 'active' && session.status !== 'starting') {
+      return reply.status(400).send({ error: `Cannot stop session with status "${session.status}"`, statusCode: 400 });
+    }
+
+    // Persist state and destroy sandbox
+    try {
+      const backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
+      backend.persistState(session.sandboxId, session.id, session.agentName);
+      await backend.destroySandbox(session.sandboxId);
+    } catch { /* runner may be gone */ }
+
+    await updateSessionStatus(session.id, 'stopped');
+    insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'stopped' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+    telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'stopped' } });
+    return reply.send({ session: { ...session, status: 'stopped' as const } });
+  });
+
+  // Fork session — create a new session branching from parent's state and messages
+  app.post<{ Params: { id: string } }>('/api/sessions/:id/fork', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      response: {
+        201: sessionResponse,
+        404: { $ref: 'ApiError#' },
+        500: { $ref: 'ApiError#' },
+        503: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const parentSession = await getSession(req.params.id);
+    if (!parentSession || parentSession.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+
+    const agent = await getAgent(parentSession.agentName, req.tenantId);
+    if (!agent) {
+      return reply.status(404).send({ error: `Agent "${parentSession.agentName}" not found`, statusCode: 404 });
+    }
+
+    // Persist parent workspace state if sandbox is still live
+    try {
+      const parentBackend = await coordinator.getBackendForRunnerAsync(parentSession.runnerId);
+      parentBackend.persistState(parentSession.sandboxId, parentSession.id, parentSession.agentName);
+    } catch { /* parent runner may be gone — will rely on existing snapshot */ }
+
+    const forkId = randomUUID();
+
+    try {
+      // Create sandbox for the forked session (cold start — will restore parent state on resume)
+      const { backend, runnerId } = await coordinator.selectBackend();
+      const handle = await backend.createSandbox({
+        sessionId: forkId,
+        agentDir: agent.path,
+        agentName: agent.name,
+        sandboxId: forkId,
+        onOomKill: () => {
+          updateSessionStatus(forkId, 'paused').catch((err) =>
+            console.error(`Failed to update session status on OOM: ${err}`)
+          );
+        },
+      });
+
+      // Restore parent workspace state into new sandbox
+      const snapshotDir = join(dataDir, 'snapshots', parentSession.id);
+      if (existsSync(snapshotDir)) {
+        restoreSessionState(dataDir, parentSession.id, handle.workspaceDir, parentSession.agentName);
+      }
+
+      // Create forked session with copied messages
+      const forkedSession = await insertForkedSession(forkId, parentSession, handle.sandboxId);
+      const effectiveRunnerId = runnerId === '__local__' ? null : runnerId;
+      await updateSessionRunner(forkId, effectiveRunnerId);
+
+      insertSessionEvent(forkId, 'lifecycle', JSON.stringify({ action: 'forked', parentSessionId: parentSession.id }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+      telemetry.emit({ sessionId: forkId, agentName: agent.name, type: 'lifecycle', data: { status: 'paused', action: 'forked', parentSessionId: parentSession.id } });
+
+      return reply.status(201).send({ session: { ...forkedSession, runnerId: effectiveRunnerId } });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('capacity reached') || msg.includes('No runners available')) {
+        return reply.status(503).send({ error: msg, statusCode: 503 });
+      }
+      return reply.status(500).send({ error: `Failed to fork session: ${msg}`, statusCode: 500 });
+    }
   });
 
   // Resume session — may route to a different runner
@@ -451,7 +578,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.send({ session });
     }
 
-    // Resumable statuses: 'paused', 'error', 'starting'
+    // Resumable statuses: 'paused', 'stopped', 'error', 'starting'
     const agentRecord = await getAgent(session.agentName, req.tenantId);
     if (!agentRecord) {
       return reply.status(404).send({ error: `Agent "${session.agentName}" not found`, statusCode: 404 });
@@ -459,7 +586,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     // Fast path: try the same runner if sandbox is still alive
     try {
-      const oldBackend = coordinator.getBackendForRunner(session.runnerId);
+      const oldBackend = await coordinator.getBackendForRunnerAsync(session.runnerId);
       if (oldBackend.isSandboxAlive(session.sandboxId)) {
         oldBackend.recordWarmHit();
         logResume('warm', session.id, session.agentName);
@@ -488,7 +615,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       }
 
       const workspaceAvailable = existsSync(oldWorkspaceDir);
-      const { backend, runnerId } = coordinator.selectBackend();
+      const { backend, runnerId } = await coordinator.selectBackend();
 
       const handle = await backend.createSandbox({
         sessionId: session.id,
@@ -540,7 +667,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     // Persist state and destroy sandbox (best-effort — runner may be gone)
     try {
-      const backend = coordinator.getBackendForRunner(session.runnerId);
+      const backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
       backend.persistState(session.sandboxId, session.id, session.agentName);
       await backend.destroySandbox(session.sandboxId);
     } catch { /* runner may be gone */ }

@@ -20,7 +20,7 @@ function mockCoordinator(workspaceDir: string | null): RunnerCoordinator {
   };
 
   return {
-    getBackendForRunner: () => backend as RunnerBackend,
+    getBackendForRunnerAsync: async () => backend as RunnerBackend,
   } as unknown as RunnerCoordinator;
 }
 

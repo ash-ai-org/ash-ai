@@ -60,14 +60,14 @@ function listFiles(dir: string, root: string): FileEntry[] {
  * Prefers the live sandbox workspace; falls back to persisted snapshot.
  * Returns { dir, source } or null if neither exists.
  */
-function resolveWorkspace(
+async function resolveWorkspace(
   coordinator: RunnerCoordinator,
   dataDir: string,
   session: { sandboxId: string; runnerId?: string | null },
-): { dir: string; source: 'sandbox' | 'snapshot' } | null {
+): Promise<{ dir: string; source: 'sandbox' | 'snapshot' } | null> {
   // Try live sandbox first
   try {
-    const backend = coordinator.getBackendForRunner(session.runnerId);
+    const backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
     const sandbox = backend.getSandbox(session.sandboxId);
     if (sandbox && existsSync(sandbox.workspaceDir)) {
       return { dir: sandbox.workspaceDir, source: 'sandbox' };
@@ -124,7 +124,7 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
 
-    const workspace = resolveWorkspace(coordinator, dataDir, session);
+    const workspace = await resolveWorkspace(coordinator, dataDir, session);
     if (!workspace) {
       return reply.status(404).send({ error: 'No workspace available for this session', statusCode: 404 });
     }
@@ -176,7 +176,7 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
       return reply.status(400).send({ error: 'Invalid file path', statusCode: 400 });
     }
 
-    const workspace = resolveWorkspace(coordinator, dataDir, session);
+    const workspace = await resolveWorkspace(coordinator, dataDir, session);
     if (!workspace) {
       return reply.status(404).send({ error: 'No workspace available for this session', statusCode: 404 });
     }

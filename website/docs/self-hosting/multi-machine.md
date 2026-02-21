@@ -42,8 +42,8 @@ graph TB
         S2 --> B4[Bridge 4]
     end
 
-    Coordinator -->|HTTP/2| R1
-    Coordinator -->|HTTP/2| R2
+    Coordinator -->|HTTP| R1
+    Coordinator -->|HTTP| R2
     R1 -->|Heartbeat| Coordinator
     R2 -->|Heartbeat| Coordinator
 ```
@@ -227,6 +227,101 @@ export ASH_API_KEY=my-production-key
 docker compose up -d
 ```
 
+## Multi-Coordinator (High Availability)
+
+For production deployments that need control plane redundancy or handle more than ~10,000 concurrent SSE connections, you can run multiple coordinators behind a load balancer.
+
+:::info Prerequisites
+Multi-coordinator requires a shared database. All coordinators must point to the same Postgres or CockroachDB instance via `ASH_DATABASE_URL`. SQLite does not support multi-coordinator.
+:::
+
+### Architecture
+
+```mermaid
+graph TB
+    Client["Client / SDK"] -->|HTTPS| LB["Load Balancer<br/>(nginx, ALB, etc.)"]
+
+    subgraph Coordinators
+        C1["Coordinator 1<br/>:4100"]
+        C2["Coordinator 2<br/>:4100"]
+    end
+
+    LB --> C1
+    LB --> C2
+    C1 & C2 --> DB[("CockroachDB")]
+    C1 & C2 -->|HTTP| R1["Runner 1"]
+    C1 & C2 -->|HTTP| R2["Runner 2"]
+```
+
+Coordinators are stateless — all routing decisions come from the database. Any coordinator can route to any runner.
+
+### Starting Multiple Coordinators
+
+```bash
+# Coordinator 1
+ASH_MODE=coordinator \
+ASH_DATABASE_URL="postgresql://ash:password@db-host:5432/ash" \
+ASH_API_KEY=my-api-key \
+ANTHROPIC_API_KEY=sk-ant-... \
+ASH_PORT=4100 \
+node packages/server/dist/index.js
+
+# Coordinator 2 (same config, different host)
+ASH_MODE=coordinator \
+ASH_DATABASE_URL="postgresql://ash:password@db-host:5432/ash" \
+ASH_API_KEY=my-api-key \
+ANTHROPIC_API_KEY=sk-ant-... \
+ASH_PORT=4100 \
+node packages/server/dist/index.js
+```
+
+### Load Balancer Configuration
+
+```nginx
+upstream ash_coordinators {
+    server coordinator-1:4100;
+    server coordinator-2:4100;
+}
+
+server {
+    listen 443 ssl;
+    location / {
+        proxy_pass http://ash_coordinators;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';    # Required for SSE
+        proxy_buffering off;              # Required for SSE
+        proxy_read_timeout 86400s;        # Long-lived SSE streams
+    }
+}
+```
+
+- **No sticky sessions needed.** Any coordinator can handle any request.
+- **Health check:** `GET /health` on each coordinator.
+- **SSE failover:** If a coordinator dies mid-stream, the client's SSE auto-reconnects through the load balancer to a different coordinator. The new coordinator looks up the session in the shared database and re-establishes the proxy to the runner. No session migration needed.
+
+### Runners with Multi-Coordinator
+
+Runners register with the load balancer URL (not a specific coordinator):
+
+```bash
+ASH_SERVER_URL=http://load-balancer:4100 \
+ASH_RUNNER_ID=runner-1 \
+node packages/runner/dist/index.js
+```
+
+Heartbeats go through the load balancer. Any coordinator that receives a heartbeat writes it to the shared database, where all other coordinators can see it.
+
+### How It Works
+
+The runner registry lives in the `runners` table in the shared database. All coordinators read and write to this table:
+
+- **Registration:** Runner sends `POST /api/internal/runners/register` → coordinator upserts into `runners` table
+- **Heartbeat:** Runner sends `POST /api/internal/runners/heartbeat` → coordinator updates `active_count`, `warming_count`, `last_heartbeat_at`
+- **Selection:** On session creation, coordinator queries `SELECT ... FROM runners ORDER BY available_capacity DESC LIMIT 1`
+- **Liveness sweep:** All coordinators run the sweep independently (every 30s). Operations are idempotent — multiple coordinators marking the same dead runner's sessions as paused is harmless.
+
+For more details on the scaling architecture, see [Scaling Architecture](/docs/architecture/scaling).
+
 ## Limitations
 
 - **Cross-runner resume requires cloud persistence.** Without `ASH_SNAPSHOT_URL`, a session paused on runner-1 cannot be resumed on runner-2 because the workspace state is local to runner-1's filesystem. Configure S3 or GCS snapshots for cross-runner resume.
@@ -234,5 +329,3 @@ docker compose up -d
 - **No automatic session migration.** If a runner is overloaded, existing sessions are not moved to a less-loaded runner. Only new sessions benefit from load-based routing.
 
 - **Runner state is in-memory.** Each runner uses an in-memory database for sandbox tracking (not SQLite). If a runner crashes, its sandbox tracking is lost. On restart, it re-registers with fresh state. The coordinator detects the gap via missed heartbeats and pauses affected sessions.
-
-- **Coordinator is a single point of failure.** The coordinator server must be running for clients to interact with the system. If it goes down, runners continue executing active sandbox processes but cannot accept new work. Use a process manager (systemd, Docker restart policies) to keep the coordinator up.

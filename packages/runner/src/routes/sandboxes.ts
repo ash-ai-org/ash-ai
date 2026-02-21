@@ -116,6 +116,16 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
     reply.raw.end();
   });
 
+  // Interrupt a running sandbox command (fire-and-forget)
+  app.post<{ Params: { id: string } }>('/runner/sandboxes/:id/interrupt', async (req, reply) => {
+    const sandbox = pool.get(req.params.id);
+    if (!sandbox) {
+      return reply.status(404).send({ error: 'Sandbox not found' });
+    }
+    sandbox.client.writeCommand({ cmd: 'interrupt' });
+    return reply.send({ ok: true });
+  });
+
   // Persist state on runner's filesystem
   app.post<{ Params: { id: string } }>('/runner/sandboxes/:id/persist', async (req, reply) => {
     const sandbox = pool.get(req.params.id);

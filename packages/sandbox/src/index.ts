@@ -26,3 +26,6 @@ export {
 } from './state-persistence.js';
 export type { SnapshotStore } from './snapshot-store.js';
 export { createSnapshotStore, getSnapshotStore, resetSnapshotStore } from './snapshot-store.js';
+export type { FileStore, FileMetadata } from './file-store.js';
+export { createFileStore, getFileStore, resetFileStore } from './file-store.js';
+export { createBundle, extractBundle } from './bundle.js';

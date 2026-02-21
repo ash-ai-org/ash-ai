@@ -67,6 +67,7 @@
 | [features/openapi-spec.md](./features/openapi-spec.md) | OpenAPI spec generation, Swagger UI, and Python SDK |
 | [features/multi-runner.md](./features/multi-runner.md) | Multi-runner architecture: standalone vs coordinator mode, session routing |
 | [features/metrics.md](./features/metrics.md) | Prometheus `/metrics` endpoint, structured resume log lines, pool stats |
+| [features/multi-coordinator.md](./features/multi-coordinator.md) | Horizontal control plane: DB-backed runner registry, multi-coordinator with CRDB |
 
 ## Runbooks
 
