@@ -63,7 +63,7 @@ function listFiles(dir: string, root: string): FileEntry[] {
 async function resolveWorkspace(
   coordinator: RunnerCoordinator,
   dataDir: string,
-  session: { sandboxId: string; runnerId?: string | null },
+  session: { id: string; sandboxId: string; runnerId?: string | null },
 ): Promise<{ dir: string; source: 'sandbox' | 'snapshot' } | null> {
   // Try live sandbox first
   try {
@@ -75,7 +75,7 @@ async function resolveWorkspace(
   } catch { /* runner gone */ }
 
   // Fall back to persisted snapshot
-  const snapshotDir = join(dataDir, 'sessions', session.sandboxId, 'workspace');
+  const snapshotDir = join(dataDir, 'sessions', session.id, 'workspace');
   if (existsSync(snapshotDir)) {
     return { dir: snapshotDir, source: 'snapshot' };
   }

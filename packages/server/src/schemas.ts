@@ -26,8 +26,9 @@ const SessionSchema = {
     tenantId: { type: 'string' },
     agentName: { type: 'string' },
     sandboxId: { type: 'string' },
-    status: { type: 'string', enum: ['starting', 'active', 'paused', 'ended', 'error'] },
+    status: { type: 'string', enum: ['starting', 'active', 'paused', 'stopped', 'ended', 'error'] },
     runnerId: { type: ['string', 'null'] },
+    parentSessionId: { type: ['string', 'null'], format: 'uuid' },
     createdAt: { type: 'string', format: 'date-time' },
     lastActiveAt: { type: 'string', format: 'date-time' },
   },
@@ -96,8 +97,10 @@ const HealthResponseSchema = {
   type: 'object',
   properties: {
     status: { type: 'string', enum: ['ok'] },
+    coordinatorId: { type: 'string', description: 'Unique coordinator ID (hostname-PID)' },
     activeSessions: { type: 'integer' },
     activeSandboxes: { type: 'integer' },
+    remoteRunners: { type: 'integer', description: 'Number of registered remote runners' },
     uptime: { type: 'integer', description: 'Seconds since process start' },
     pool: { $ref: 'PoolStats#' },
   },
@@ -115,7 +118,6 @@ const AttachmentSchema = {
     filename: { type: 'string' },
     mimeType: { type: 'string' },
     size: { type: 'integer' },
-    storagePath: { type: 'string' },
     createdAt: { type: 'string', format: 'date-time' },
   },
   required: ['id', 'sessionId', 'filename', 'mimeType', 'size', 'createdAt'],
@@ -142,6 +144,50 @@ const QueueItemSchema = {
   required: ['id', 'agentName', 'prompt', 'status', 'priority', 'retryCount', 'maxRetries', 'createdAt'],
 } as const;
 
+const CredentialSchema = {
+  $id: 'Credential',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    type: { type: 'string' },
+    label: { type: ['string', 'null'] },
+    createdAt: { type: 'string', format: 'date-time' },
+    lastUsedAt: { type: ['string', 'null'], format: 'date-time' },
+  },
+  required: ['id', 'type', 'createdAt'],
+} as const;
+
+const UsageEventSchema = {
+  $id: 'UsageEvent',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    sessionId: { type: 'string', format: 'uuid' },
+    agentName: { type: 'string' },
+    eventType: { type: 'string' },
+    value: { type: 'number' },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+  required: ['id', 'sessionId', 'agentName', 'eventType', 'value', 'createdAt'],
+} as const;
+
+const UsageStatsSchema = {
+  $id: 'UsageStats',
+  type: 'object',
+  properties: {
+    totalInputTokens: { type: 'number' },
+    totalOutputTokens: { type: 'number' },
+    totalCacheCreationTokens: { type: 'number' },
+    totalCacheReadTokens: { type: 'number' },
+    totalToolCalls: { type: 'number' },
+    totalMessages: { type: 'number' },
+    totalComputeSeconds: { type: 'number' },
+  },
+  required: ['totalInputTokens', 'totalOutputTokens', 'totalCacheCreationTokens', 'totalCacheReadTokens', 'totalToolCalls', 'totalMessages', 'totalComputeSeconds'],
+} as const;
+
 export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(AgentSchema);
   app.addSchema(SessionSchema);
@@ -152,4 +198,7 @@ export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(HealthResponseSchema);
   app.addSchema(QueueItemSchema);
   app.addSchema(AttachmentSchema);
+  app.addSchema(CredentialSchema);
+  app.addSchema(UsageEventSchema);
+  app.addSchema(UsageStatsSchema);
 }
