@@ -7,6 +7,7 @@ import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming } from '@ash
 import { getAgent, insertSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
 import { classifyBridgeMessage } from '@ash-ai/shared';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
+import type { TelemetryExporter } from '../telemetry/exporter.js';
 import { restoreSessionState, hasPersistedState, restoreStateFromCloud } from '@ash-ai/sandbox';
 
 /** Structured log line for every resume — always on, not gated by ASH_DEBUG_TIMING. */
@@ -61,7 +62,7 @@ export async function writeSSE(raw: ServerResponse, frame: string): Promise<void
   }
 }
 
-export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, dataDir: string): void {
+export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, dataDir: string, telemetry: TelemetryExporter): void {
   // Create session — picks the best runner via coordinator
   app.post('/api/sessions', {
     schema: {
@@ -113,6 +114,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
       // Record lifecycle event
       insertSessionEvent(sessionId, 'lifecycle', JSON.stringify({ action: 'created', agentName: agentRecord.name }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+      telemetry.emit({ sessionId, agentName: agentRecord.name, type: 'lifecycle', data: { status: 'active', action: 'created' } });
 
       return reply.status(201).send({ session: { ...session, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {
@@ -300,6 +302,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     insertMessage(session.id, 'user', JSON.stringify({ type: 'user', content }), req.tenantId).catch((err) =>
       console.error(`Failed to persist user message: ${err}`)
     );
+    telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'message', data: { role: 'user', content } });
 
     // SSE response
     reply.raw.writeHead(200, {
@@ -334,6 +337,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
             insertMessage(session.id, 'assistant', JSON.stringify(data), req.tenantId).catch((err) =>
               console.error(`Failed to persist assistant message: ${err}`)
             );
+            telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'message', data: { role: 'assistant', messageType: data.type } });
           }
 
           // Classify and persist timeline events (non-blocking)
@@ -347,6 +351,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
                 tenantId: req.tenantId,
               }))
             ).catch((err) => console.error(`Failed to persist session events: ${err}`));
+            for (const c of classified) {
+              telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: c.type, data: c.data });
+            }
           }
         } else if (event.ev === 'error') {
           await writeSSE(reply.raw, `event: error\ndata: ${JSON.stringify({ error: event.error })}\n\n`);
@@ -354,10 +361,12 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           insertSessionEvent(session.id, 'error', JSON.stringify({ error: event.error }), req.tenantId).catch((err) =>
             console.error(`Failed to persist error event: ${err}`)
           );
+          telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'error', data: { error: event.error } });
         } else if (event.ev === 'done') {
           await writeSSE(reply.raw, `event: done\ndata: ${JSON.stringify({ sessionId: event.sessionId })}\n\n`);
           // Best-effort state persistence after each completed turn
           backend.persistState(session.sandboxId, session.id, session.agentName);
+          telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'turn_complete', data: {} });
         }
       }
     } catch (err: unknown) {
@@ -413,6 +422,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     await updateSessionStatus(session.id, 'paused');
     insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'paused' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+    telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'paused' } });
     return reply.send({ session: { ...session, status: 'paused' } });
   });
 
@@ -455,6 +465,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         logResume('warm', session.id, session.agentName);
         await updateSessionStatus(session.id, 'active');
         insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'warm' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+        telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'active', action: 'resumed', path: 'warm' } });
         return reply.send({ session: { ...session, status: 'active' } });
       }
     } catch { /* runner gone — cold path */ }
@@ -499,6 +510,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       await updateSessionRunner(session.id, effectiveRunnerId);
       await updateSessionStatus(session.id, 'active');
       insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'cold' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+      telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'active', action: 'resumed', path: 'cold' } });
 
       return reply.send({ session: { ...session, sandboxId: handle.sandboxId, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {
@@ -535,6 +547,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     await updateSessionStatus(session.id, 'ended');
     insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'ended' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+    telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'ended' } });
     return reply.send({ session: { ...session, status: 'ended' } });
   });
 }

@@ -41,10 +41,8 @@ Each of these is a genuinely hard engineering problem. You should not have to so
 ## Quick Look
 
 ```bash
-# Install
+# Install and start the server
 npm install -g @ash-ai/cli
-
-# Start the server
 export ANTHROPIC_API_KEY=sk-ant-...
 ash start
 
@@ -55,10 +53,9 @@ You are a helpful coding assistant. Be concise and accurate.
 When asked to write code, include working examples.
 EOF
 
-# Deploy and use it
+# Deploy and chat
 ash deploy ./my-agent --name my-agent
-ash session create my-agent
-ash session send <SESSION_ID> "Write a prime number checker in Python"
+ash chat my-agent "Write a prime number checker in Python"
 ```
 
 Your agent folder becomes a full production API:

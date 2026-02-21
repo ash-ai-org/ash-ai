@@ -5,7 +5,7 @@ title: Quickstart
 
 # Quickstart
 
-Deploy an agent and send it a message. This takes about two minutes, assuming you have completed [Installation](installation.md).
+Deploy an agent and chat with it. This takes about two minutes, assuming you have completed [Installation](installation.md).
 
 ## 1. Define an Agent
 
@@ -23,51 +23,40 @@ EOF
 
 That is the only required file. For production agents, you can add `.claude/settings.json` (tool permissions), `.claude/skills/` (reusable skills), and `.mcp.json` (MCP server connections). See [Key Concepts](concepts.md) for more.
 
-## 2. Deploy the Agent
+## 2. Deploy and Chat
 
 ```bash
 ash deploy ./my-agent --name my-agent
-```
-
-Verify it is registered:
-
-```bash
-ash agent list
-```
-
-## 3. Create a Session
-
-```bash
-ash session create my-agent
-```
-
-Output:
-
-```json
-{ "id": "550e8400-e29b-41d4-a716-446655440000", "status": "active", "agentName": "my-agent" }
-```
-
-Copy the `id` value -- you will need it for the next step.
-
-## 4. Send a Message
-
-Replace `SESSION_ID` with the actual session ID from the previous step:
-
-```bash
-ash session send SESSION_ID "What is a closure in JavaScript?"
+ash chat my-agent "What is a closure in JavaScript?"
 ```
 
 The response streams back in real time:
 
 ```
-[message] assistant: A closure is a function that retains access to variables
-from its enclosing scope, even after the outer function has returned...
-[done] 550e8400-e29b-41d4-a716-446655440000
+A closure is a function that retains access to variables from its enclosing
+scope, even after the outer function has returned...
 ```
 
-## 5. End the Session
+That is it. `ash chat` creates a session, streams the response, and cleans up automatically.
+
+:::tip
+Use `ash chat --keep` to keep the session alive after the response. It prints the session ID to stderr so you can send follow-up messages with `ash session send`.
+:::
+
+## Detailed Flow (Optional)
+
+If you need more control -- multiple messages, pause/resume, or session inspection -- use the session commands directly:
 
 ```bash
+# Create a session
+ash session create my-agent
+# → { "id": "550e8400-...", "status": "active", "agentName": "my-agent" }
+
+# Send messages (replace SESSION_ID with the actual ID)
+ash session send SESSION_ID "What is a closure in JavaScript?"
+ash session send SESSION_ID "Now explain it with an example"
+
+# End the session when done
 ash session end SESSION_ID
 ```
 

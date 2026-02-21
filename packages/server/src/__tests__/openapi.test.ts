@@ -23,7 +23,8 @@ describe('OpenAPI spec generation', () => {
     // Register routes with stub dependencies (handlers never called)
     const nullCoordinator = {} as any;
     agentRoutes(app, '/tmp/unused');
-    sessionRoutes(app, nullCoordinator, '/tmp/unused');
+    const noopTelemetry = { emit() {}, async flush() {}, async shutdown() {} };
+    sessionRoutes(app, nullCoordinator, '/tmp/unused', noopTelemetry);
     fileRoutes(app, nullCoordinator, '/tmp/unused');
     healthRoutes(app, nullCoordinator, null);
 

@@ -43,6 +43,7 @@ Commands:
   stop            Stop the Ash server container
   status          Show Ash server status
   logs            Show Ash server logs
+  chat            Send a message to an agent (one-shot)
   deploy          Deploy an agent to the server
   session         Manage sessions
   agent           Manage agents
@@ -55,6 +56,7 @@ Commands:
 | Group | Description |
 |-------|-------------|
 | **Server Lifecycle** | `start`, `stop`, `status`, `logs` -- manage the Ash server Docker container |
+| **Quick** | `chat` -- send a one-shot message to an agent (creates session, streams response, cleans up) |
 | **Agents** | `deploy`, `agent list`, `agent info`, `agent delete` -- deploy and manage agent definitions |
 | **Sessions** | `session create`, `session send`, `session list`, `session pause`, `session resume`, `session end` -- interact with agent sessions |
 | **Health** | `health` -- check server health and pool stats |

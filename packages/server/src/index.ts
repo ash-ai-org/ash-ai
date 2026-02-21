@@ -15,6 +15,7 @@ import { sessionRoutes } from './routes/sessions.js';
 import { healthRoutes } from './routes/health.js';
 import { runnerRoutes } from './routes/runners.js';
 import { fileRoutes } from './routes/files.js';
+import { createTelemetryExporter } from './telemetry/exporter.js';
 
 // Config from env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -74,6 +75,8 @@ if (mode === 'standalone') {
   coordinator = new RunnerCoordinator({});
 }
 
+const telemetry = createTelemetryExporter();
+
 const app = Fastify({ logger: true });
 
 // OpenAPI / Swagger
@@ -100,7 +103,7 @@ registerAuth(app, process.env.ASH_API_KEY, db);
 
 // Routes
 agentRoutes(app, dataDir);
-sessionRoutes(app, coordinator, dataDir);
+sessionRoutes(app, coordinator, dataDir, telemetry);
 fileRoutes(app, coordinator, dataDir);
 healthRoutes(app, coordinator, pool);
 runnerRoutes(app, coordinator);
@@ -110,6 +113,7 @@ coordinator.startLivenessSweep();
 // Graceful shutdown
 async function shutdown() {
   app.log.info('Shutting down...');
+  await telemetry.shutdown();
   coordinator.stopLivenessSweep();
   if (pool) {
     pool.stopIdleSweep();

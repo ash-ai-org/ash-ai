@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
 
 /**
@@ -57,14 +59,63 @@ function getDb(): Db {
 }
 
 export async function initDb(opts: { dataDir: string; databaseUrl?: string }): Promise<Db> {
+  const { DrizzleDb } = await import('./drizzle-db.js');
+
   if (opts.databaseUrl && /^postgres(ql)?:\/\//.test(opts.databaseUrl)) {
-    const { PgDb } = await import('./pg.js');
-    const pgDb = new PgDb(opts.databaseUrl);
-    await pgDb.init();
-    db = pgDb;
+    const pgMod = await import('pg');
+    const { drizzle } = await import('drizzle-orm/node-postgres');
+    const { migrate } = await import('drizzle-orm/node-postgres/migrator');
+    const pgSchema = await import('./schema.pg.js');
+    const { resolve, dirname } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+
+    const pool = new pgMod.default.Pool({ connectionString: opts.databaseUrl });
+
+    // Retry connection with exponential backoff (total ~31s: 1s, 2s, 4s, 8s, 16s)
+    const maxRetries = 5;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await pool.query('SELECT 1');
+        break;
+      } catch (err) {
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to connect to database after ${maxRetries + 1} attempts: ${(err as Error).message}`);
+        }
+        const delay = 1000 * Math.pow(2, attempt);
+        console.log(`[db] Connection attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+
+    const d = drizzle(pool, { schema: pgSchema });
+
+    // Resolve migration folder — works from both src (tsx) and dist (compiled)
+    const thisFile = typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url);
+    const pkgRoot = resolve(dirname(thisFile), '..', '..');
+    await migrate(d, { migrationsFolder: resolve(pkgRoot, 'drizzle', 'pg') });
+
+    db = new DrizzleDb(d, pgSchema, 'pg', async () => { await pool.end(); });
   } else {
-    const { SqliteDb } = await import('./sqlite.js');
-    db = new SqliteDb(opts.dataDir);
+    const BetterSqlite3 = (await import('better-sqlite3')).default;
+    const { drizzle } = await import('drizzle-orm/better-sqlite3');
+    const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
+    const sqliteSchema = await import('./schema.sqlite.js');
+    const { resolve, dirname } = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+
+    mkdirSync(opts.dataDir, { recursive: true });
+    const sqlite = new BetterSqlite3(join(opts.dataDir, 'ash.db'));
+    sqlite.pragma('journal_mode = WAL');
+    sqlite.pragma('foreign_keys = ON');
+
+    const d = drizzle(sqlite, { schema: sqliteSchema });
+
+    // Resolve migration folder — works from both src (tsx) and dist (compiled)
+    const thisFile = typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url);
+    const pkgRoot = resolve(dirname(thisFile), '..', '..');
+    migrate(d, { migrationsFolder: resolve(pkgRoot, 'drizzle', 'sqlite') });
+
+    db = new DrizzleDb(d, sqliteSchema, 'sqlite', async () => { sqlite.close(); });
   }
   return db;
 }
