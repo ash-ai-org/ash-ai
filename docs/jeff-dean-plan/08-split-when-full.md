@@ -1,16 +1,18 @@
 # 08: Re-Split Server/Runner When One Machine Isn't Enough
 
-## When To Do This
+## Status: Implemented
 
-Not now. Do this when:
+The multi-runner architecture is built and tested. The runner package is a standalone Fastify process that registers with the coordinator over HTTP. The coordinator routes sessions to the least-loaded healthy runner. All the primitives for multi-machine deployment are in place.
+
+## When To Deploy This
+
+When:
 
 1. You have measured (step 06) that a single machine hits a resource ceiling
 2. That ceiling is CPU/memory/process count, not a software bug
 3. You actually need more than ~200-500 concurrent agent sessions
 
-If you're not there, you're paying distributed systems tax for nothing. Stop reading and go back to steps 01-07.
-
-## Still here? OK.
+If you're not there, you're paying distributed systems tax for nothing. The code exists but you don't need to run it.
 
 ## What Changes
 
@@ -134,6 +136,37 @@ From measuring (step 06), expect per runner (c5.2xlarge, 8 vCPU, 16GB RAM):
 | No memory limit | CPU (8 cores) | ~50-200 (depends on agent activity) |
 
 The "1000 sandboxes per runner" number from the original plan is aspirational. Real number depends on what agents actually do. Measure it.
+
+## What Was Built
+
+### Runner Registration & Lifecycle
+
+- **Registration with retry**: Runners register with the coordinator via `POST /api/internal/runners/register`. If registration fails, retries with exponential backoff (1s, 2s, 4s, 8s, 16s) until successful.
+- **Graceful deregistration**: On shutdown, the runner calls `POST /api/internal/runners/deregister`. The coordinator immediately pauses all active sessions on that runner (single bulk UPDATE, not per-session) and removes it from the registry. No more waiting 30s for the liveness sweep.
+- **Heartbeat loop**: Every 10 seconds, sends pool stats to the coordinator.
+- **Internal endpoint auth**: When `ASH_INTERNAL_SECRET` is set, all internal endpoints require `Authorization: Bearer <secret>`. Required for multi-machine deployments. No-op in dev/single-machine mode.
+
+### Coordinator Improvements
+
+- **Bulk session pause**: `handleDeadRunner` uses a single `UPDATE sessions SET status='paused' WHERE runner_id=? AND status IN ('active','starting')` instead of N+1 queries.
+- **Liveness sweep jitter**: Random 0-5s jitter on each sweep interval prevents thundering herd when multiple coordinators run independently.
+- **Single-query dead runner detection**: `checkLiveness` queries directly for runners past the heartbeat cutoff instead of listing all runners then filtering in JS.
+- **Stale cache cleanup**: After processing dead runners, purges local backend cache entries for runners that another coordinator removed from the DB.
+- **Coordinator ID**: Each coordinator logs its ID (`hostname-PID`) on startup and includes it in the health endpoint for debugging multi-coordinator deployments.
+
+### Key Files
+
+| File | What |
+|------|------|
+| `packages/runner/src/index.ts` | Runner entry point (Fastify + sandbox pool) |
+| `packages/runner/src/registration.ts` | Registration with retry + graceful deregister |
+| `packages/runner/src/routes/sandboxes.ts` | Sandbox CRUD + SSE streaming for commands |
+| `packages/runner/src/routes/health.ts` | Health endpoint with pool stats |
+| `packages/server/src/runner/coordinator.ts` | DB-backed coordinator with bulk operations |
+| `packages/server/src/runner/remote-backend.ts` | HTTP client wrapper for runner backends |
+| `packages/server/src/runner/runner-client.ts` | Raw HTTP/SSE client to runner processes |
+| `packages/server/src/routes/runners.ts` | Registration/heartbeat/deregister endpoints |
+| `packages/server/src/__tests__/coordinator.test.ts` | 13 tests including deregistration and bulk pause |
 
 ## What's Next
 

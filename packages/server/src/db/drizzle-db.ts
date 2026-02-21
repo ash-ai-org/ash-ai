@@ -73,6 +73,19 @@ export class DrizzleDb implements Db {
     }));
   }
 
+  async listDeadRunners(cutoffIso: string): Promise<RunnerRecord[]> {
+    const { runners } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(runners)
+      .where(sql`${runners.lastHeartbeatAt} <= ${cutoffIso}`);
+    return rows.map((r: any) => ({
+      id: r.id, host: r.host, port: r.port, maxSandboxes: r.maxSandboxes,
+      activeCount: r.activeCount, warmingCount: r.warmingCount,
+      lastHeartbeatAt: r.lastHeartbeatAt, registeredAt: r.registeredAt,
+    }));
+  }
+
   async selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
     const { runners } = this.schema;
     const rows = await this.drizzle
@@ -284,6 +297,19 @@ export class DrizzleDb implements Db {
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
       status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
+  }
+
+  async bulkPauseSessionsByRunner(runnerId: string): Promise<number> {
+    const { sessions } = this.schema;
+    const now = new Date().toISOString();
+    const result = await this.drizzle
+      .update(sessions)
+      .set({ status: 'paused', lastActiveAt: now })
+      .where(and(
+        eq(sessions.runnerId, runnerId),
+        inArray(sessions.status, ['active', 'starting']),
+      ));
+    return result.changes ?? result.rowCount ?? 0;
   }
 
   async touchSession(id: string): Promise<void> {

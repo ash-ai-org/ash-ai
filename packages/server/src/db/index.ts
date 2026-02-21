@@ -22,6 +22,8 @@ export interface Db {
   heartbeatRunner(id: string, activeCount: number, warmingCount: number): Promise<void>;
   getRunner(id: string): Promise<RunnerRecord | null>;
   listHealthyRunners(cutoffIso: string): Promise<RunnerRecord[]>;
+  /** List runners whose last heartbeat is at or before the cutoff. */
+  listDeadRunners(cutoffIso: string): Promise<RunnerRecord[]>;
   selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null>;
   deleteRunner(id: string): Promise<void>;
   listAllRunners(): Promise<RunnerRecord[]>;
@@ -39,6 +41,8 @@ export interface Db {
   getSession(id: string): Promise<Session | null>;
   listSessions(tenantId?: string, agent?: string): Promise<Session[]>;
   listSessionsByRunner(runnerId: string): Promise<Session[]>;
+  /** Bulk-pause all active/starting sessions on a runner. Returns count of paused sessions. */
+  bulkPauseSessionsByRunner(runnerId: string): Promise<number>;
   touchSession(id: string): Promise<void>;
   // Sandboxes (insertSandbox is tenant-scoped)
   insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string, tenantId?: string): Promise<void>;
@@ -200,6 +204,10 @@ export async function listSessionsByRunner(runnerId: string): Promise<Session[]>
   return getDb().listSessionsByRunner(runnerId);
 }
 
+export async function bulkPauseSessionsByRunner(runnerId: string): Promise<number> {
+  return getDb().bulkPauseSessionsByRunner(runnerId);
+}
+
 export async function touchSession(id: string): Promise<void> {
   return getDb().touchSession(id);
 }
@@ -305,6 +313,10 @@ export async function getRunner(id: string): Promise<RunnerRecord | null> {
 
 export async function listHealthyRunners(cutoffIso: string): Promise<RunnerRecord[]> {
   return getDb().listHealthyRunners(cutoffIso);
+}
+
+export async function listDeadRunners(cutoffIso: string): Promise<RunnerRecord[]> {
+  return getDb().listDeadRunners(cutoffIso);
 }
 
 export async function selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {

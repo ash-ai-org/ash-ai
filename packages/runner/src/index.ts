@@ -53,10 +53,11 @@ const app = Fastify({ logger: true });
 sandboxRoutes(app, pool, dataDir);
 healthRoutes(app, pool, runnerId, maxCapacity);
 
-// Graceful shutdown
+// Graceful shutdown — deregisters from control plane immediately so sessions are paused,
+// rather than waiting 30s for the liveness sweep to detect the dead runner.
 async function shutdown() {
   app.log.info('Runner shutting down...');
-  stopRegistration();
+  await stopRegistration();
   pool.stopIdleSweep();
   await pool.destroyAll();
   await app.close();
@@ -81,6 +82,7 @@ try {
       maxSandboxes: maxCapacity,
       serverUrl,
       pool,
+      internalSecret: process.env.ASH_INTERNAL_SECRET,
     });
   }
 } catch (err) {

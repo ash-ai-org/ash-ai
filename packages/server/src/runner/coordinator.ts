@@ -2,7 +2,7 @@ import type { PoolStats, RunnerRecord } from '@ash-ai/shared';
 import { RUNNER_LIVENESS_TIMEOUT_MS } from '@ash-ai/shared';
 import type { RunnerBackend } from './types.js';
 import { RemoteRunnerBackend } from './remote-backend.js';
-import { updateSessionStatus, listSessionsByRunner, upsertRunner, heartbeatRunner, selectBestRunner, deleteRunner, listAllRunners, getRunner } from '../db/index.js';
+import { bulkPauseSessionsByRunner, upsertRunner, heartbeatRunner, selectBestRunner, deleteRunner, listAllRunners, listDeadRunners, getRunner } from '../db/index.js';
 
 /**
  * Coordinates multiple runners. Routes session creation to the least-loaded runner.
@@ -53,6 +53,16 @@ export class RunnerCoordinator {
    */
   async heartbeat(runnerId: string, stats: PoolStats): Promise<void> {
     await heartbeatRunner(runnerId, stats.running ?? 0, stats.warming ?? 0);
+  }
+
+  /**
+   * Graceful deregistration. Called when a runner shuts down cleanly.
+   * Immediately pauses its sessions and removes it from the registry,
+   * rather than waiting 30s for the liveness sweep to notice.
+   */
+  async deregisterRunner(runnerId: string): Promise<void> {
+    console.log(`[coordinator] Runner ${runnerId} deregistering gracefully`);
+    await this.handleDeadRunner(runnerId);
   }
 
   /**
@@ -147,15 +157,23 @@ export class RunnerCoordinator {
    * Start periodic liveness checks for remote runners.
    * Safe to run on multiple coordinators — all operations are idempotent.
    * Each coordinator runs independently; no leader election needed.
+   *
+   * Uses random jitter (0-5s) on each interval to prevent thundering herd
+   * when multiple coordinators run the same sweep at the same time.
    */
   startLivenessSweep(): void {
     if (this.livenessSweepTimer) return;
-    this.livenessSweepTimer = setInterval(() => {
-      this.checkLiveness().catch((err) =>
-        console.error('[coordinator] Liveness sweep error:', err)
-      );
-    }, RUNNER_LIVENESS_TIMEOUT_MS);
-    this.livenessSweepTimer.unref();
+    const scheduleNext = () => {
+      // Add 0-5s random jitter to prevent thundering herd across coordinators
+      const jitter = Math.floor(Math.random() * 5000);
+      this.livenessSweepTimer = setTimeout(() => {
+        this.checkLiveness()
+          .catch((err) => console.error('[coordinator] Liveness sweep error:', err))
+          .finally(() => scheduleNext());
+      }, RUNNER_LIVENESS_TIMEOUT_MS + jitter);
+      this.livenessSweepTimer.unref();
+    };
+    scheduleNext();
   }
 
   stopLivenessSweep(): void {
@@ -165,29 +183,42 @@ export class RunnerCoordinator {
     }
   }
 
+  /**
+   * Single-query dead runner detection. Instead of listing ALL runners then
+   * filtering in JS, queries directly for runners past the heartbeat cutoff.
+   * Also cleans up stale local backend cache entries.
+   */
   private async checkLiveness(): Promise<void> {
     const cutoff = new Date(Date.now() - RUNNER_LIVENESS_TIMEOUT_MS).toISOString();
-    const allRunners = await listAllRunners();
-    for (const runner of allRunners) {
-      if (runner.lastHeartbeatAt <= cutoff) {
-        console.warn(`[coordinator] Runner ${runner.id} missed heartbeat — marking sessions paused`);
-        await this.handleDeadRunner(runner.id);
+    const deadRunners = await listDeadRunners(cutoff);
+    for (const runner of deadRunners) {
+      console.warn(`[coordinator] Runner ${runner.id} missed heartbeat — marking sessions paused`);
+      await this.handleDeadRunner(runner.id);
+    }
+
+    // Purge stale local cache entries: backends for runners no longer in DB.
+    // This handles the case where another coordinator removed the runner.
+    if (this.backends.size > 0) {
+      const liveRunnerIds = new Set((await listAllRunners()).map(r => r.id));
+      for (const [id, backend] of this.backends) {
+        if (!liveRunnerIds.has(id)) {
+          backend.close();
+          this.backends.delete(id);
+        }
       }
     }
   }
 
   /**
    * Handle a dead runner: pause its sessions and remove from registry.
-   * Idempotent — safe to call from multiple coordinators.
+   * Idempotent — safe to call from multiple coordinators concurrently.
+   * Uses a single bulk UPDATE instead of per-session queries.
    */
   async handleDeadRunner(runnerId: string): Promise<void> {
-    // Mark all active/starting sessions on this runner as paused
-    const sessions = await listSessionsByRunner(runnerId);
-    for (const session of sessions) {
-      if (session.status === 'active' || session.status === 'starting') {
-        await updateSessionStatus(session.id, 'paused');
-        console.log(`[coordinator] Paused session ${session.id} (runner ${runnerId} dead)`);
-      }
+    // Single bulk UPDATE — no N+1
+    const pausedCount = await bulkPauseSessionsByRunner(runnerId);
+    if (pausedCount > 0) {
+      console.log(`[coordinator] Paused ${pausedCount} session(s) on runner ${runnerId}`);
     }
 
     // Remove from DB (all coordinators will see this)

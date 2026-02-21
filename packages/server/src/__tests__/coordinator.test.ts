@@ -217,6 +217,79 @@ describe('RunnerCoordinator (DB-backed)', () => {
     });
   });
 
+  describe('deregisterRunner', () => {
+    it('immediately pauses sessions and removes runner from DB', async () => {
+      await coordinator.registerRunner({
+        runnerId: 'runner-shutting-down',
+        host: 'host-1',
+        port: 4200,
+        maxSandboxes: 50,
+      });
+
+      // Create two sessions: one active, one ended
+      const activeId = randomUUID();
+      const endedId = randomUUID();
+      await insertSession(activeId, 'test-agent', activeId);
+      await updateSessionRunner(activeId, 'runner-shutting-down');
+      await updateSessionStatus(activeId, 'active');
+
+      await insertSession(endedId, 'test-agent', endedId);
+      await updateSessionRunner(endedId, 'runner-shutting-down');
+      await updateSessionStatus(endedId, 'ended');
+
+      await coordinator.deregisterRunner('runner-shutting-down');
+
+      const { getSession } = await import('../db/index.js');
+      // Active session should be paused
+      const active = await getSession(activeId);
+      expect(active?.status).toBe('paused');
+
+      // Ended session should remain ended (not re-paused)
+      const ended = await getSession(endedId);
+      expect(ended?.status).toBe('ended');
+
+      // Runner should be gone
+      const info = await coordinator.getRunnerInfoFromDb();
+      expect(info).toHaveLength(0);
+    });
+  });
+
+  describe('bulkPauseSessionsByRunner', () => {
+    it('pauses multiple active sessions in a single operation', async () => {
+      await coordinator.registerRunner({
+        runnerId: 'runner-bulk',
+        host: 'host-1',
+        port: 4200,
+        maxSandboxes: 50,
+      });
+
+      // Create 5 sessions: 3 active, 1 paused, 1 ended
+      const ids = Array.from({ length: 5 }, () => randomUUID());
+      for (const id of ids) {
+        await insertSession(id, 'test-agent', id);
+        await updateSessionRunner(id, 'runner-bulk');
+      }
+      await updateSessionStatus(ids[0], 'active');
+      await updateSessionStatus(ids[1], 'active');
+      await updateSessionStatus(ids[2], 'active');
+      await updateSessionStatus(ids[3], 'paused');
+      await updateSessionStatus(ids[4], 'ended');
+
+      await coordinator.handleDeadRunner('runner-bulk');
+
+      const { getSession } = await import('../db/index.js');
+      // All 3 active sessions should be paused
+      for (const id of ids.slice(0, 3)) {
+        const session = await getSession(id);
+        expect(session?.status).toBe('paused');
+      }
+      // Already paused stays paused
+      expect((await getSession(ids[3]))?.status).toBe('paused');
+      // Ended stays ended
+      expect((await getSession(ids[4]))?.status).toBe('ended');
+    });
+  });
+
   describe('multi-coordinator consistency', () => {
     it('second coordinator can select runner registered by first', async () => {
       // First coordinator registers a runner
