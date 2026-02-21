@@ -144,6 +144,71 @@ describe('SDK application', () => {
     await client.endSession(session.id);
   }, 15_000);
 
+  it('multi-turn conversation preserves history in mock bridge', async () => {
+    const session = await client.createSession('sdk-agent');
+
+    // Helper to extract assistant text from a stream
+    const getAssistantText = async (sessionId: string, message: string): Promise<string> => {
+      const events: Array<{ type: string; data: unknown }> = [];
+      for await (const ev of client.sendMessageStream(sessionId, message)) {
+        events.push(ev);
+      }
+      const assistantEvent = events.find(
+        (e) => e.type === 'message' && (e.data as any).type === 'assistant',
+      );
+      const content = (assistantEvent?.data as any)?.message?.content;
+      return content?.[0]?.text ?? '';
+    };
+
+    // Turn 1
+    const text1 = await getAssistantText(session.id, 'first question');
+    expect(text1).toContain('Turn 1');
+    expect(text1).toContain('first question');
+    expect(text1).not.toContain('second question');
+
+    // Turn 2 — should see both prompts in history
+    const text2 = await getAssistantText(session.id, 'second question');
+    expect(text2).toContain('Turn 2');
+    expect(text2).toContain('first question');
+    expect(text2).toContain('second question');
+
+    // Turn 3 — full history
+    const text3 = await getAssistantText(session.id, 'third question');
+    expect(text3).toContain('Turn 3');
+    expect(text3).toContain('first question');
+    expect(text3).toContain('second question');
+    expect(text3).toContain('third question');
+
+    await client.endSession(session.id);
+  }, 20_000);
+
+  it('separate sessions have independent history', async () => {
+    const s1 = await client.createSession('sdk-agent');
+    const s2 = await client.createSession('sdk-agent');
+
+    const getAssistantText = async (sessionId: string, message: string): Promise<string> => {
+      const events: Array<{ type: string; data: unknown }> = [];
+      for await (const ev of client.sendMessageStream(sessionId, message)) {
+        events.push(ev);
+      }
+      const assistantEvent = events.find(
+        (e) => e.type === 'message' && (e.data as any).type === 'assistant',
+      );
+      return (assistantEvent?.data as any)?.message?.content?.[0]?.text ?? '';
+    };
+
+    // Send to session 1
+    await getAssistantText(s1.id, 'session-one-msg');
+
+    // Send to session 2 — should NOT see session 1's history
+    const text2 = await getAssistantText(s2.id, 'session-two-msg');
+    expect(text2).toContain('Turn 1');
+    expect(text2).toContain('session-two-msg');
+    expect(text2).not.toContain('session-one-msg');
+
+    await Promise.all([client.endSession(s1.id), client.endSession(s2.id)]);
+  }, 20_000);
+
   it('concurrent sessions to the same agent', async () => {
     const [s1, s2] = await Promise.all([
       client.createSession('sdk-agent'),

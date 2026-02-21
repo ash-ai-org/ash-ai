@@ -1,6 +1,13 @@
-import { join } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
+
+/** Resolve the package root from the current file — works from both src/ (tsx) and dist/ (compiled). */
+function pkgRoot(): string {
+  const thisFile = typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url);
+  return resolve(dirname(thisFile), '..', '..');
+}
 
 /**
  * Database interface for Ash persistence.
@@ -66,8 +73,6 @@ export async function initDb(opts: { dataDir: string; databaseUrl?: string }): P
     const { drizzle } = await import('drizzle-orm/node-postgres');
     const { migrate } = await import('drizzle-orm/node-postgres/migrator');
     const pgSchema = await import('./schema.pg.js');
-    const { resolve, dirname } = await import('node:path');
-    const { fileURLToPath } = await import('node:url');
 
     const pool = new pgMod.default.Pool({ connectionString: opts.databaseUrl });
 
@@ -88,11 +93,7 @@ export async function initDb(opts: { dataDir: string; databaseUrl?: string }): P
     }
 
     const d = drizzle(pool, { schema: pgSchema });
-
-    // Resolve migration folder — works from both src (tsx) and dist (compiled)
-    const thisFile = typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url);
-    const pkgRoot = resolve(dirname(thisFile), '..', '..');
-    await migrate(d, { migrationsFolder: resolve(pkgRoot, 'drizzle', 'pg') });
+    await migrate(d, { migrationsFolder: resolve(pkgRoot(), 'drizzle', 'pg') });
 
     db = new DrizzleDb(d, pgSchema, 'pg', async () => { await pool.end(); });
   } else {
@@ -100,8 +101,6 @@ export async function initDb(opts: { dataDir: string; databaseUrl?: string }): P
     const { drizzle } = await import('drizzle-orm/better-sqlite3');
     const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
     const sqliteSchema = await import('./schema.sqlite.js');
-    const { resolve, dirname } = await import('node:path');
-    const { fileURLToPath } = await import('node:url');
 
     mkdirSync(opts.dataDir, { recursive: true });
     const sqlite = new BetterSqlite3(join(opts.dataDir, 'ash.db'));
@@ -109,11 +108,7 @@ export async function initDb(opts: { dataDir: string; databaseUrl?: string }): P
     sqlite.pragma('foreign_keys = ON');
 
     const d = drizzle(sqlite, { schema: sqliteSchema });
-
-    // Resolve migration folder — works from both src (tsx) and dist (compiled)
-    const thisFile = typeof __filename !== 'undefined' ? __filename : fileURLToPath(import.meta.url);
-    const pkgRoot = resolve(dirname(thisFile), '..', '..');
-    migrate(d, { migrationsFolder: resolve(pkgRoot, 'drizzle', 'sqlite') });
+    migrate(d, { migrationsFolder: resolve(pkgRoot(), 'drizzle', 'sqlite') });
 
     db = new DrizzleDb(d, sqliteSchema, 'sqlite', async () => { sqlite.close(); });
   }
