@@ -1,9 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { join } from 'node:path';
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { getSession } from '../db/index.js';
-import { createBundle, extractBundle, hasPersistedState, persistSessionState, restoreSessionState } from '@ash-ai/sandbox';
+import { createBundle, extractBundle, hasPersistedState, restoreSessionState } from '@ash-ai/sandbox';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
+
+/** Max body size for workspace uploads: ~134MB base64 ≈ 100MB binary. */
+const WORKSPACE_BODY_LIMIT = 134 * 1024 * 1024;
 
 export function workspaceRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, dataDir: string): void {
   // Download workspace as tar.gz bundle
@@ -27,6 +30,7 @@ export function workspaceRoutes(app: FastifyInstance, coordinator: RunnerCoordin
 
     // Try live sandbox workspace first
     let workspaceDir: string | null = null;
+    let tempDir: string | null = null;
     try {
       const backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
       const sandbox = backend.getSandbox(session.sandboxId);
@@ -41,7 +45,7 @@ export function workspaceRoutes(app: FastifyInstance, coordinator: RunnerCoordin
       if (existsSync(snapshotDir)) {
         workspaceDir = snapshotDir;
       } else if (hasPersistedState(dataDir, session.id, session.tenantId)) {
-        const tempDir = join(dataDir, 'tmp', `bundle-${session.id}`);
+        tempDir = join(dataDir, 'tmp', `bundle-${session.id}-${Date.now()}`);
         restoreSessionState(dataDir, session.id, tempDir, session.tenantId);
         workspaceDir = tempDir;
       }
@@ -51,15 +55,23 @@ export function workspaceRoutes(app: FastifyInstance, coordinator: RunnerCoordin
       return reply.status(404).send({ error: 'No workspace available for this session', statusCode: 404 });
     }
 
-    const bundle = createBundle(workspaceDir);
-    return reply
-      .header('Content-Type', 'application/gzip')
-      .header('Content-Disposition', `attachment; filename="${session.id}.tar.gz"`)
-      .send(bundle);
+    try {
+      const bundle = createBundle(workspaceDir);
+      return reply
+        .header('Content-Type', 'application/gzip')
+        .header('Content-Disposition', `attachment; filename="${session.id}.tar.gz"`)
+        .send(bundle);
+    } finally {
+      // Clean up temp directory if we created one
+      if (tempDir) {
+        try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* best effort */ }
+      }
+    }
   });
 
   // Upload/restore workspace from tar.gz bundle
   app.post<{ Params: { id: string } }>('/api/sessions/:id/workspace', {
+    bodyLimit: WORKSPACE_BODY_LIMIT,
     schema: {
       tags: ['sessions'],
       params: {

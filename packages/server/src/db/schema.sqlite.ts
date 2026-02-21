@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const runners = sqliteTable('runners', {
   id: text('id').primaryKey(),
@@ -116,7 +116,7 @@ export const usageEvents = sqliteTable('usage_events', {
   sessionId: text('session_id').notNull(),
   agentName: text('agent_name').notNull(),
   eventType: text('event_type').notNull(),
-  value: integer('value').notNull(),
+  value: real('value').notNull(),
   createdAt: text('created_at').notNull(),
 }, (table) => [
   index('idx_usage_session').on(table.tenantId, table.sessionId),
@@ -150,6 +150,7 @@ export const queueItems = sqliteTable('queue_items', {
   retryCount: integer('retry_count').notNull().default(0),
   maxRetries: integer('max_retries').notNull().default(3),
   error: text('error'),
+  retryAfter: text('retry_after'),
   createdAt: text('created_at').notNull(),
   startedAt: text('started_at'),
   completedAt: text('completed_at'),

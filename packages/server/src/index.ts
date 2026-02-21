@@ -97,6 +97,8 @@ await app.register(swagger, {
       { name: 'health', description: 'Server health' },
       { name: 'agents', description: 'Agent deployment and management' },
       { name: 'sessions', description: 'Session lifecycle and messaging' },
+      { name: 'credentials', description: 'Credential storage and management' },
+      { name: 'attachments', description: 'File attachments for sessions' },
       { name: 'queue', description: 'Async message queue' },
       { name: 'usage', description: 'Usage tracking and analytics' },
     ],

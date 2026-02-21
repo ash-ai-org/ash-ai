@@ -11,6 +11,7 @@ import { stopCommand } from './commands/stop.js';
 import { statusCommand } from './commands/status.js';
 import { logsCommand } from './commands/logs.js';
 import { chatCommand } from './commands/chat.js';
+import { loginCommand, logoutCommand } from './commands/login.js';
 
 export const isDevMode = basename(process.argv[1] ?? '').startsWith('ash-dev');
 
@@ -28,5 +29,7 @@ program.addCommand(deployCommand());
 program.addCommand(sessionCommand());
 program.addCommand(agentCommand());
 program.addCommand(healthCommand());
+program.addCommand(loginCommand());
+program.addCommand(logoutCommand());
 
 program.parse();

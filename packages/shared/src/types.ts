@@ -385,6 +385,7 @@ export interface QueueStats {
   processing: number;
   completed: number;
   failed: number;
+  cancelled: number;
 }
 
 export interface ListQueueResponse {

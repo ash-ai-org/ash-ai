@@ -71,8 +71,9 @@ export interface Db {
   insertQueueItem(id: string, tenantId: string, agentName: string, prompt: string, sessionId?: string, priority?: number, maxRetries?: number): Promise<QueueItem>;
   getQueueItem(id: string): Promise<QueueItem | null>;
   getNextPendingQueueItem(tenantId?: string): Promise<QueueItem | null>;
+  claimQueueItem(id: string): Promise<boolean>;
   updateQueueItemStatus(id: string, status: QueueItemStatus, error?: string): Promise<void>;
-  incrementQueueItemRetry(id: string): Promise<void>;
+  incrementQueueItemRetry(id: string, retryAfter?: string): Promise<void>;
   listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]>;
   getQueueStats(tenantId: string): Promise<QueueStats>;
   // Credentials (tenant-scoped)
@@ -90,8 +91,8 @@ export interface Db {
   // Usage (tenant-scoped)
   insertUsageEvent(id: string, tenantId: string, sessionId: string, agentName: string, eventType: UsageEventType, value: number): Promise<UsageEvent>;
   insertUsageEvents(events: Array<{ id: string; tenantId: string; sessionId: string; agentName: string; eventType: UsageEventType; value: number }>): Promise<void>;
-  listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]>;
-  getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats>;
+  listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number }): Promise<UsageEvent[]>;
+  getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats>;
   // Lifecycle
   close(): Promise<void>;
 }
@@ -349,8 +350,12 @@ export async function updateQueueItemStatus(id: string, status: QueueItemStatus,
   return getDb().updateQueueItemStatus(id, status, error);
 }
 
-export async function incrementQueueItemRetry(id: string): Promise<void> {
-  return getDb().incrementQueueItemRetry(id);
+export async function claimQueueItem(id: string): Promise<boolean> {
+  return getDb().claimQueueItem(id);
+}
+
+export async function incrementQueueItemRetry(id: string, retryAfter?: string): Promise<void> {
+  return getDb().incrementQueueItemRetry(id, retryAfter);
 }
 
 export async function listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]> {
@@ -415,11 +420,11 @@ export async function insertUsageEvents(events: Array<{ id: string; tenantId: st
   return getDb().insertUsageEvents(events);
 }
 
-export async function listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]> {
+export async function listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number }): Promise<UsageEvent[]> {
   return getDb().listUsageEvents(tenantId, opts);
 }
 
-export async function getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats> {
+export async function getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats> {
   return getDb().getUsageStats(tenantId, opts);
 }
 

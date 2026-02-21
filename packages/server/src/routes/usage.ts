@@ -11,6 +11,8 @@ export function usageRoutes(app: FastifyInstance): void {
         properties: {
           sessionId: { type: 'string', format: 'uuid' },
           agentName: { type: 'string' },
+          after: { type: 'string', format: 'date-time', description: 'Only events after this ISO timestamp' },
+          before: { type: 'string', format: 'date-time', description: 'Only events before this ISO timestamp' },
           limit: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
         },
       },
@@ -20,17 +22,7 @@ export function usageRoutes(app: FastifyInstance): void {
           properties: {
             events: {
               type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  sessionId: { type: 'string' },
-                  agentName: { type: 'string' },
-                  eventType: { type: 'string' },
-                  value: { type: 'number' },
-                  createdAt: { type: 'string' },
-                },
-              },
+              items: { $ref: 'UsageEvent#' },
             },
           },
           required: ['events'],
@@ -38,8 +30,10 @@ export function usageRoutes(app: FastifyInstance): void {
       },
     },
   }, async (req, reply) => {
-    const { sessionId, agentName, limit } = req.query as { sessionId?: string; agentName?: string; limit?: number };
-    const events = await listUsageEvents(req.tenantId, { sessionId, agentName, limit });
+    const { sessionId, agentName, after, before, limit } = req.query as {
+      sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number;
+    };
+    const events = await listUsageEvents(req.tenantId, { sessionId, agentName, after, before, limit });
     return reply.send({ events });
   });
 
@@ -52,32 +46,25 @@ export function usageRoutes(app: FastifyInstance): void {
         properties: {
           sessionId: { type: 'string', format: 'uuid' },
           agentName: { type: 'string' },
+          after: { type: 'string', format: 'date-time', description: 'Only events after this ISO timestamp' },
+          before: { type: 'string', format: 'date-time', description: 'Only events before this ISO timestamp' },
         },
       },
       response: {
         200: {
           type: 'object',
           properties: {
-            stats: {
-              type: 'object',
-              properties: {
-                totalInputTokens: { type: 'integer' },
-                totalOutputTokens: { type: 'integer' },
-                totalCacheCreationTokens: { type: 'integer' },
-                totalCacheReadTokens: { type: 'integer' },
-                totalToolCalls: { type: 'integer' },
-                totalMessages: { type: 'integer' },
-                totalComputeSeconds: { type: 'number' },
-              },
-            },
+            stats: { $ref: 'UsageStats#' },
           },
           required: ['stats'],
         },
       },
     },
   }, async (req, reply) => {
-    const { sessionId, agentName } = req.query as { sessionId?: string; agentName?: string };
-    const stats = await getUsageStats(req.tenantId, { sessionId, agentName });
+    const { sessionId, agentName, after, before } = req.query as {
+      sessionId?: string; agentName?: string; after?: string; before?: string;
+    };
+    const stats = await getUsageStats(req.tenantId, { sessionId, agentName, after, before });
     return reply.send({ stats });
   });
 }

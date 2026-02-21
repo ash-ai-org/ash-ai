@@ -50,6 +50,13 @@
       "when": 1771639437402,
       "tag": "0006_third_shiva",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771706260827,
+      "tag": "0007_keen_shockwave",
+      "breakpoints": true
     }
   ]
 }

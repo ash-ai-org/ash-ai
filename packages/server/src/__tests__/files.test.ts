@@ -116,8 +116,8 @@ describe('file routes', () => {
       populateWorkspace();
       const session = await createTestSession();
 
-      // Persist state to snapshot location
-      const snapshotDir = join(dataDir, 'sessions', session.sandboxId, 'workspace');
+      // Persist state to snapshot location (uses session.id, not sandboxId)
+      const snapshotDir = join(dataDir, 'sessions', session.id, 'workspace');
       mkdirSync(snapshotDir, { recursive: true });
       writeFileSync(join(snapshotDir, 'snapshot-file.txt'), 'from snapshot');
 

@@ -56,25 +56,26 @@ export async function createFileStore(url: string): Promise<FileStore> {
   throw new Error(`Unsupported file store URL scheme: ${url} (expected s3:// or file://)`);
 }
 
-let store: FileStore | null | undefined;
+let storePromise: Promise<FileStore | null> | undefined;
 
 /**
  * Module-level singleton. Returns null if ASH_FILE_STORE_URL is not set.
+ * Caches the promise itself to prevent concurrent double-initialization.
  */
 export async function getFileStore(): Promise<FileStore | null> {
-  if (store !== undefined) return store;
+  if (storePromise !== undefined) return storePromise;
   const url = process.env.ASH_FILE_STORE_URL;
   if (!url) {
-    store = null;
+    storePromise = Promise.resolve(null);
     return null;
   }
-  store = await createFileStore(url);
-  return store;
+  storePromise = createFileStore(url);
+  return storePromise;
 }
 
 /**
  * Reset the singleton (for testing).
  */
 export function resetFileStore(): void {
-  store = undefined;
+  storePromise = undefined;
 }
