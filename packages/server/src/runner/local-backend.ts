@@ -21,6 +21,7 @@ export class LocalRunnerBackend implements RunnerBackend {
       skipAgentCopy: opts.skipAgentCopy,
       limits: opts.limits,
       onOomKill: opts.onOomKill,
+      extraEnv: opts.extraEnv,
     });
     return { sandboxId: sandbox.id, workspaceDir: sandbox.workspaceDir };
   }
@@ -39,6 +40,12 @@ export class LocalRunnerBackend implements RunnerBackend {
       throw new Error(`Sandbox ${sandboxId} not found`);
     }
     yield* sandbox.client.sendCommand(cmd);
+  }
+
+  interrupt(sandboxId: string): void {
+    const sandbox = this.pool.get(sandboxId);
+    if (!sandbox) return; // sandbox already gone — no-op
+    sandbox.client.writeCommand({ cmd: 'interrupt' });
   }
 
   getSandbox(sandboxId: string): SandboxHandle | undefined {

@@ -8,6 +8,48 @@
       "when": 1771632907426,
       "tag": "0000_thick_loners",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771637682149,
+      "tag": "0001_rare_lester",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771637997708,
+      "tag": "0002_short_shinko_yamashiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771638247011,
+      "tag": "0003_remarkable_mastermind",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771638581803,
+      "tag": "0004_warm_reaper",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771639241182,
+      "tag": "0005_overconfident_mole_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771639437402,
+      "tag": "0006_third_shiva",
+      "breakpoints": true
     }
   ]
 }

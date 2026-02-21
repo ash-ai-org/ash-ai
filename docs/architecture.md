@@ -58,6 +58,85 @@ graph LR
 
 In coordinator mode (`ASH_MODE=coordinator`), the server is a pure control plane. Runners register via internal endpoints, send heartbeats, and host the sandboxes. The coordinator routes new sessions to the least-loaded runner. See [features/multi-runner.md](./features/multi-runner.md) for details.
 
+### Multi-Coordinator Mode (Horizontal Control Plane)
+
+```mermaid
+graph LR
+    Client["CLI / SDK / Browser"]
+    LB["Load Balancer"]
+    C1["Coordinator 1<br/>(:4100)"]
+    C2["Coordinator 2<br/>(:4100)"]
+    DB["CRDB"]
+    R1["Runner A"]
+    R2["Runner B"]
+
+    Client -->|HTTPS| LB
+    LB --> C1
+    LB --> C2
+    C1 --> DB
+    C2 --> DB
+    C1 -->|HTTP| R1
+    C1 -->|HTTP| R2
+    C2 -->|HTTP| R1
+    C2 -->|HTTP| R2
+```
+
+For high availability or when a single coordinator saturates its SSE connection capacity (~10,000 concurrent), run multiple coordinators behind a load balancer. Requirements:
+
+- **Shared database**: All coordinators must use the same Postgres/CRDB via `ASH_DATABASE_URL`
+- **Runner registry in DB**: The `runners` table stores all registered runners (registration, heartbeat, capacity stats)
+- **Stateless coordinators**: All routing decisions come from DB queries. The in-memory `Map<string, RemoteRunnerBackend>` is a connection cache only.
+- **Idempotent liveness sweep**: All coordinators run the sweep independently. Operations are idempotent — no leader election needed.
+- **SSE failover**: If a coordinator dies, clients auto-reconnect through the LB to a different coordinator, which re-establishes the runner proxy from DB state.
+
+See [features/multi-coordinator.md](./features/multi-coordinator.md) for implementation details.
+
+### Session Routing Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant Co as Coordinator
+    participant DB as Database (CRDB)
+    participant R as Runner
+
+    C->>Co: POST /api/sessions {agent: "my-agent"}
+    Co->>DB: SELECT runner with most capacity
+    DB-->>Co: runner-2 (host, port)
+    Co->>R: POST /runner/sandboxes {sessionId, agentDir}
+    R-->>Co: {sandboxId, workspaceDir}
+    Co->>DB: INSERT session (runner_id = "runner-2")
+    Co-->>C: 201 {session}
+
+    C->>Co: POST /api/sessions/:id/messages
+    Co->>DB: SELECT session → runner_id
+    Co->>R: POST /runner/sandboxes/:id/cmd
+    R-->>Co: SSE stream (bridge events)
+    Co-->>C: SSE stream (proxied)
+```
+
+### Runner Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant R as Runner
+    participant Co as Coordinator
+    participant DB as Database
+
+    R->>Co: POST /api/internal/runners/register
+    Co->>DB: UPSERT runners table
+    Co-->>R: {ok: true}
+
+    loop Every 10s
+        R->>Co: POST /api/internal/runners/heartbeat
+        Co->>DB: UPDATE active_count, warming_count, last_heartbeat_at
+    end
+
+    Note over Co: Runner misses heartbeat for 30s
+    Co->>DB: UPDATE sessions SET status='paused' WHERE runner_id=...
+    Co->>DB: DELETE FROM runners WHERE id=...
+```
+
 ## Components
 
 ### ash-shared (`@ash-ai/shared`)

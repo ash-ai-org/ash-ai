@@ -104,6 +104,44 @@ const HealthResponseSchema = {
   required: ['status', 'activeSessions', 'activeSandboxes', 'uptime', 'pool'],
 } as const;
 
+const AttachmentSchema = {
+  $id: 'Attachment',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    messageId: { type: 'string' },
+    sessionId: { type: 'string', format: 'uuid' },
+    filename: { type: 'string' },
+    mimeType: { type: 'string' },
+    size: { type: 'integer' },
+    storagePath: { type: 'string' },
+    createdAt: { type: 'string', format: 'date-time' },
+  },
+  required: ['id', 'sessionId', 'filename', 'mimeType', 'size', 'createdAt'],
+} as const;
+
+const QueueItemSchema = {
+  $id: 'QueueItem',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    sessionId: { type: ['string', 'null'] },
+    agentName: { type: 'string' },
+    prompt: { type: 'string' },
+    status: { type: 'string', enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'] },
+    priority: { type: 'integer' },
+    retryCount: { type: 'integer' },
+    maxRetries: { type: 'integer' },
+    error: { type: ['string', 'null'] },
+    createdAt: { type: 'string', format: 'date-time' },
+    startedAt: { type: ['string', 'null'] },
+    completedAt: { type: ['string', 'null'] },
+  },
+  required: ['id', 'agentName', 'prompt', 'status', 'priority', 'retryCount', 'maxRetries', 'createdAt'],
+} as const;
+
 export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(AgentSchema);
   app.addSchema(SessionSchema);
@@ -112,4 +150,6 @@ export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(ApiErrorSchema);
   app.addSchema(PoolStatsSchema);
   app.addSchema(HealthResponseSchema);
+  app.addSchema(QueueItemSchema);
+  app.addSchema(AttachmentSchema);
 }

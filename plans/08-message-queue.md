@@ -1,6 +1,6 @@
 # Plan 08: Message Queue
 
-## Status: Not Started
+## Status: Done
 ## Priority: Medium
 ## Effort: Medium
 

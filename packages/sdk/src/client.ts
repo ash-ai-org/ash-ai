@@ -4,10 +4,21 @@ import type {
   Message,
   SessionEvent,
   SessionEventType,
+  Credential,
+  Attachment,
+  UsageEvent,
+  UsageStats,
+  QueueItem,
+  QueueItemStatus,
+  QueueStats,
   ListAgentsResponse,
   ListSessionsResponse,
   ListMessagesResponse,
   ListSessionEventsResponse,
+  ListCredentialsResponse,
+  ListAttachmentsResponse,
+  ListUsageResponse,
+  ListQueueResponse,
   HealthResponse,
   AshStreamEvent,
   ListFilesResponse,
@@ -77,8 +88,10 @@ export class AshClient {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async createSession(agent: string): Promise<Session> {
-    const res = await this.request<{ session: Session }>('POST', '/api/sessions', { agent });
+  async createSession(agent: string, opts?: { credentialId?: string }): Promise<Session> {
+    const body: Record<string, unknown> = { agent };
+    if (opts?.credentialId) body.credentialId = opts.credentialId;
+    const res = await this.request<{ session: Session }>('POST', '/api/sessions', body);
     return res.session;
   }
 
@@ -121,6 +134,16 @@ export class AshClient {
     const res = await this.sendMessage(sessionId, content, opts);
     if (!res.body) return;
     yield* parseSSEStream(res.body);
+  }
+
+  async stopSession(id: string): Promise<Session> {
+    const res = await this.request<{ session: Session }>('POST', `/api/sessions/${id}/stop`);
+    return res.session;
+  }
+
+  async forkSession(id: string): Promise<Session> {
+    const res = await this.request<{ session: Session }>('POST', `/api/sessions/${id}/fork`);
+    return res.session;
   }
 
   async pauseSession(id: string): Promise<Session> {
@@ -175,6 +198,134 @@ export class AshClient {
   /** Read a single file from the session's workspace. */
   async getSessionFile(sessionId: string, path: string): Promise<GetFileResponse> {
     return this.request<GetFileResponse>('GET', `/api/sessions/${sessionId}/files/${path}`);
+  }
+
+  // -- Credentials ------------------------------------------------------------
+
+  async storeCredential(type: string, key: string, label?: string): Promise<Credential> {
+    const body: Record<string, unknown> = { type, key };
+    if (label) body.label = label;
+    const res = await this.request<{ credential: Credential }>('POST', '/api/credentials', body);
+    return res.credential;
+  }
+
+  async listCredentials(): Promise<Credential[]> {
+    const res = await this.request<ListCredentialsResponse>('GET', '/api/credentials');
+    return res.credentials;
+  }
+
+  async deleteCredential(id: string): Promise<void> {
+    await this.request('DELETE', `/api/credentials/${id}`);
+  }
+
+  // -- Attachments -------------------------------------------------------------
+
+  async uploadAttachment(sessionId: string, filename: string, content: Buffer, opts?: { mimeType?: string; messageId?: string }): Promise<Attachment> {
+    const body: Record<string, unknown> = {
+      filename,
+      content: content.toString('base64'),
+    };
+    if (opts?.mimeType) body.mimeType = opts.mimeType;
+    if (opts?.messageId) body.messageId = opts.messageId;
+    const res = await this.request<{ attachment: Attachment }>('POST', `/api/sessions/${sessionId}/attachments`, body);
+    return res.attachment;
+  }
+
+  async listAttachments(sessionId: string): Promise<Attachment[]> {
+    const res = await this.request<ListAttachmentsResponse>('GET', `/api/sessions/${sessionId}/attachments`);
+    return res.attachments;
+  }
+
+  async downloadAttachment(id: string): Promise<Buffer> {
+    const res = await fetch(`${this.serverUrl}/api/attachments/${id}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
+      throw new Error(err.error);
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  async deleteAttachment(id: string): Promise<void> {
+    await this.request('DELETE', `/api/attachments/${id}`);
+  }
+
+  // -- Workspace Bundles -------------------------------------------------------
+
+  /** Download the session's workspace as a tar.gz bundle. */
+  async downloadWorkspace(sessionId: string): Promise<Buffer> {
+    const res = await fetch(`${this.serverUrl}/api/sessions/${sessionId}/workspace`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
+      throw new Error(err.error);
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  /** Upload a tar.gz bundle to restore the session's workspace. */
+  async uploadWorkspace(sessionId: string, bundle: Buffer): Promise<void> {
+    await this.request('POST', `/api/sessions/${sessionId}/workspace`, {
+      bundle: bundle.toString('base64'),
+    });
+  }
+
+  // -- Queue ------------------------------------------------------------------
+
+  async enqueue(agentName: string, prompt: string, opts?: { sessionId?: string; priority?: number; maxRetries?: number }): Promise<QueueItem> {
+    const body: Record<string, unknown> = { agentName, prompt };
+    if (opts?.sessionId) body.sessionId = opts.sessionId;
+    if (opts?.priority !== undefined) body.priority = opts.priority;
+    if (opts?.maxRetries !== undefined) body.maxRetries = opts.maxRetries;
+    const res = await this.request<{ item: QueueItem }>('POST', '/api/queue', body);
+    return res.item;
+  }
+
+  async listQueueItems(opts?: { status?: QueueItemStatus; limit?: number }): Promise<QueueItem[]> {
+    const params = new URLSearchParams();
+    if (opts?.status) params.set('status', opts.status);
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    const qs = params.toString();
+    const res = await this.request<ListQueueResponse>('GET', `/api/queue${qs ? `?${qs}` : ''}`);
+    return res.items;
+  }
+
+  async getQueueItem(id: string): Promise<QueueItem> {
+    const res = await this.request<{ item: QueueItem }>('GET', `/api/queue/${id}`);
+    return res.item;
+  }
+
+  async cancelQueueItem(id: string): Promise<QueueItem> {
+    const res = await this.request<{ item: QueueItem }>('DELETE', `/api/queue/${id}`);
+    return res.item;
+  }
+
+  async getQueueStats(): Promise<QueueStats> {
+    const res = await this.request<{ stats: QueueStats }>('GET', '/api/queue/stats');
+    return res.stats;
+  }
+
+  // -- Usage ------------------------------------------------------------------
+
+  async listUsageEvents(opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]> {
+    const params = new URLSearchParams();
+    if (opts?.sessionId) params.set('sessionId', opts.sessionId);
+    if (opts?.agentName) params.set('agentName', opts.agentName);
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    const qs = params.toString();
+    const res = await this.request<ListUsageResponse>('GET', `/api/usage${qs ? `?${qs}` : ''}`);
+    return res.events;
+  }
+
+  async getUsageStats(opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats> {
+    const params = new URLSearchParams();
+    if (opts?.sessionId) params.set('sessionId', opts.sessionId);
+    if (opts?.agentName) params.set('agentName', opts.agentName);
+    const qs = params.toString();
+    const res = await this.request<{ stats: UsageStats }>('GET', `/api/usage/stats${qs ? `?${qs}` : ''}`);
+    return res.stats;
   }
 
   // -- Health -----------------------------------------------------------------

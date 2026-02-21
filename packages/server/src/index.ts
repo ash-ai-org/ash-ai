@@ -15,6 +15,11 @@ import { sessionRoutes } from './routes/sessions.js';
 import { healthRoutes } from './routes/health.js';
 import { runnerRoutes } from './routes/runners.js';
 import { fileRoutes } from './routes/files.js';
+import { credentialRoutes } from './routes/credentials.js';
+import { queueRoutes } from './routes/queue.js';
+import { attachmentRoutes } from './routes/attachments.js';
+import { usageRoutes } from './routes/usage.js';
+import { workspaceRoutes } from './routes/workspace.js';
 import { createTelemetryExporter } from './telemetry/exporter.js';
 
 // Config from env
@@ -92,6 +97,8 @@ await app.register(swagger, {
       { name: 'health', description: 'Server health' },
       { name: 'agents', description: 'Agent deployment and management' },
       { name: 'sessions', description: 'Session lifecycle and messaging' },
+      { name: 'queue', description: 'Async message queue' },
+      { name: 'usage', description: 'Usage tracking and analytics' },
     ],
   },
 });
@@ -105,6 +112,11 @@ registerAuth(app, process.env.ASH_API_KEY, db);
 agentRoutes(app, dataDir);
 sessionRoutes(app, coordinator, dataDir, telemetry);
 fileRoutes(app, coordinator, dataDir);
+credentialRoutes(app);
+queueRoutes(app);
+attachmentRoutes(app, dataDir);
+usageRoutes(app);
+workspaceRoutes(app, coordinator, dataDir);
 healthRoutes(app, coordinator, pool);
 runnerRoutes(app, coordinator);
 

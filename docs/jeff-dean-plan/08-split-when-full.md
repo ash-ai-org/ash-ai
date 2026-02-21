@@ -25,89 +25,63 @@ Client → ash-server (has runner in-process) → bridge
 ### After
 
 ```
-Client → ash-server → gRPC → ash-runner-1 → bridge
+Client → ash-server → HTTP → ash-runner-1 → bridge
                            → ash-runner-2 → bridge
                            → ash-runner-N → bridge
 ```
 
-## Why gRPC, Not HTTP
+## Why HTTP, Not gRPC
 
-The server→runner communication in the original implementation used HTTP/fetch. This was fine for same-machine but wrong for multi-machine:
+See [Decision 0002: HTTP over gRPC for Runner Communication](../decisions/0002-http-over-grpc-for-runner.md).
 
-1. **Streaming**: gRPC has bidirectional streaming built in. SSE over HTTP is client→server only. The bridge event stream is server→client, which means the original design proxied SSE from runner to server to client — two SSE streams per connection.
+The original plan proposed gRPC but we chose HTTP + SSE because:
 
-2. **Backpressure**: gRPC/HTTP2 has flow control per stream. HTTP/1.1 SSE does not.
-
-3. **Multiplexing**: One gRPC connection between server and runner handles all sandboxes on that runner. HTTP would be one connection per SSE stream.
-
-4. **Health/heartbeat**: gRPC has built-in keepalive and health checking.
+1. **Simplicity**: No protobuf, no code generation, no native modules. Same Fastify framework everywhere.
+2. **LLM latency dominates**: Server→runner latency is single-digit ms. LLM inference is seconds. The wire protocol doesn't matter.
+3. **Debuggability**: `curl` works. Logs are readable. No binary wire format.
+4. **SSE streaming**: Server→client and runner→server both use SSE. One pattern, not two.
 
 ## Runner Registration
 
-When a runner starts, it registers with the control plane:
+When a runner starts, it registers with the control plane via HTTP:
 
-```protobuf
-service RunnerRegistry {
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse);
-}
-
-message RegisterRequest {
-  string runner_id = 1;
-  string host = 2;
-  int32 port = 3;
-  int32 max_sandboxes = 4;
+```
+POST /api/internal/runners/register
+{
+  "runnerId": "runner-1",
+  "host": "runner-1.internal",
+  "port": 4200,
+  "maxSandboxes": 100
 }
 ```
 
-The heartbeat is a bidirectional stream. Runner sends capacity updates every 10 seconds. Server sends assignment commands.
+Heartbeats are sent every 10 seconds via `POST /api/internal/runners/heartbeat` with pool stats (running, warming counts). The coordinator detects dead runners after 30 seconds of missed heartbeats.
 
 ## Session Routing
 
-The session router (currently in-process lookups) becomes a routing table:
+Sessions track their assigned runner in the database:
 
 ```sql
--- In the SQLite database (or Redis if you need cross-server)
-ALTER TABLE sessions ADD COLUMN runner_id TEXT;
+-- sessions table includes:
+runner_id TEXT  -- NULL for local, runner ID for remote
+CREATE INDEX idx_sessions_runner ON sessions (runner_id);
 ```
 
-```typescript
-class SessionRouter {
-  async createSession(agentName: string): Promise<Session> {
-    // Pick a runner with capacity
-    const runner = this.runnerCoordinator.selectRunner(agentName);
-    if (!runner) throw new Error('No runners with capacity');
+The `RunnerCoordinator` picks the runner with the most available capacity:
 
-    // Tell the runner to create a sandbox
-    const sandbox = await runner.grpcClient.createSandbox({ agentName, agentDir });
-
-    // Record routing
-    db.insertSession({ ...session, runnerId: runner.id });
-    return session;
-  }
-
-  async routeMessage(sessionId: string, content: string): Promise<AsyncGenerator<BridgeEvent>> {
-    const session = db.getSession(sessionId);
-    const runner = this.runnerCoordinator.getRunner(session.runnerId);
-    return runner.grpcClient.sendMessage(session.sandboxId, content);
-  }
-}
+```sql
+SELECT id, host, port, max_sandboxes, active_count, warming_count
+FROM runners
+WHERE last_heartbeat_at > NOW() - INTERVAL '30 seconds'
+ORDER BY (max_sandboxes - active_count - warming_count) DESC
+LIMIT 1;
 ```
+
+This is one query per session creation — not a hot path.
 
 ## Runner Selection Strategy
 
-Simple least-loaded:
-
-```typescript
-selectRunner(agentName: string): RunnerConnection | null {
-  return this.runners
-    .filter(r => r.healthy && r.capacity.active < r.capacity.max)
-    .sort((a, b) => a.capacity.active - b.capacity.active)
-    [0] ?? null;
-}
-```
-
-That's it. Don't build anything fancier until you measure a problem with this.
+Simple least-loaded by available capacity (max - active - warming). That's it. Don't build anything fancier until you measure a problem with this.
 
 Advanced strategies for later (not now):
 - Agent affinity (prefer runners that already have warm sandboxes for this agent)
@@ -137,16 +111,16 @@ Server detects runner going down (missed heartbeat), proactively migrates sessio
 ## What This Reuses
 
 The runner package already has:
-- `api.ts` — standalone HTTP API (swap to gRPC)
-- `SandboxManager` — unchanged
-- `SandboxPool` — unchanged
-- `BridgeClient` — unchanged
+- `routes/sandboxes.ts` — HTTP API for sandbox CRUD + streaming
+- `routes/health.ts` — Health endpoint with pool stats
+- `registration.ts` — Auto-registration and heartbeat loop
 
 The server already has:
-- `SessionRouter` — add runner selection
-- `AgentStore` — unchanged (agents replicated to runners on assignment)
+- `RunnerCoordinator` — Runner discovery, selection, and liveness sweep
+- `RemoteRunnerBackend` — HTTP client wrapping `RunnerClient`
+- `LocalRunnerBackend` — In-process wrapper for standalone mode
 
-The split boundary is exactly where it was in the original architecture. The work in steps 01-07 didn't delete the boundary — it just stopped crossing it over HTTP for no reason.
+Both implement the `RunnerBackend` interface. The split boundary is exactly where it was in the original architecture. The work in steps 01-07 didn't delete the boundary — it just stopped crossing it over HTTP for no reason.
 
 ## Estimated Capacity Per Runner
 

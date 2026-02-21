@@ -27,6 +27,8 @@ export interface CreateSandboxOpts {
   skipAgentCopy?: boolean;
   limits?: Partial<SandboxLimits>;
   onOomKill?: (sandboxId: string) => void;
+  /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
+  extraEnv?: Record<string, string>;
 }
 
 // Internal tracking — keeps cleanup handles out of the public interface
@@ -80,6 +82,11 @@ export class SandboxManager {
     env.ASH_WORKSPACE_DIR = workspaceDir;
     env.ASH_SANDBOX_ID = id;
     env.ASH_SESSION_ID = opts.sessionId;
+
+    // Merge caller-supplied env (e.g. decrypted credential keys)
+    if (opts.extraEnv) {
+      Object.assign(env, opts.extraEnv);
+    }
 
     // When ASH_SANDBOX_UID is set (Docker), run bridge as non-root user.
     // Claude Code refuses --dangerously-skip-permissions as root.

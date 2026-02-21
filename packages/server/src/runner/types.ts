@@ -8,6 +8,8 @@ export interface CreateSandboxRequest {
   skipAgentCopy?: boolean;
   limits?: Partial<SandboxLimits>;
   onOomKill?: (sandboxId: string) => void;
+  /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
+  extraEnv?: Record<string, string>;
 }
 
 export interface SandboxHandle {
@@ -26,6 +28,9 @@ export interface RunnerBackend {
   destroyAll(): Promise<void>;
 
   sendCommand(sandboxId: string, cmd: BridgeCommand): AsyncGenerator<BridgeEvent>;
+
+  /** Send interrupt to a running sandbox (fire-and-forget). */
+  interrupt(sandboxId: string): void;
 
   /** Returns sandbox info if alive, undefined if not found or dead. */
   getSandbox(sandboxId: string): SandboxHandle | undefined;

@@ -57,6 +57,8 @@ describe('OpenAPI spec generation', () => {
     expect(pathKeys).toContain('/api/sessions');
     expect(pathKeys).toContain('/api/sessions/{id}');
     expect(pathKeys).toContain('/api/sessions/{id}/messages');
+    expect(pathKeys).toContain('/api/sessions/{id}/stop');
+    expect(pathKeys).toContain('/api/sessions/{id}/fork');
     expect(pathKeys).toContain('/api/sessions/{id}/pause');
     expect(pathKeys).toContain('/api/sessions/{id}/resume');
     expect(pathKeys).toContain('/api/sessions/{id}/files');
@@ -64,7 +66,7 @@ describe('OpenAPI spec generation', () => {
     expect(pathKeys.some((p: string) => p.startsWith('/api/sessions/{id}/files/') && p !== '/api/sessions/{id}/files')).toBe(true);
   });
 
-  it('has 14 operations total', () => {
+  it('has expected number of operations', () => {
     const paths = spec.paths as Record<string, Record<string, unknown>>;
     let count = 0;
     for (const path of Object.values(paths)) {
@@ -72,7 +74,7 @@ describe('OpenAPI spec generation', () => {
         if (path[method]) count++;
       }
     }
-    expect(count).toBe(16);
+    expect(count).toBe(18);
   });
 
   it('has component schemas for Agent, Session, ApiError, HealthResponse', () => {

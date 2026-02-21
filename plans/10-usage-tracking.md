@@ -1,6 +1,6 @@
 # Plan 10: Usage Tracking
 
-## Status: Not Started
+## Status: Done
 ## Priority: Low
 ## Effort: Small
 

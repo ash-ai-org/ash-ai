@@ -1,0 +1,1 @@
+ALTER TABLE `sessions` ADD `parent_session_id` text;

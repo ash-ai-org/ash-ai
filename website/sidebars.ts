@@ -79,6 +79,7 @@ const sidebars: SidebarsConfig = {
         'architecture/sandbox-pool',
         'architecture/sse-backpressure',
         'architecture/database',
+        'architecture/scaling',
         'architecture/decisions',
       ],
     },

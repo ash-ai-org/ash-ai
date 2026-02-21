@@ -17,7 +17,7 @@ export interface Agent {
 
 // -- Sessions -----------------------------------------------------------------
 
-export type SessionStatus = 'starting' | 'active' | 'paused' | 'ended' | 'error';
+export type SessionStatus = 'starting' | 'active' | 'paused' | 'stopped' | 'ended' | 'error';
 
 export interface Session {
   id: string;
@@ -29,6 +29,8 @@ export interface Session {
   lastActiveAt: string;
   /** Runner that owns this session's sandbox. Null in standalone mode. */
   runnerId?: string | null;
+  /** Parent session this was forked from. Null if not a fork. */
+  parentSessionId?: string | null;
 }
 
 // -- Sandboxes ----------------------------------------------------------------
@@ -55,6 +57,20 @@ export interface SandboxRecord {
   lastUsedAt: string;
 }
 
+
+// -- Runners ------------------------------------------------------------------
+
+export interface RunnerRecord {
+  id: string;
+  host: string;
+  port: number;
+  maxSandboxes: number;
+  activeCount: number;
+  warmingCount: number;
+  lastHeartbeatAt: string;
+  registeredAt: string;
+}
+
 // -- Messages -----------------------------------------------------------------
 
 export interface Message {
@@ -69,6 +85,89 @@ export interface Message {
 
 export interface ListMessagesResponse {
   messages: Message[];
+}
+
+// -- Structured Message Content -----------------------------------------------
+// Parse-on-read layer over raw SDK JSON. Known block types get structured;
+// anything unrecognized becomes RawContent. Never drops data.
+
+export interface TextContent { type: 'text'; text: string }
+export interface ToolUseContent { type: 'tool_use'; id: string; name: string; input: unknown }
+export interface ToolResultContent { type: 'tool_result'; tool_use_id: string; content: unknown; is_error?: boolean }
+export interface ThinkingContent { type: 'thinking'; thinking: string }
+export interface ImageContent { type: 'image'; source: Record<string, unknown> }
+/** Catch-all for any SDK content block type we don't recognize. Forward-compatible. */
+export interface RawContent { type: 'raw'; rawType: string; raw: Record<string, unknown> }
+
+export type MessageContent =
+  | TextContent
+  | ToolUseContent
+  | ToolResultContent
+  | ThinkingContent
+  | ImageContent
+  | RawContent;
+
+/**
+ * Parse raw SDK message JSON into structured MessageContent[].
+ * Known block types are parsed; everything else becomes RawContent.
+ * Never throws, never drops data.
+ */
+export function parseMessageContent(rawJson: string): MessageContent[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    return [{ type: 'text', text: rawJson }];
+  }
+
+  const data = parsed as Record<string, any>;
+
+  // Assistant message with content blocks array
+  if (data.type === 'assistant' && Array.isArray(data.message?.content)) {
+    return data.message.content.map(parseContentBlock);
+  }
+
+  // Direct content blocks array (some SDK shapes)
+  if (Array.isArray(data.content)) {
+    return data.content.map(parseContentBlock);
+  }
+
+  // Tool result message
+  if (data.type === 'user' && data.tool_use_result) {
+    const r = data.tool_use_result;
+    return [{
+      type: 'tool_result',
+      tool_use_id: r.tool_use_id ?? '',
+      content: r.stdout ?? r.content ?? '',
+      is_error: r.is_error,
+    }];
+  }
+
+  // Result message — wrap as text
+  if (data.type === 'result' && typeof data.result === 'string') {
+    return [{ type: 'text', text: data.result }];
+  }
+
+  // Fallback: wrap the whole thing as raw
+  return [{ type: 'raw', rawType: data.type ?? 'unknown', raw: data }];
+}
+
+function parseContentBlock(block: Record<string, any>): MessageContent {
+  switch (block.type) {
+    case 'text':
+      return { type: 'text', text: block.text ?? '' };
+    case 'tool_use':
+      return { type: 'tool_use', id: block.id ?? '', name: block.name ?? '', input: block.input };
+    case 'tool_result':
+      return { type: 'tool_result', tool_use_id: block.tool_use_id ?? '', content: block.content, is_error: block.is_error };
+    case 'thinking':
+      return { type: 'thinking', thinking: block.thinking ?? '' };
+    case 'image':
+      return { type: 'image', source: block.source ?? {} };
+    default:
+      // Unknown block type — preserve everything, never drop
+      return { type: 'raw', rawType: block.type ?? 'unknown', raw: block };
+  }
 }
 
 // -- Session Events (Timeline) ------------------------------------------------
@@ -197,10 +296,107 @@ export interface GetFileResponse {
   source: 'sandbox' | 'snapshot';
 }
 
+// -- Credentials --------------------------------------------------------------
+
+export type CredentialType = 'anthropic' | 'openai' | 'custom';
+
+export interface Credential {
+  id: string;
+  tenantId?: string;
+  type: CredentialType;
+  label: string;
+  active: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface ListCredentialsResponse {
+  credentials: Credential[];
+}
+
+// -- Attachments --------------------------------------------------------------
+
+export interface Attachment {
+  id: string;
+  tenantId?: string;
+  messageId: string;
+  sessionId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  storagePath: string;
+  createdAt: string;
+}
+
+export interface ListAttachmentsResponse {
+  attachments: Attachment[];
+}
+
+// -- Usage Tracking -----------------------------------------------------------
+
+export type UsageEventType = 'input_tokens' | 'output_tokens' | 'cache_creation_tokens' | 'cache_read_tokens' | 'tool_call' | 'message' | 'compute_seconds';
+
+export interface UsageEvent {
+  id: string;
+  tenantId?: string;
+  sessionId: string;
+  agentName: string;
+  eventType: UsageEventType;
+  value: number;
+  createdAt: string;
+}
+
+export interface UsageStats {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCacheCreationTokens: number;
+  totalCacheReadTokens: number;
+  totalToolCalls: number;
+  totalMessages: number;
+  totalComputeSeconds: number;
+}
+
+export interface ListUsageResponse {
+  events: UsageEvent[];
+}
+
+// -- Queue --------------------------------------------------------------------
+
+export type QueueItemStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+
+export interface QueueItem {
+  id: string;
+  tenantId?: string;
+  sessionId: string | null;
+  agentName: string;
+  prompt: string;
+  status: QueueItemStatus;
+  priority: number;
+  retryCount: number;
+  maxRetries: number;
+  error: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface QueueStats {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
+export interface ListQueueResponse {
+  items: QueueItem[];
+}
+
 // -- API request/response -----------------------------------------------------
 
 export interface CreateSessionRequest {
   agent: string;
+  /** Credential ID to inject into sandbox env. */
+  credentialId?: string;
 }
 
 export interface CreateSessionResponse {
@@ -240,10 +436,26 @@ export interface ApiError {
 }
 
 // -- SSE Stream Events --------------------------------------------------------
-// These carry SDK messages as-is (principle 8: no type translation).
-// The `message` event data is a raw SDK Message object passed through from the bridge.
+// Granular event layer on top of raw SDK messages. Clients get both:
+//   1. Granular events (text_delta, tool_use, etc.) for structured consumption
+//   2. Raw `message` events for passthrough / backward compat
+// The type is an open string — unknown event types flow through, never dropped.
 
-export type AshSSEEventType = 'message' | 'error' | 'done';
+/** Known SSE event types we actively parse and structure. */
+export type KnownSSEEventType =
+  | 'session_start'
+  | 'text_delta'
+  | 'thinking_delta'
+  | 'tool_use'
+  | 'tool_result'
+  | 'turn_complete'
+  | 'message'       // full raw SDK message (always emitted alongside granular events)
+  | 'session_end'
+  | 'error'
+  | 'done';
+
+/** Open type — known events get autocomplete, unknown strings still work. */
+export type AshSSEEventType = KnownSSEEventType | (string & {});
 
 export interface AshMessageEvent {
   type: 'message';
@@ -262,7 +474,126 @@ export interface AshDoneEvent {
   data: { sessionId: string };
 }
 
-export type AshStreamEvent = AshMessageEvent | AshErrorEvent | AshDoneEvent;
+export interface AshTextDeltaEvent {
+  type: 'text_delta';
+  data: { delta: string };
+}
+
+export interface AshThinkingDeltaEvent {
+  type: 'thinking_delta';
+  data: { delta: string };
+}
+
+export interface AshToolUseEvent {
+  type: 'tool_use';
+  data: { id: string; name: string; input: unknown };
+}
+
+export interface AshToolResultEvent {
+  type: 'tool_result';
+  data: { tool_use_id: string; content: unknown; is_error?: boolean };
+}
+
+export interface AshTurnCompleteEvent {
+  type: 'turn_complete';
+  data: { numTurns?: number; result?: string };
+}
+
+export interface AshSessionStartEvent {
+  type: 'session_start';
+  data: { sessionId: string };
+}
+
+export interface AshSessionEndEvent {
+  type: 'session_end';
+  data: { sessionId: string };
+}
+
+/** Catch-all for unknown event types — raw data preserved. */
+export interface AshUnknownEvent {
+  type: string;
+  data: Record<string, any>;
+}
+
+export type AshStreamEvent =
+  | AshMessageEvent
+  | AshErrorEvent
+  | AshDoneEvent
+  | AshTextDeltaEvent
+  | AshThinkingDeltaEvent
+  | AshToolUseEvent
+  | AshToolResultEvent
+  | AshTurnCompleteEvent
+  | AshSessionStartEvent
+  | AshSessionEndEvent
+  | AshUnknownEvent;
+
+/**
+ * Classify a raw SDK message into granular SSE events.
+ * Always includes a 'message' event with the raw data for backward compat.
+ * Unknown SDK shapes are emitted with their original type string + raw data.
+ * Never drops, never errors.
+ */
+export function classifyToStreamEvents(data: Record<string, any>): AshStreamEvent[] {
+  const events: AshStreamEvent[] = [];
+
+  // Stream event — partial message delta
+  if (data.type === 'stream_event') {
+    const event = data.event;
+    if (event?.type === 'content_block_delta') {
+      const delta = event.delta;
+      if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+        events.push({ type: 'text_delta', data: { delta: delta.text } });
+      } else if (delta?.type === 'thinking_delta' && typeof delta.thinking === 'string') {
+        events.push({ type: 'thinking_delta', data: { delta: delta.thinking } });
+      }
+      // input_json_delta and other delta types — emit as unknown for forward compat
+      if (delta && delta.type !== 'text_delta' && delta.type !== 'thinking_delta') {
+        events.push({ type: delta.type, data: delta });
+      }
+    }
+    // Always emit the raw message too
+    events.push({ type: 'message', data });
+    return events;
+  }
+
+  // Assistant message with content blocks
+  if (data.type === 'assistant' && Array.isArray(data.message?.content)) {
+    for (const block of data.message.content) {
+      if (block.type === 'text') {
+        events.push({ type: 'text_delta', data: { delta: block.text } });
+      } else if (block.type === 'tool_use') {
+        events.push({ type: 'tool_use', data: { id: block.id, name: block.name, input: block.input } });
+      } else if (block.type === 'thinking') {
+        events.push({ type: 'thinking_delta', data: { delta: block.thinking } });
+      } else {
+        // Unknown block type — forward as-is
+        events.push({ type: block.type, data: block });
+      }
+    }
+  }
+
+  // Tool result message
+  if (data.type === 'user' && data.tool_use_result) {
+    const r = data.tool_use_result;
+    events.push({
+      type: 'tool_result',
+      data: { tool_use_id: r.tool_use_id, content: r.stdout ?? r.content, is_error: r.is_error },
+    });
+  }
+
+  // Result / turn complete
+  if (data.type === 'result') {
+    events.push({
+      type: 'turn_complete',
+      data: { numTurns: data.num_turns, result: data.result },
+    });
+  }
+
+  // Always emit the raw message for backward compat
+  events.push({ type: 'message', data });
+  return events;
+}
 
 // -- SDK Message Display Helpers -----------------------------------------------
 

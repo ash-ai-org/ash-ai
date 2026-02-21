@@ -1,6 +1,6 @@
 # Plan 11: Workspace Bundles
 
-## Status: Not Started
+## Status: Done
 ## Priority: Low
 ## Effort: Medium
 

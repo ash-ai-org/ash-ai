@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { eq, and, sql, gt, lt, ne, asc, desc, inArray } from 'drizzle-orm';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 import type * as sqliteSchema from './schema.sqlite.js';
@@ -20,6 +20,91 @@ export class DrizzleDb implements Db {
     private dialect: 'sqlite' | 'pg',
     private closeFn: () => Promise<void>,
   ) {}
+
+
+  // -- Runners ----------------------------------------------------------------
+
+  async upsertRunner(id: string, host: string, port: number, maxSandboxes: number): Promise<RunnerRecord> {
+    const { runners } = this.schema;
+    const now = new Date().toISOString();
+
+    await this.drizzle
+      .insert(runners)
+      .values({ id, host, port, maxSandboxes, activeCount: 0, warmingCount: 0, lastHeartbeatAt: now, registeredAt: now })
+      .onConflictDoUpdate({
+        target: runners.id,
+        set: { host, port, maxSandboxes, lastHeartbeatAt: now },
+      });
+
+    return { id, host, port, maxSandboxes, activeCount: 0, warmingCount: 0, lastHeartbeatAt: now, registeredAt: now };
+  }
+
+  async heartbeatRunner(id: string, activeCount: number, warmingCount: number): Promise<void> {
+    const { runners } = this.schema;
+    const now = new Date().toISOString();
+    await this.drizzle
+      .update(runners)
+      .set({ activeCount, warmingCount, lastHeartbeatAt: now })
+      .where(eq(runners.id, id));
+  }
+
+  async getRunner(id: string): Promise<RunnerRecord | null> {
+    const { runners } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(runners)
+      .where(eq(runners.id, id))
+      .limit(1);
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return { id: r.id, host: r.host, port: r.port, maxSandboxes: r.maxSandboxes, activeCount: r.activeCount, warmingCount: r.warmingCount, lastHeartbeatAt: r.lastHeartbeatAt, registeredAt: r.registeredAt };
+  }
+
+  async listHealthyRunners(cutoffIso: string): Promise<RunnerRecord[]> {
+    const { runners } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(runners)
+      .where(gt(runners.lastHeartbeatAt, cutoffIso));
+    return rows.map((r: any) => ({
+      id: r.id, host: r.host, port: r.port, maxSandboxes: r.maxSandboxes,
+      activeCount: r.activeCount, warmingCount: r.warmingCount,
+      lastHeartbeatAt: r.lastHeartbeatAt, registeredAt: r.registeredAt,
+    }));
+  }
+
+  async selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
+    const { runners } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(runners)
+      .where(gt(runners.lastHeartbeatAt, cutoffIso))
+      .orderBy(desc(sql`${runners.maxSandboxes} - ${runners.activeCount} - ${runners.warmingCount}`))
+      .limit(1);
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return { id: r.id, host: r.host, port: r.port, maxSandboxes: r.maxSandboxes, activeCount: r.activeCount, warmingCount: r.warmingCount, lastHeartbeatAt: r.lastHeartbeatAt, registeredAt: r.registeredAt };
+  }
+
+  async deleteRunner(id: string): Promise<void> {
+    const { runners } = this.schema;
+    await this.drizzle
+      .delete(runners)
+      .where(eq(runners.id, id));
+  }
+
+  async listAllRunners(): Promise<RunnerRecord[]> {
+    const { runners } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(runners)
+      .orderBy(desc(sql`${runners.maxSandboxes} - ${runners.activeCount} - ${runners.warmingCount}`));
+    return rows.map((r: any) => ({
+      id: r.id, host: r.host, port: r.port, maxSandboxes: r.maxSandboxes,
+      activeCount: r.activeCount, warmingCount: r.warmingCount,
+      lastHeartbeatAt: r.lastHeartbeatAt, registeredAt: r.registeredAt,
+    }));
+  }
 
   // -- Agents -----------------------------------------------------------------
 
@@ -87,14 +172,47 @@ export class DrizzleDb implements Db {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default'): Promise<Session> {
+  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default', parentSessionId?: string): Promise<Session> {
     const { sessions } = this.schema;
     const now = new Date().toISOString();
     await this.drizzle
       .insert(sessions)
-      .values({ id, tenantId, agentName, sandboxId, status: 'starting', createdAt: now, lastActiveAt: now });
+      .values({ id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, createdAt: now, lastActiveAt: now });
 
-    return { id, tenantId, agentName, sandboxId, status: 'starting', createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, createdAt: now, lastActiveAt: now };
+  }
+
+  async insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session> {
+    const { sessions, messages } = this.schema;
+    const now = new Date().toISOString();
+    const tenantId = parentSession.tenantId ?? 'default';
+
+    // 1. Create new session linked to parent
+    await this.drizzle
+      .insert(sessions)
+      .values({ id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused', parentSessionId: parentSession.id, createdAt: now, lastActiveAt: now });
+
+    // 2. Copy all messages from parent session with new IDs and session reference
+    const parentMessages = await this.drizzle
+      .select()
+      .from(messages)
+      .where(and(eq(messages.tenantId, tenantId), eq(messages.sessionId, parentSession.id)))
+      .orderBy(asc(messages.sequence));
+
+    if (parentMessages.length > 0) {
+      const copied = parentMessages.map((m: any) => ({
+        id: randomUUID(),
+        tenantId,
+        sessionId: id,
+        role: m.role,
+        content: m.content,
+        sequence: m.sequence,
+        createdAt: m.createdAt,
+      }));
+      await this.drizzle.insert(messages).values(copied);
+    }
+
+    return { id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused' as SessionStatus, parentSessionId: parentSession.id, createdAt: now, lastActiveAt: now };
   }
 
   async updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
@@ -133,7 +251,7 @@ export class DrizzleDb implements Db {
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0];
-    return { id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId, status: r.status as SessionStatus, runnerId: r.runnerId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt };
+    return { id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId, status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt };
   }
 
   async listSessions(tenantId: string = 'default', agent?: string): Promise<Session[]> {
@@ -150,7 +268,7 @@ export class DrizzleDb implements Db {
 
     return rows.map((r: any) => ({
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
-      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
+      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
   }
 
@@ -164,7 +282,7 @@ export class DrizzleDb implements Db {
 
     return rows.map((r: any) => ({
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
-      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
+      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
   }
 
@@ -486,6 +604,231 @@ export class DrizzleDb implements Db {
       .delete(apiKeys)
       .where(eq(apiKeys.id, id));
     return (result.changes ?? result.rowCount ?? 0) > 0;
+  }
+
+  // -- Credentials ------------------------------------------------------------
+
+  async insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string): Promise<Credential> {
+    const { credentials } = this.schema;
+    const now = new Date().toISOString();
+    await this.drizzle
+      .insert(credentials)
+      .values({ id, tenantId, type, encryptedKey, iv, authTag, label, active: 1, createdAt: now, lastUsedAt: null });
+    return { id, tenantId, type: type as Credential['type'], label, active: true, createdAt: now, lastUsedAt: null };
+  }
+
+  async getCredential(id: string): Promise<{ id: string; tenantId: string; type: string; encryptedKey: string; iv: string; authTag: string; label: string; active: boolean; createdAt: string; lastUsedAt: string | null } | null> {
+    const { credentials } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(credentials)
+      .where(eq(credentials.id, id))
+      .limit(1);
+    if (rows.length === 0) return null;
+    const r = rows[0] as any;
+    return { id: r.id, tenantId: r.tenantId, type: r.type, encryptedKey: r.encryptedKey, iv: r.iv, authTag: r.authTag, label: r.label, active: r.active === 1, createdAt: r.createdAt, lastUsedAt: r.lastUsedAt };
+  }
+
+  async listCredentials(tenantId: string): Promise<Credential[]> {
+    const { credentials } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(credentials)
+      .where(eq(credentials.tenantId, tenantId))
+      .orderBy(desc(credentials.createdAt));
+    return rows.map((r: any) => ({
+      id: r.id, tenantId: r.tenantId, type: r.type as Credential['type'], label: r.label, active: r.active === 1, createdAt: r.createdAt, lastUsedAt: r.lastUsedAt,
+    }));
+  }
+
+  async deleteCredential(id: string): Promise<boolean> {
+    const { credentials } = this.schema;
+    const result = await this.drizzle
+      .delete(credentials)
+      .where(eq(credentials.id, id));
+    return (result.changes ?? result.rowCount ?? 0) > 0;
+  }
+
+  async touchCredentialUsed(id: string): Promise<void> {
+    const { credentials } = this.schema;
+    const now = new Date().toISOString();
+    await this.drizzle
+      .update(credentials)
+      .set({ lastUsedAt: now })
+      .where(eq(credentials.id, id));
+  }
+
+  // -- Queue ------------------------------------------------------------------
+
+  async insertQueueItem(id: string, tenantId: string, agentName: string, prompt: string, sessionId?: string, priority?: number, maxRetries?: number): Promise<QueueItem> {
+    const { queueItems } = this.schema;
+    const now = new Date().toISOString();
+    const item = { id, tenantId, sessionId: sessionId ?? null, agentName, prompt, status: 'pending', priority: priority ?? 0, retryCount: 0, maxRetries: maxRetries ?? 3, error: null, createdAt: now, startedAt: null, completedAt: null };
+    await this.drizzle.insert(queueItems).values(item);
+    return item as QueueItem;
+  }
+
+  async getQueueItem(id: string): Promise<QueueItem | null> {
+    const { queueItems } = this.schema;
+    const rows = await this.drizzle.select().from(queueItems).where(eq(queueItems.id, id)).limit(1);
+    if (rows.length === 0) return null;
+    return rows[0] as QueueItem;
+  }
+
+  async getNextPendingQueueItem(tenantId?: string): Promise<QueueItem | null> {
+    const { queueItems } = this.schema;
+    const conditions = [eq(queueItems.status, 'pending')];
+    if (tenantId) conditions.push(eq(queueItems.tenantId, tenantId));
+    const rows = await this.drizzle.select().from(queueItems).where(and(...conditions)).orderBy(desc(queueItems.priority), asc(queueItems.createdAt)).limit(1);
+    if (rows.length === 0) return null;
+    return rows[0] as QueueItem;
+  }
+
+  async updateQueueItemStatus(id: string, status: QueueItemStatus, error?: string): Promise<void> {
+    const { queueItems } = this.schema;
+    const now = new Date().toISOString();
+    const set: Record<string, unknown> = { status };
+    if (status === 'processing') set.startedAt = now;
+    if (status === 'completed' || status === 'failed') set.completedAt = now;
+    if (error !== undefined) set.error = error;
+    await this.drizzle.update(queueItems).set(set).where(eq(queueItems.id, id));
+  }
+
+  async incrementQueueItemRetry(id: string): Promise<void> {
+    const { queueItems } = this.schema;
+    await this.drizzle
+      .update(queueItems)
+      .set({ retryCount: sql`${queueItems.retryCount} + 1` })
+      .where(eq(queueItems.id, id));
+  }
+
+  async listQueueItems(tenantId: string, status?: QueueItemStatus, limit = 50): Promise<QueueItem[]> {
+    const { queueItems } = this.schema;
+    const conditions = [eq(queueItems.tenantId, tenantId)];
+    if (status) conditions.push(eq(queueItems.status, status));
+    const rows = await this.drizzle.select().from(queueItems).where(and(...conditions)).orderBy(desc(queueItems.createdAt)).limit(limit);
+    return rows as QueueItem[];
+  }
+
+  async getQueueStats(tenantId: string): Promise<QueueStats> {
+    const { queueItems } = this.schema;
+    const rows = await this.drizzle
+      .select({ status: queueItems.status, count: sql<number>`count(*)` })
+      .from(queueItems)
+      .where(eq(queueItems.tenantId, tenantId))
+      .groupBy(queueItems.status);
+
+    const stats: QueueStats = { pending: 0, processing: 0, completed: 0, failed: 0 };
+    for (const r of rows) {
+      const s = r.status as keyof QueueStats;
+      if (s in stats) stats[s] = Number(r.count);
+    }
+    return stats;
+  }
+
+  // -- Attachments -------------------------------------------------------------
+
+  async insertAttachment(id: string, tenantId: string, messageId: string, sessionId: string, filename: string, mimeType: string, size: number, storagePath: string): Promise<Attachment> {
+    const { attachments } = this.schema;
+    const now = new Date().toISOString();
+    const row = { id, tenantId, messageId, sessionId, filename, mimeType, size, storagePath, createdAt: now };
+    await this.drizzle.insert(attachments).values(row);
+    return row as Attachment;
+  }
+
+  async getAttachment(id: string): Promise<Attachment | null> {
+    const { attachments } = this.schema;
+    const rows = await this.drizzle.select().from(attachments).where(eq(attachments.id, id)).limit(1);
+    if (rows.length === 0) return null;
+    return rows[0] as Attachment;
+  }
+
+  async listAttachmentsByMessage(messageId: string, tenantId?: string): Promise<Attachment[]> {
+    const { attachments } = this.schema;
+    const conditions = [eq(attachments.messageId, messageId)];
+    if (tenantId) conditions.push(eq(attachments.tenantId, tenantId));
+    const rows = await this.drizzle.select().from(attachments).where(and(...conditions)).orderBy(asc(attachments.createdAt));
+    return rows as Attachment[];
+  }
+
+  async listAttachmentsBySession(sessionId: string, tenantId?: string): Promise<Attachment[]> {
+    const { attachments } = this.schema;
+    const conditions = [eq(attachments.sessionId, sessionId)];
+    if (tenantId) conditions.push(eq(attachments.tenantId, tenantId));
+    const rows = await this.drizzle.select().from(attachments).where(and(...conditions)).orderBy(asc(attachments.createdAt));
+    return rows as Attachment[];
+  }
+
+  async deleteAttachment(id: string): Promise<boolean> {
+    const { attachments } = this.schema;
+    const result = await this.drizzle.delete(attachments).where(eq(attachments.id, id));
+    return (result?.rowsAffected ?? result?.changes ?? 1) > 0;
+  }
+
+  // -- Usage ------------------------------------------------------------------
+
+  async insertUsageEvent(id: string, tenantId: string, sessionId: string, agentName: string, eventType: UsageEventType, value: number): Promise<UsageEvent> {
+    const { usageEvents } = this.schema;
+    const now = new Date().toISOString();
+    const row = { id, tenantId, sessionId, agentName, eventType, value, createdAt: now };
+    await this.drizzle.insert(usageEvents).values(row);
+    return row as UsageEvent;
+  }
+
+  async insertUsageEvents(events: Array<{ id: string; tenantId: string; sessionId: string; agentName: string; eventType: UsageEventType; value: number }>): Promise<void> {
+    if (events.length === 0) return;
+    const { usageEvents } = this.schema;
+    const now = new Date().toISOString();
+    await this.drizzle.insert(usageEvents).values(events.map(e => ({ ...e, createdAt: now })));
+  }
+
+  async listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]> {
+    const { usageEvents } = this.schema;
+    const conditions = [eq(usageEvents.tenantId, tenantId)];
+    if (opts?.sessionId) conditions.push(eq(usageEvents.sessionId, opts.sessionId));
+    if (opts?.agentName) conditions.push(eq(usageEvents.agentName, opts.agentName));
+    const limit = opts?.limit ?? 100;
+    const rows = await this.drizzle.select().from(usageEvents).where(and(...conditions)).orderBy(desc(usageEvents.createdAt)).limit(limit);
+    return rows as UsageEvent[];
+  }
+
+  async getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats> {
+    const { usageEvents } = this.schema;
+    const conditions = [eq(usageEvents.tenantId, tenantId)];
+    if (opts?.sessionId) conditions.push(eq(usageEvents.sessionId, opts.sessionId));
+    if (opts?.agentName) conditions.push(eq(usageEvents.agentName, opts.agentName));
+
+    const rows = await this.drizzle
+      .select({ eventType: usageEvents.eventType, total: sql<number>`sum(${usageEvents.value})` })
+      .from(usageEvents)
+      .where(and(...conditions))
+      .groupBy(usageEvents.eventType);
+
+    const stats: UsageStats = {
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCacheCreationTokens: 0,
+      totalCacheReadTokens: 0,
+      totalToolCalls: 0,
+      totalMessages: 0,
+      totalComputeSeconds: 0,
+    };
+
+    const map: Record<string, keyof UsageStats> = {
+      input_tokens: 'totalInputTokens',
+      output_tokens: 'totalOutputTokens',
+      cache_creation_tokens: 'totalCacheCreationTokens',
+      cache_read_tokens: 'totalCacheReadTokens',
+      tool_call: 'totalToolCalls',
+      message: 'totalMessages',
+      compute_seconds: 'totalComputeSeconds',
+    };
+
+    for (const r of rows) {
+      const key = map[r.eventType];
+      if (key) stats[key] = Number(r.total);
+    }
+    return stats;
   }
 
   // -- Lifecycle --------------------------------------------------------------

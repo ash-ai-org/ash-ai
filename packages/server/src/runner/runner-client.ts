@@ -115,6 +115,16 @@ export class RunnerClient {
     }
   }
 
+  async interrupt(sandboxId: string): Promise<void> {
+    const resp = await fetch(`${this.baseUrl}/runner/sandboxes/${sandboxId}/interrupt`, {
+      method: 'POST',
+    });
+    if (!resp.ok && resp.status !== 404) {
+      const body = await resp.text();
+      throw new Error(`Runner interrupt failed (${resp.status}): ${body}`);
+    }
+  }
+
   async getSandbox(sandboxId: string): Promise<{ sandboxId: string; workspaceDir: string; alive: boolean } | null> {
     const resp = await fetch(`${this.baseUrl}/runner/sandboxes/${sandboxId}`);
     if (resp.status === 404) return null;

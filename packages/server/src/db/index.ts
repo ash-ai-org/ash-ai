@@ -1,7 +1,7 @@
 import { join, resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
 
 /** Resolve the package root from the current file — works from both src/ (tsx) and dist/ (compiled). */
 function pkgRoot(): string {
@@ -17,13 +17,22 @@ function pkgRoot(): string {
  * DB layer while remaining fully backward-compatible for single-tenant deployments.
  */
 export interface Db {
+  // Runners
+  upsertRunner(id: string, host: string, port: number, maxSandboxes: number): Promise<RunnerRecord>;
+  heartbeatRunner(id: string, activeCount: number, warmingCount: number): Promise<void>;
+  getRunner(id: string): Promise<RunnerRecord | null>;
+  listHealthyRunners(cutoffIso: string): Promise<RunnerRecord[]>;
+  selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null>;
+  deleteRunner(id: string): Promise<void>;
+  listAllRunners(): Promise<RunnerRecord[]>;
   // Agents (tenant-scoped)
   upsertAgent(name: string, path: string, tenantId?: string): Promise<Agent>;
   getAgent(name: string, tenantId?: string): Promise<Agent | null>;
   listAgents(tenantId?: string): Promise<Agent[]>;
   deleteAgent(name: string, tenantId?: string): Promise<boolean>;
   // Sessions (tenant-scoped)
-  insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string): Promise<Session>;
+  insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string): Promise<Session>;
+  insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session>;
   updateSessionStatus(id: string, status: SessionStatus): Promise<void>;
   updateSessionSandbox(id: string, sandboxId: string): Promise<void>;
   updateSessionRunner(id: string, runnerId: string | null): Promise<void>;
@@ -54,6 +63,31 @@ export interface Db {
   insertApiKey(id: string, tenantId: string, keyHash: string, label: string): Promise<ApiKey>;
   listApiKeysByTenant(tenantId: string): Promise<ApiKey[]>;
   deleteApiKey(id: string): Promise<boolean>;
+  // Queue (tenant-scoped)
+  insertQueueItem(id: string, tenantId: string, agentName: string, prompt: string, sessionId?: string, priority?: number, maxRetries?: number): Promise<QueueItem>;
+  getQueueItem(id: string): Promise<QueueItem | null>;
+  getNextPendingQueueItem(tenantId?: string): Promise<QueueItem | null>;
+  updateQueueItemStatus(id: string, status: QueueItemStatus, error?: string): Promise<void>;
+  incrementQueueItemRetry(id: string): Promise<void>;
+  listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]>;
+  getQueueStats(tenantId: string): Promise<QueueStats>;
+  // Credentials (tenant-scoped)
+  insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string): Promise<Credential>;
+  getCredential(id: string): Promise<{ id: string; tenantId: string; type: string; encryptedKey: string; iv: string; authTag: string; label: string; active: boolean; createdAt: string; lastUsedAt: string | null } | null>;
+  listCredentials(tenantId: string): Promise<Credential[]>;
+  deleteCredential(id: string): Promise<boolean>;
+  touchCredentialUsed(id: string): Promise<void>;
+  // Attachments (tenant-scoped)
+  insertAttachment(id: string, tenantId: string, messageId: string, sessionId: string, filename: string, mimeType: string, size: number, storagePath: string): Promise<Attachment>;
+  getAttachment(id: string): Promise<Attachment | null>;
+  listAttachmentsByMessage(messageId: string, tenantId?: string): Promise<Attachment[]>;
+  listAttachmentsBySession(sessionId: string, tenantId?: string): Promise<Attachment[]>;
+  deleteAttachment(id: string): Promise<boolean>;
+  // Usage (tenant-scoped)
+  insertUsageEvent(id: string, tenantId: string, sessionId: string, agentName: string, eventType: UsageEventType, value: number): Promise<UsageEvent>;
+  insertUsageEvents(events: Array<{ id: string; tenantId: string; sessionId: string; agentName: string; eventType: UsageEventType; value: number }>): Promise<void>;
+  listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]>;
+  getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats>;
   // Lifecycle
   close(): Promise<void>;
 }
@@ -134,8 +168,12 @@ export async function deleteAgent(name: string, tenantId?: string): Promise<bool
   return getDb().deleteAgent(name, tenantId);
 }
 
-export async function insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string): Promise<Session> {
-  return getDb().insertSession(id, agentName, sandboxId, tenantId);
+export async function insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string): Promise<Session> {
+  return getDb().insertSession(id, agentName, sandboxId, tenantId, parentSessionId);
+}
+
+export async function insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session> {
+  return getDb().insertForkedSession(id, parentSession, sandboxId);
 }
 
 export async function updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
@@ -248,6 +286,129 @@ export async function listApiKeysByTenant(tenantId: string): Promise<ApiKey[]> {
 
 export async function deleteApiKey(id: string): Promise<boolean> {
   return getDb().deleteApiKey(id);
+}
+
+
+// -- Runners ------------------------------------------------------------------
+
+export async function upsertRunner(id: string, host: string, port: number, maxSandboxes: number): Promise<RunnerRecord> {
+  return getDb().upsertRunner(id, host, port, maxSandboxes);
+}
+
+export async function heartbeatRunner(id: string, activeCount: number, warmingCount: number): Promise<void> {
+  return getDb().heartbeatRunner(id, activeCount, warmingCount);
+}
+
+export async function getRunner(id: string): Promise<RunnerRecord | null> {
+  return getDb().getRunner(id);
+}
+
+export async function listHealthyRunners(cutoffIso: string): Promise<RunnerRecord[]> {
+  return getDb().listHealthyRunners(cutoffIso);
+}
+
+export async function selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
+  return getDb().selectBestRunner(cutoffIso);
+}
+
+export async function deleteRunner(id: string): Promise<void> {
+  return getDb().deleteRunner(id);
+}
+
+export async function listAllRunners(): Promise<RunnerRecord[]> {
+  return getDb().listAllRunners();
+}
+
+// -- Queue --------------------------------------------------------------------
+
+export async function insertQueueItem(id: string, tenantId: string, agentName: string, prompt: string, sessionId?: string, priority?: number, maxRetries?: number): Promise<QueueItem> {
+  return getDb().insertQueueItem(id, tenantId, agentName, prompt, sessionId, priority, maxRetries);
+}
+
+export async function getQueueItem(id: string): Promise<QueueItem | null> {
+  return getDb().getQueueItem(id);
+}
+
+export async function getNextPendingQueueItem(tenantId?: string): Promise<QueueItem | null> {
+  return getDb().getNextPendingQueueItem(tenantId);
+}
+
+export async function updateQueueItemStatus(id: string, status: QueueItemStatus, error?: string): Promise<void> {
+  return getDb().updateQueueItemStatus(id, status, error);
+}
+
+export async function incrementQueueItemRetry(id: string): Promise<void> {
+  return getDb().incrementQueueItemRetry(id);
+}
+
+export async function listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]> {
+  return getDb().listQueueItems(tenantId, status, limit);
+}
+
+export async function getQueueStats(tenantId: string): Promise<QueueStats> {
+  return getDb().getQueueStats(tenantId);
+}
+
+// -- Credentials --------------------------------------------------------------
+
+export async function insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string): Promise<Credential> {
+  return getDb().insertCredential(id, tenantId, type, encryptedKey, iv, authTag, label);
+}
+
+export async function getCredential(id: string) {
+  return getDb().getCredential(id);
+}
+
+export async function listCredentials(tenantId: string): Promise<Credential[]> {
+  return getDb().listCredentials(tenantId);
+}
+
+export async function deleteCredentialById(id: string): Promise<boolean> {
+  return getDb().deleteCredential(id);
+}
+
+export async function touchCredentialUsed(id: string): Promise<void> {
+  return getDb().touchCredentialUsed(id);
+}
+
+// -- Attachments --------------------------------------------------------------
+
+export async function insertAttachment(id: string, tenantId: string, messageId: string, sessionId: string, filename: string, mimeType: string, size: number, storagePath: string): Promise<Attachment> {
+  return getDb().insertAttachment(id, tenantId, messageId, sessionId, filename, mimeType, size, storagePath);
+}
+
+export async function getAttachment(id: string): Promise<Attachment | null> {
+  return getDb().getAttachment(id);
+}
+
+export async function listAttachmentsByMessage(messageId: string, tenantId?: string): Promise<Attachment[]> {
+  return getDb().listAttachmentsByMessage(messageId, tenantId);
+}
+
+export async function listAttachmentsBySession(sessionId: string, tenantId?: string): Promise<Attachment[]> {
+  return getDb().listAttachmentsBySession(sessionId, tenantId);
+}
+
+export async function deleteAttachment(id: string): Promise<boolean> {
+  return getDb().deleteAttachment(id);
+}
+
+// -- Usage --------------------------------------------------------------------
+
+export async function insertUsageEvent(id: string, tenantId: string, sessionId: string, agentName: string, eventType: UsageEventType, value: number): Promise<UsageEvent> {
+  return getDb().insertUsageEvent(id, tenantId, sessionId, agentName, eventType, value);
+}
+
+export async function insertUsageEvents(events: Array<{ id: string; tenantId: string; sessionId: string; agentName: string; eventType: UsageEventType; value: number }>): Promise<void> {
+  return getDb().insertUsageEvents(events);
+}
+
+export async function listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; limit?: number }): Promise<UsageEvent[]> {
+  return getDb().listUsageEvents(tenantId, opts);
+}
+
+export async function getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string }): Promise<UsageStats> {
+  return getDb().getUsageStats(tenantId, opts);
 }
 
 export async function closeDb(): Promise<void> {
