@@ -71,11 +71,12 @@ In coordinator mode (`ASH_MODE=coordinator`), the server does not create a local
 export ASH_MODE=coordinator
 export ASH_DATABASE_URL="postgresql://ash:password@db-host:5432/ash"
 export ASH_API_KEY=my-api-key
+export ASH_INTERNAL_SECRET=my-runner-secret  # Required: authenticates runner registration
 export ANTHROPIC_API_KEY=sk-ant-...
 
 node packages/server/dist/index.js
 # Or via Docker:
-# ash start -e ASH_MODE=coordinator -e ASH_DATABASE_URL=...
+# ash start -e ASH_MODE=coordinator -e ASH_DATABASE_URL=... -e ASH_INTERNAL_SECRET=...
 ```
 
 The coordinator logs:
@@ -96,6 +97,7 @@ export ASH_SERVER_URL=http://coordinator-host:4100
 export ASH_RUNNER_PORT=4200
 export ASH_RUNNER_ADVERTISE_HOST=10.0.1.5  # IP the coordinator can reach
 export ASH_MAX_SANDBOXES=50
+export ASH_INTERNAL_SECRET=my-runner-secret  # Must match coordinator
 export ANTHROPIC_API_KEY=sk-ant-...
 
 node packages/runner/dist/index.js
@@ -104,7 +106,7 @@ node packages/runner/dist/index.js
 The runner:
 1. Creates a `SandboxPool` with a lightweight in-memory database for sandbox tracking.
 2. Starts a Fastify HTTP server on port 4200.
-3. Sends a registration request to `ASH_SERVER_URL/api/internal/runners/register`.
+3. Sends a registration request to `ASH_SERVER_URL/api/internal/runners/register` (with exponential backoff retry on failure).
 4. Begins sending heartbeats every 10 seconds to `ASH_SERVER_URL/api/internal/runners/heartbeat`, including pool stats (running, warming, waiting counts).
 
 The coordinator logs:
@@ -123,13 +125,19 @@ Once a session is assigned to a runner, all subsequent messages for that session
 
 ## Failure Handling
 
-### Runner Dies
+### Graceful Shutdown
 
-If a runner stops sending heartbeats for 30 seconds (`RUNNER_LIVENESS_TIMEOUT_MS`), the coordinator:
+When a runner shuts down cleanly (receives `SIGTERM`), it calls `POST /api/internal/runners/deregister`. The coordinator immediately bulk-pauses all active sessions on that runner in a single query and removes it from the registry. No 30-second wait.
 
-1. Marks all active sessions on that runner as `paused`.
+### Runner Crashes
+
+If a runner crashes without deregistering, the coordinator detects it via missed heartbeats. After 30 seconds without a heartbeat (`RUNNER_LIVENESS_TIMEOUT_MS`), the coordinator:
+
+1. Bulk-pauses all active/starting sessions on that runner (single `UPDATE` query).
 2. Removes the runner from the routing table.
-3. Logs a warning for each affected session.
+3. Purges stale entries from its local backend cache.
+
+Each coordinator adds random 0-5s jitter to its sweep interval to prevent thundering herd when multiple coordinators sweep independently.
 
 Paused sessions can be resumed later. If `ASH_SNAPSHOT_URL` is configured, the runner persists workspace state to cloud storage before eviction, enabling resume on a different runner.
 
@@ -178,6 +186,7 @@ services:
       - ASH_MODE=coordinator
       - ASH_DATABASE_URL=postgresql://ash:ash@db:5432/ash
       - ASH_API_KEY=${ASH_API_KEY}
+      - ASH_INTERNAL_SECRET=${ASH_INTERNAL_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       db:
@@ -195,6 +204,7 @@ services:
       - ASH_SERVER_URL=http://coordinator:4100
       - ASH_RUNNER_ADVERTISE_HOST=runner-1
       - ASH_MAX_SANDBOXES=50
+      - ASH_INTERNAL_SECRET=${ASH_INTERNAL_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       - coordinator
@@ -211,6 +221,7 @@ services:
       - ASH_SERVER_URL=http://coordinator:4100
       - ASH_RUNNER_ADVERTISE_HOST=runner-2
       - ASH_MAX_SANDBOXES=50
+      - ASH_INTERNAL_SECRET=${ASH_INTERNAL_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       - coordinator
@@ -224,6 +235,7 @@ volumes:
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export ASH_API_KEY=my-production-key
+export ASH_INTERNAL_SECRET=my-runner-secret
 docker compose up -d
 ```
 
@@ -262,6 +274,7 @@ Coordinators are stateless — all routing decisions come from the database. Any
 ASH_MODE=coordinator \
 ASH_DATABASE_URL="postgresql://ash:password@db-host:5432/ash" \
 ASH_API_KEY=my-api-key \
+ASH_INTERNAL_SECRET=my-runner-secret \
 ANTHROPIC_API_KEY=sk-ant-... \
 ASH_PORT=4100 \
 node packages/server/dist/index.js
@@ -270,9 +283,16 @@ node packages/server/dist/index.js
 ASH_MODE=coordinator \
 ASH_DATABASE_URL="postgresql://ash:password@db-host:5432/ash" \
 ASH_API_KEY=my-api-key \
+ASH_INTERNAL_SECRET=my-runner-secret \
 ANTHROPIC_API_KEY=sk-ant-... \
 ASH_PORT=4100 \
 node packages/server/dist/index.js
+```
+
+Each coordinator logs its unique ID (`hostname-PID`) on startup for debugging:
+
+```
+Ash server listening on 0.0.0.0:4100 (mode: coordinator, id: ip-10-0-1-5-12345)
 ```
 
 ### Load Balancer Configuration
@@ -306,6 +326,7 @@ Runners register with the load balancer URL (not a specific coordinator):
 ```bash
 ASH_SERVER_URL=http://load-balancer:4100 \
 ASH_RUNNER_ID=runner-1 \
+ASH_INTERNAL_SECRET=my-runner-secret \
 node packages/runner/dist/index.js
 ```
 
@@ -315,10 +336,12 @@ Heartbeats go through the load balancer. Any coordinator that receives a heartbe
 
 The runner registry lives in the `runners` table in the shared database. All coordinators read and write to this table:
 
-- **Registration:** Runner sends `POST /api/internal/runners/register` → coordinator upserts into `runners` table
+- **Registration:** Runner sends `POST /api/internal/runners/register` → coordinator upserts into `runners` table (with retry and exponential backoff)
 - **Heartbeat:** Runner sends `POST /api/internal/runners/heartbeat` → coordinator updates `active_count`, `warming_count`, `last_heartbeat_at`
+- **Deregistration:** Runner sends `POST /api/internal/runners/deregister` on graceful shutdown → coordinator bulk-pauses sessions and deletes runner in one pass
 - **Selection:** On session creation, coordinator queries `SELECT ... FROM runners ORDER BY available_capacity DESC LIMIT 1`
-- **Liveness sweep:** All coordinators run the sweep independently (every 30s). Operations are idempotent — multiple coordinators marking the same dead runner's sessions as paused is harmless.
+- **Liveness sweep:** All coordinators run the sweep independently (every 30s + random 0-5s jitter). Operations are idempotent — multiple coordinators marking the same dead runner's sessions as paused is harmless.
+- **Auth:** When `ASH_INTERNAL_SECRET` is set, all `/api/internal/*` endpoints require `Authorization: Bearer <secret>`.
 
 For more details on the scaling architecture, see [Scaling Architecture](/docs/architecture/scaling).
 

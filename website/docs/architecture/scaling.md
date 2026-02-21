@@ -108,9 +108,27 @@ sequenceDiagram
     end
 ```
 
+## Graceful Runner Shutdown
+
+When a runner shuts down cleanly, it deregisters from the coordinator. Sessions are paused immediately — no 30-second wait.
+
+```mermaid
+sequenceDiagram
+    participant R as Runner
+    participant Co as Coordinator
+    participant DB as Database
+
+    Note over R: SIGTERM received
+    R->>Co: POST /api/internal/runners/deregister
+    Co->>DB: UPDATE sessions SET status='paused' WHERE runner_id AND status IN ('active','starting')
+    Co->>DB: DELETE FROM runners WHERE id='runner-1'
+    Co-->>R: {ok: true}
+    Note over R: Destroy sandboxes, close server, exit
+```
+
 ## Dead Runner Detection
 
-The coordinator sweeps for dead runners every 30 seconds. If a runner misses its heartbeat window, all its sessions are paused.
+If a runner crashes without deregistering, the coordinator sweeps for dead runners every 30 seconds (with random 0-5s jitter to prevent thundering herd across coordinators). Sessions are bulk-paused in a single query.
 
 ```mermaid
 sequenceDiagram
@@ -118,10 +136,10 @@ sequenceDiagram
     participant DB as Database
     participant C as Client
 
-    Note over Co: Liveness sweep (every 30s)
-    Co->>DB: SELECT runners WHERE last_heartbeat_at < cutoff
+    Note over Co: Liveness sweep (every 30s + jitter)
+    Co->>DB: SELECT runners WHERE last_heartbeat_at <= cutoff
     DB-->>Co: [runner-3 is stale]
-    Co->>DB: UPDATE sessions SET status='paused' WHERE runner_id='runner-3'
+    Co->>DB: UPDATE sessions SET status='paused' WHERE runner_id='runner-3' AND status IN ('active','starting')
     Co->>DB: DELETE FROM runners WHERE id='runner-3'
     Note over C: Client detects disconnect
     C->>Co: POST /api/sessions/:id/resume
@@ -166,7 +184,8 @@ graph TB
 **Key properties:**
 - Any coordinator can route to any runner (DB is source of truth)
 - Coordinators don't talk to each other
-- Liveness sweep runs on all coordinators (idempotent)
+- Each coordinator has a unique ID (`hostname-PID`) reported in `GET /health` and startup logs
+- Liveness sweep runs on all coordinators independently (idempotent, with random jitter to prevent thundering herd)
 - SSE reconnection handles coordinator failover (no session migration)
 
 ### Coordinator Failover
@@ -248,6 +267,7 @@ erDiagram
 | `ASH_MODE` | `standalone` | Set to `coordinator` for multi-runner mode |
 | `ASH_DATABASE_URL` | — | Postgres/CRDB connection string (required for multi-coordinator) |
 | `ASH_PORT` | `4100` | HTTP listen port |
+| `ASH_INTERNAL_SECRET` | — | Shared secret for runner auth. If set, all `/api/internal/*` endpoints require `Authorization: Bearer <secret>`. **Required for multi-machine deployments.** |
 
 ### Runner
 
@@ -255,9 +275,10 @@ erDiagram
 |----------|---------|-------------|
 | `ASH_RUNNER_ID` | `runner-{pid}` | Unique runner identifier |
 | `ASH_RUNNER_PORT` | `4200` | HTTP listen port |
-| `ASH_SERVER_URL` | — | Coordinator URL for registration |
+| `ASH_SERVER_URL` | — | Coordinator URL for registration (use LB URL in multi-coordinator mode) |
 | `ASH_RUNNER_ADVERTISE_HOST` | — | Host reachable from coordinator |
 | `ASH_MAX_SANDBOXES` | `1000` | Maximum concurrent sandboxes |
+| `ASH_INTERNAL_SECRET` | — | Must match the coordinator's `ASH_INTERNAL_SECRET` |
 
 ## When to Scale
 
