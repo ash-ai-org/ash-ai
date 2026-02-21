@@ -1,5 +1,11 @@
 # @ash-ai/bridge
 
+## 0.0.4 - 2026-02-21
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.4
+
 ## 0.0.3 - 2026-02-20
 
 ### Changed

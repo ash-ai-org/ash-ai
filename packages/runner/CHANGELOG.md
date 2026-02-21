@@ -1,5 +1,19 @@
 # @ash-ai/runner
 
+## 0.0.4 - 2026-02-21
+
+### Added
+
+- Multi-coordinator support for distributed coordination
+
+### Fixed
+
+- Production correctness hardening for multi-runner scenarios
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.4, @ash-ai/sandbox@0.0.4
+
 ## 0.0.3 - 2026-02-20
 
 ### Changed

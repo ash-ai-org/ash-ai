@@ -1,5 +1,20 @@
 # @ash-ai/sdk
 
+## 0.0.4 - 2026-02-21
+
+### Added
+
+- Credential management methods: `createCredential`, `listCredentials`, `deleteCredential`
+- Queue methods: `enqueueItem`, `listQueueItems`, `getQueueStats`
+- Attachment methods: `uploadAttachment`, `listAttachments`, `downloadAttachment`, `deleteAttachment`
+- Usage methods: `getUsageStats`, `listUsageEvents`
+- Workspace bundle methods: `uploadWorkspace`, `downloadWorkspace`
+- Re-exported types: `Message`, `Credential`, `Attachment`, `QueueItem`, `UsageEvent`, `UsageStats`, and more
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.4
+
 ## 0.0.3 - 2026-02-20
 
 ### Added

@@ -1,5 +1,21 @@
 # @ash-ai/shared
 
+## 0.0.4 - 2026-02-21
+
+### Added
+
+- Credential types for agent secret management
+- Queue types: `QueueItem`, `QueueItemStatus`, `QueueStats`
+- Attachment types for file upload/download
+- Usage tracking types: `UsageEvent`, `UsageEventType`, `UsageStats`
+- Workspace bundle types for agent workspace snapshots
+- Structured message types for rich content
+- Multi-coordinator types for distributed coordination
+
+### Fixed
+
+- Queue processor and usage extractor type fixes
+
 ## 0.0.3 - 2026-02-20
 
 ### Added
