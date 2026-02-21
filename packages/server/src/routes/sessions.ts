@@ -360,6 +360,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
               console.error(`Failed to persist assistant message: ${err}`)
             );
             telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'message', data: { role: 'assistant', messageType: data.type } });
+            // Extract and record usage metrics (non-blocking)
+            recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
           }
           // Extract and record usage metrics once per turn (result has the usage summary)
           if (data.type === 'result') {
