@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { launchServer, waitForReady, type ServerHandle } from '../helpers/server-launcher.js';
+import { launchServer, waitForReady, shouldUseDocker, type ServerHandle } from '../helpers/server-launcher.js';
 import { launchRunner, waitForRunnerReady, type RunnerHandle } from '../helpers/runner-launcher.js';
 
 /**
@@ -17,13 +17,16 @@ import { launchRunner, waitForRunnerReady, type RunnerHandle } from '../helpers/
  *   - Graceful runner shutdown (sessions paused)
  *   - New runner joins (sessions route there)
  *
- * Runs directly (no Docker) on macOS/Linux.
+ * On macOS with Docker: coordinator runs direct, runners run in Docker
+ * (for cgroups/bwrap sandbox isolation).
+ * On Linux: everything runs direct (native cgroups available).
  */
 describe('multi-runner lifecycle', () => {
   let coordinator: ServerHandle;
   let runner1: RunnerHandle;
   let testRoot: string;
   let agentDir: string;
+  let useDocker: boolean;
 
   const COORD_PORT = 14300 + Math.floor(Math.random() * 200);
   const RUNNER1_PORT = COORD_PORT + 100;
@@ -31,6 +34,13 @@ describe('multi-runner lifecycle', () => {
   const INTERNAL_SECRET = 'test-secret-' + Date.now();
 
   beforeAll(async () => {
+    useDocker = shouldUseDocker();
+    if (useDocker) {
+      console.log('[multi-runner] Using Docker for runners (macOS detected)');
+    } else {
+      console.log('[multi-runner] Using direct mode for runners (Linux or no Docker)');
+    }
+
     testRoot = mkdtempSync(join(tmpdir(), 'ash-multi-runner-'));
     agentDir = join(testRoot, 'test-agent');
     mkdirSync(agentDir);
@@ -42,10 +52,7 @@ describe('multi-runner lifecycle', () => {
     const runner1DataDir = join(testRoot, 'runner1-data');
     mkdirSync(runner1DataDir, { recursive: true });
 
-    // Start coordinator (no local sandbox pool)
-    // Force direct mode — coordinator doesn't need Docker (no sandbox creation),
-    // and running in Docker would mean the runner can't reach it or the Docker image
-    // may not have latest code.
+    // Start coordinator — always direct (no sandbox creation, pure control plane)
     coordinator = await launchServer({
       port: COORD_PORT,
       testRoot,
@@ -58,7 +65,7 @@ describe('multi-runner lifecycle', () => {
     });
     await waitForReady(coordinator.url);
 
-    // Start runner 1
+    // Start runner 1 — Docker on macOS, direct on Linux
     runner1 = launchRunner({
       runnerId: 'runner-1',
       port: RUNNER1_PORT,
@@ -66,12 +73,13 @@ describe('multi-runner lifecycle', () => {
       maxSandboxes: 10,
       dataDir: runner1DataDir,
       internalSecret: INTERNAL_SECRET,
+      testRoot,
     });
     await waitForRunnerReady(runner1.url);
 
-    // Wait for runner to register with coordinator (heartbeat takes a bit)
+    // Wait for runner to register with coordinator
     await waitForRunnerRegistered(coordinator.url, 'runner-1');
-  }, 60_000);
+  }, 120_000); // generous timeout for Docker image build on first run
 
   afterAll(async () => {
     if (runner1) await runner1.stop();
@@ -164,7 +172,7 @@ describe('multi-runner lifecycle', () => {
     const eventLines = lines.filter((l) => l.startsWith('event: '));
     expect(eventLines.length).toBeGreaterThan(0);
 
-    // Look for a message event with SDK data (type: 'assistant')
+    // Look for a message event with SDK data — first is 'system' init, then 'assistant'
     const messageEvents: any[] = [];
     for (let i = 0; i < lines.length; i++) {
       if (lines[i] === 'event: message' && i + 1 < lines.length && lines[i + 1].startsWith('data: ')) {
@@ -172,11 +180,12 @@ describe('multi-runner lifecycle', () => {
       }
     }
     expect(messageEvents.length).toBeGreaterThan(0);
-    expect(messageEvents[0].type).toBe('assistant');
+    const assistantMsg = messageEvents.find((m) => m.type === 'assistant');
+    expect(assistantMsg).toBeTruthy();
 
     // Clean up
     await fetch(`${coordinator.url}/api/sessions/${session.id}`, { method: 'DELETE' });
-  }, 15_000);
+  }, 30_000);
 
   it('pauses session when runner is stopped', async () => {
     // Create a session on runner-1
@@ -193,7 +202,7 @@ describe('multi-runner lifecycle', () => {
     await runner1.stop();
 
     // Wait for deregistration to propagate
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     // Session should now be paused
     const getRes = await fetch(`${coordinator.url}/api/sessions/${session.id}`);
@@ -205,13 +214,13 @@ describe('multi-runner lifecycle', () => {
     const runnersBody = await runnersRes.json() as any;
     const r1 = runnersBody.runners.find((r: any) => r.runnerId === 'runner-1');
     expect(r1).toBeUndefined();
-  }, 15_000);
+  }, 30_000);
 
   it('new runner picks up new sessions after previous runner dies', async () => {
     const runner2DataDir = join(testRoot, 'runner2-data');
     mkdirSync(runner2DataDir, { recursive: true });
 
-    // Start runner 2
+    // Start runner 2 — Docker on macOS, direct on Linux
     const runner2 = launchRunner({
       runnerId: 'runner-2',
       port: RUNNER2_PORT,
@@ -219,6 +228,7 @@ describe('multi-runner lifecycle', () => {
       maxSandboxes: 10,
       dataDir: runner2DataDir,
       internalSecret: INTERNAL_SECRET,
+      testRoot,
     });
 
     try {
@@ -249,7 +259,7 @@ describe('multi-runner lifecycle', () => {
     } finally {
       await runner2.stop();
     }
-  }, 30_000);
+  }, 60_000);
 
   it('rejects session creation when no runners available', async () => {
     // At this point, both runners are stopped
@@ -269,7 +279,7 @@ describe('multi-runner lifecycle', () => {
 async function waitForRunnerRegistered(
   coordinatorUrl: string,
   runnerId: string,
-  timeoutMs = 15_000,
+  timeoutMs = 30_000,
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {

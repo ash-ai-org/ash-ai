@@ -13,6 +13,10 @@
  *
  * The difference between the two is the cost of the coordinator→runner hop.
  *
+ * On macOS with Docker: standalone runs in Docker (for sandbox isolation),
+ * coordinator runs direct (pure control plane), runner runs in Docker.
+ * On Linux: everything runs direct (native cgroups available).
+ *
  * Usage:
  *   tsx test/bench/multi-runner-overhead.ts             # defaults (3 rounds)
  *   tsx test/bench/multi-runner-overhead.ts --rounds 10  # more samples
@@ -23,7 +27,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 
 // ---------------------------------------------------------------------------
@@ -44,6 +48,45 @@ if (isNaN(ROUNDS) || ROUNDS < 1) {
 }
 
 const TTFT_PROMPT = 'Respond with the number 1 and nothing else.';
+const DOCKER_IMAGE = 'ash-dev';
+
+// ---------------------------------------------------------------------------
+// Platform detection (same logic as test helpers)
+// ---------------------------------------------------------------------------
+
+function isDockerAvailable(): boolean {
+  try {
+    execSync('docker info', { stdio: 'ignore', timeout: 10_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function shouldUseDocker(): boolean {
+  if (process.env.ASH_TEST_DOCKER === '1') return true;
+  if (process.env.ASH_TEST_DOCKER === '0') return false;
+  return process.platform === 'darwin' && isDockerAvailable();
+}
+
+function isImageBuilt(): boolean {
+  try {
+    execSync(`docker image inspect ${DOCKER_IMAGE}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureImage(): void {
+  if (isImageBuilt()) return;
+  console.error(`[bench] Building ${DOCKER_IMAGE} Docker image...`);
+  execSync(`docker build -t ${DOCKER_IMAGE} .`, {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+    timeout: 300_000,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,7 +124,7 @@ async function post(url: string, body: object): Promise<Response> {
   });
 }
 
-async function waitForReady(url: string, timeoutMs = 20_000): Promise<void> {
+async function waitForReady(url: string, timeoutMs = 30_000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -93,7 +136,7 @@ async function waitForReady(url: string, timeoutMs = 20_000): Promise<void> {
   throw new Error(`Server at ${url} did not become ready within ${timeoutMs}ms`);
 }
 
-async function waitForRunnerHealth(url: string, timeoutMs = 15_000): Promise<void> {
+async function waitForRunnerHealth(url: string, timeoutMs = 30_000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -105,7 +148,7 @@ async function waitForRunnerHealth(url: string, timeoutMs = 15_000): Promise<voi
   throw new Error(`Runner at ${url} did not become ready within ${timeoutMs}ms`);
 }
 
-async function waitForRunnerRegistered(coordUrl: string, runnerId: string, timeoutMs = 15_000): Promise<void> {
+async function waitForRunnerRegistered(coordUrl: string, runnerId: string, timeoutMs = 30_000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -120,15 +163,73 @@ async function waitForRunnerRegistered(coordUrl: string, runnerId: string, timeo
   throw new Error(`Runner ${runnerId} did not register within ${timeoutMs}ms`);
 }
 
-function launchProcess(cmd: string, args: string[], env: Record<string, string>): ChildProcess {
-  const child = spawn(cmd, args, {
+// ---------------------------------------------------------------------------
+// Process launchers
+// ---------------------------------------------------------------------------
+
+interface ProcessHandle {
+  stop(): Promise<void>;
+}
+
+function launchDirectProcess(cmd: string, cmdArgs: string[], env: Record<string, string>): ProcessHandle & { child: ChildProcess } {
+  const child = spawn(cmd, cmdArgs, {
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
     cwd: process.cwd(),
   });
   child.stdout?.on('data', () => {}); // drain
   child.stderr?.on('data', () => {}); // drain
-  return child;
+  return {
+    child,
+    stop: () => stopProcess(child),
+  };
+}
+
+function launchDockerProcess(opts: {
+  name: string;
+  port: number;
+  testRoot: string;
+  env: Record<string, string>;
+  cmd?: string[];
+}): ProcessHandle & { child: ChildProcess } {
+  const containerName = `ash-bench-${opts.name}-${opts.port}`;
+
+  // Safety: stop leftover container
+  try { execSync(`docker stop ${containerName}`, { stdio: 'ignore', timeout: 5000 }); } catch { /* fine */ }
+
+  const envArgs: string[] = [];
+  for (const [key, value] of Object.entries(opts.env)) {
+    envArgs.push('-e', `${key}=${value}`);
+  }
+
+  const child = spawn('docker', [
+    'run', '--rm',
+    '--name', containerName,
+    '--init',
+    '-p', `${opts.port}:${opts.port}`,
+    '-v', `${opts.testRoot}:${opts.testRoot}`,
+    '--privileged',
+    ...envArgs,
+    DOCKER_IMAGE,
+    ...(opts.cmd ?? ['node', 'packages/server/dist/index.js']),
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  child.stdout?.on('data', () => {}); // drain
+  child.stderr?.on('data', (chunk: Buffer) => {
+    const line = chunk.toString().trimEnd();
+    if (line.includes('error') || line.includes('Error') || line.includes('listening') || line.includes('ENOENT') || line.includes('fatal')) {
+      console.error(`[bench:docker:${opts.name}]`, line);
+    }
+  });
+
+  return {
+    child,
+    stop: async () => {
+      try { execSync(`docker stop ${containerName}`, { stdio: 'ignore', timeout: 10_000 }); } catch { /* fine */ }
+      await stopProcess(child);
+    },
+  };
 }
 
 function stopProcess(child: ChildProcess): Promise<void> {
@@ -211,10 +312,15 @@ async function runWorkload(serverUrl: string, agentName: string, rounds: number)
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const useDocker = shouldUseDocker();
+
   console.error(`[bench] multi-runner-overhead: ${ROUNDS} rounds per mode`);
   console.error(`[bench] Date: ${new Date().toISOString()}`);
   console.error(`[bench] Platform: ${process.platform} ${process.arch}`);
   console.error(`[bench] Node: ${process.version}`);
+  console.error(`[bench] Docker: ${useDocker ? 'yes (runners in Docker)' : 'no (direct mode)'}`);
+
+  if (useDocker) ensureImage();
 
   const testRoot = mkdtempSync(join(tmpdir(), 'ash-bench-mr-'));
   const agentDir = join(testRoot, 'bench-agent');
@@ -230,6 +336,9 @@ async function main() {
   const COORD_PORT = STANDALONE_PORT + 1;
   const RUNNER_PORT = STANDALONE_PORT + 2;
 
+  // Agent path — same in Docker or direct since testRoot is mounted at the same path
+  const standaloneAgentPath = agentDir;
+
   let standaloneResult: BenchResult | null = null;
   let multiRunnerResult: BenchResult | null = null;
 
@@ -241,12 +350,28 @@ async function main() {
   const standaloneDataDir = join(testRoot, 'standalone-data');
   mkdirSync(standaloneDataDir, { recursive: true });
 
-  const standaloneProc = launchProcess('node', [serverEntry], {
-    ASH_PORT: String(STANDALONE_PORT),
-    ASH_HOST: '127.0.0.1',
-    ASH_DATA_DIR: standaloneDataDir,
-    ASH_BRIDGE_ENTRY: bridgeEntry,
-  });
+  let standaloneHandle: ProcessHandle;
+  if (useDocker) {
+    standaloneHandle = launchDockerProcess({
+      name: 'standalone',
+      port: STANDALONE_PORT,
+      testRoot,
+      env: {
+        ASH_PORT: String(STANDALONE_PORT),
+        ASH_HOST: '0.0.0.0',
+        ASH_DATA_DIR: join(standaloneDataDir),
+        ASH_BRIDGE_ENTRY: '/app/packages/bridge/dist/index.js',
+        ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+      },
+    });
+  } else {
+    standaloneHandle = launchDirectProcess('node', [serverEntry], {
+      ASH_PORT: String(STANDALONE_PORT),
+      ASH_HOST: '127.0.0.1',
+      ASH_DATA_DIR: standaloneDataDir,
+      ASH_BRIDGE_ENTRY: bridgeEntry,
+    });
+  }
 
   try {
     const standaloneUrl = `http://127.0.0.1:${STANDALONE_PORT}`;
@@ -254,12 +379,12 @@ async function main() {
     console.error(`[bench] Standalone server ready at ${standaloneUrl}`);
 
     // Deploy agent
-    const deployRes = await post(`${standaloneUrl}/api/agents`, { name: AGENT, path: agentDir });
+    const deployRes = await post(`${standaloneUrl}/api/agents`, { name: AGENT, path: standaloneAgentPath });
     if (!deployRes.ok) throw new Error(`Deploy failed: ${await deployRes.text()}`);
 
     standaloneResult = await runWorkload(standaloneUrl, AGENT, ROUNDS);
   } finally {
-    await stopProcess(standaloneProc);
+    await standaloneHandle.stop();
   }
 
   // =========================================================================
@@ -272,7 +397,8 @@ async function main() {
   const runnerDataDir = join(testRoot, 'runner-data');
   mkdirSync(runnerDataDir, { recursive: true });
 
-  const coordProc = launchProcess('node', [serverEntry], {
+  // Coordinator always runs direct (pure control plane, no sandbox creation)
+  const coordHandle = launchDirectProcess('node', [serverEntry], {
     ASH_PORT: String(COORD_PORT),
     ASH_HOST: '127.0.0.1',
     ASH_MODE: 'coordinator',
@@ -280,38 +406,65 @@ async function main() {
     ASH_BRIDGE_ENTRY: bridgeEntry,
   });
 
-  let runnerProc: ChildProcess | null = null;
+  let runnerHandle: ProcessHandle | null = null;
 
   try {
     const coordUrl = `http://127.0.0.1:${COORD_PORT}`;
     await waitForReady(coordUrl);
     console.error(`[bench] Coordinator ready at ${coordUrl}`);
 
-    // Start runner
-    runnerProc = launchProcess('node', [runnerEntry], {
-      ASH_RUNNER_ID: 'bench-runner',
-      ASH_RUNNER_PORT: String(RUNNER_PORT),
-      ASH_RUNNER_HOST: '127.0.0.1',
-      ASH_SERVER_URL: coordUrl,
-      ASH_RUNNER_ADVERTISE_HOST: '127.0.0.1',
-      ASH_MAX_SANDBOXES: '50',
-      ASH_BRIDGE_ENTRY: bridgeEntry,
-      ASH_DATA_DIR: runnerDataDir,
-    });
+    // Start runner — Docker on macOS, direct on Linux
+    if (useDocker) {
+      // Runner in Docker. The coordinator is on the host, so the runner
+      // connects to host.docker.internal. It advertises host.docker.internal
+      // so the coordinator resolves it; the port is forwarded to the host.
+      const dockerCoordUrl = coordUrl
+        .replace('localhost', 'host.docker.internal')
+        .replace('127.0.0.1', 'host.docker.internal');
+
+      runnerHandle = launchDockerProcess({
+        name: 'runner',
+        port: RUNNER_PORT,
+        testRoot,
+        env: {
+          ASH_RUNNER_ID: 'bench-runner',
+          ASH_RUNNER_PORT: String(RUNNER_PORT),
+          ASH_RUNNER_HOST: '0.0.0.0',
+          ASH_SERVER_URL: dockerCoordUrl,
+          ASH_RUNNER_ADVERTISE_HOST: '127.0.0.1',
+          ASH_MAX_SANDBOXES: '50',
+          ASH_BRIDGE_ENTRY: '/app/packages/bridge/dist/index.js',
+          ASH_DATA_DIR: join(runnerDataDir),
+          ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+        },
+        cmd: ['node', 'packages/runner/dist/index.js'],
+      });
+    } else {
+      runnerHandle = launchDirectProcess('node', [runnerEntry], {
+        ASH_RUNNER_ID: 'bench-runner',
+        ASH_RUNNER_PORT: String(RUNNER_PORT),
+        ASH_RUNNER_HOST: '127.0.0.1',
+        ASH_SERVER_URL: coordUrl,
+        ASH_RUNNER_ADVERTISE_HOST: '127.0.0.1',
+        ASH_MAX_SANDBOXES: '50',
+        ASH_BRIDGE_ENTRY: bridgeEntry,
+        ASH_DATA_DIR: runnerDataDir,
+      });
+    }
 
     const runnerUrl = `http://127.0.0.1:${RUNNER_PORT}`;
     await waitForRunnerHealth(runnerUrl);
     await waitForRunnerRegistered(coordUrl, 'bench-runner');
     console.error(`[bench] Runner registered with coordinator`);
 
-    // Deploy agent on coordinator
+    // Deploy agent on coordinator (uses host path — coordinator is direct)
     const deployRes = await post(`${coordUrl}/api/agents`, { name: AGENT, path: agentDir });
     if (!deployRes.ok) throw new Error(`Deploy failed: ${await deployRes.text()}`);
 
     multiRunnerResult = await runWorkload(coordUrl, AGENT, ROUNDS);
   } finally {
-    if (runnerProc) await stopProcess(runnerProc);
-    await stopProcess(coordProc);
+    if (runnerHandle) await runnerHandle.stop();
+    await coordHandle.stop();
   }
 
   // =========================================================================
@@ -322,6 +475,7 @@ async function main() {
     date: new Date().toISOString(),
     platform: `${process.platform} ${process.arch}`,
     node: process.version,
+    docker: useDocker,
     rounds: ROUNDS,
     standalone: standaloneResult ? {
       createLatency: stats(standaloneResult.createLatency),
@@ -345,7 +499,7 @@ async function main() {
 
   // Human-readable summary to stderr
   console.error('');
-  console.error('=== Multi-Runner Overhead (ms) ===');
+  console.error(`=== Multi-Runner Overhead (ms) ${useDocker ? '[Docker]' : '[Direct]'} ===`);
   console.error('');
   console.error('  Mode              Metric            p50        p95        mean');
   console.error('  ----------------  ----------------  ---------  ---------  ---------');
