@@ -3,15 +3,23 @@ import { createSession, sendMessage, endSession } from '../client.js';
 
 export function chatCommand(): Command {
   return new Command('chat')
-    .description('Send a message to an agent (creates session, streams response, ends session)')
+    .description('Send a message to an agent (keeps session alive for follow-ups)')
     .argument('<agent>', 'Agent name')
     .argument('<message>', 'Message content')
-    .option('-k, --keep', 'Keep session alive after response (prints session ID)')
-    .action(async (agent: string, message: string, opts: { keep?: boolean }) => {
-      let sessionId: string | undefined;
+    .option('-s, --session-id <id>', 'Continue an existing session instead of creating a new one')
+    .option('--end', 'End the session after the response')
+    .action(async (agent: string, message: string, opts: { sessionId?: string; end?: boolean }) => {
+      let sessionId: string;
+      let isNewSession = false;
+
       try {
-        const session = await createSession(agent) as { id: string };
-        sessionId = session.id;
+        if (opts.sessionId) {
+          sessionId = opts.sessionId;
+        } else {
+          const session = await createSession(agent) as { id: string };
+          sessionId = session.id;
+          isNewSession = true;
+        }
 
         const stream = await sendMessage(sessionId, message);
         if (!stream) { console.log('No response'); return; }
@@ -33,7 +41,6 @@ export function chatCommand(): Command {
               const data = line.slice(6);
               try {
                 const parsed = JSON.parse(data);
-                // Extract text content from assistant messages
                 if (parsed.type === 'assistant' && Array.isArray(parsed.message?.content)) {
                   for (const block of parsed.message.content) {
                     if (block.type === 'text') {
@@ -48,18 +55,17 @@ export function chatCommand(): Command {
           }
         }
 
-        // Ensure output ends with a newline
         process.stdout.write('\n');
 
-        if (opts.keep) {
-          console.error(`Session: ${sessionId}`);
-        } else {
+        if (opts.end) {
           await endSession(sessionId);
+        } else {
+          console.error(`Session: ${sessionId}`);
         }
       } catch (err: unknown) {
         console.error(`Failed: ${err instanceof Error ? err.message : err}`);
-        if (sessionId && !opts.keep) {
-          try { await endSession(sessionId); } catch { /* best effort */ }
+        if (isNewSession && opts.end) {
+          try { await endSession(sessionId!); } catch { /* best effort */ }
         }
         process.exit(1);
       }

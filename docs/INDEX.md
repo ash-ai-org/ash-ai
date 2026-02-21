@@ -27,6 +27,7 @@
 | [jeff-dean-plan/06-measure.md](./jeff-dean-plan/06-measure.md) | Instrument the hot path |
 | [jeff-dean-plan/07-session-resume.md](./jeff-dean-plan/07-session-resume.md) | Session persistence and resume |
 | [jeff-dean-plan/08-split-when-full.md](./jeff-dean-plan/08-split-when-full.md) | Multi-machine split |
+| [jeff-dean-plan/09-multi-coordinator.md](./jeff-dean-plan/09-multi-coordinator.md) | Multi-coordinator with CRDB (horizontal control plane) |
 
 ## Testing
 

@@ -30,17 +30,28 @@ ash deploy ./my-agent --name my-agent
 ash chat my-agent "What is a closure in JavaScript?"
 ```
 
-The response streams back in real time:
+The response streams back in real time, with the session ID printed at the end:
 
 ```
 A closure is a function that retains access to variables from its enclosing
 scope, even after the outer function has returned...
+Session: 550e8400-e29b-41d4-a716-446655440000
 ```
 
-That is it. `ash chat` creates a session, streams the response, and cleans up automatically.
+The session stays alive so you can continue the conversation:
+
+```bash
+ash chat --session 550e8400-e29b-41d4-a716-446655440000 "Now explain with an example"
+```
+
+When you are done, end the session:
+
+```bash
+ash session end 550e8400-e29b-41d4-a716-446655440000
+```
 
 :::tip
-Use `ash chat --keep` to keep the session alive after the response. It prints the session ID to stderr so you can send follow-up messages with `ash session send`.
+Use `ash chat --end` for one-shot messages that don't need follow-ups -- it ends the session automatically after the response.
 :::
 
 ## Detailed Flow (Optional)

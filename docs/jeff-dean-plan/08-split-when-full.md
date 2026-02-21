@@ -160,3 +160,7 @@ From measuring (step 06), expect per runner (c5.2xlarge, 8 vCPU, 16GB RAM):
 | No memory limit | CPU (8 cores) | ~50-200 (depends on agent activity) |
 
 The "1000 sandboxes per runner" number from the original plan is aspirational. Real number depends on what agents actually do. Measure it.
+
+## What's Next
+
+Step 08 scales the data plane (runners). If the single coordinator becomes the bottleneck — either for SSE fan-out or for redundancy — see [Step 09: Multi-Coordinator](./09-multi-coordinator.md). It requires CRDB and is ~100 lines of code changes.
