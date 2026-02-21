@@ -16,6 +16,9 @@ export interface RunnerHealthResponse {
  * HTTP client to a single runner process.
  * Uses standard HTTP (Fastify on the runner side). For SSE streaming,
  * parses the event stream from the response body.
+ *
+ * Note: Node.js >= 18 built-in fetch (undici) already uses HTTP keep-alive
+ * by default. No custom agent needed — connections are pooled per origin.
  */
 export class RunnerClient {
   private baseUrl: string;

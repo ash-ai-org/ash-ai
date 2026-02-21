@@ -75,11 +75,10 @@ export class RunnerCoordinator {
     const bestRunner = await selectBestRunner(cutoff);
 
     if (bestRunner) {
-      const available = bestRunner.maxSandboxes - bestRunner.activeCount - bestRunner.warmingCount;
-      if (available > 0) {
-        const backend = this.getOrCreateBackend(bestRunner);
-        return { backend, runnerId: bestRunner.id };
-      }
+      // selectBestRunner() already orders by available capacity DESC and only
+      // returns healthy runners. Trust the query — no redundant capacity check.
+      const backend = this.getOrCreateBackend(bestRunner);
+      return { backend, runnerId: bestRunner.id };
     }
 
     // Fall back to local backend (standalone mode)
@@ -184,9 +183,12 @@ export class RunnerCoordinator {
   }
 
   /**
-   * Single-query dead runner detection. Instead of listing ALL runners then
-   * filtering in JS, queries directly for runners past the heartbeat cutoff.
-   * Also cleans up stale local backend cache entries.
+   * Single-query dead runner detection. Queries directly for runners past
+   * the heartbeat cutoff instead of listing ALL runners then filtering in JS.
+   *
+   * Cache cleanup: stale backend cache entries are cleaned up in handleDeadRunner()
+   * (for this coordinator's kills) and lazily on next use via getOrCreateBackend()
+   * (for kills by other coordinators). No need to list all runners every sweep.
    */
   private async checkLiveness(): Promise<void> {
     const cutoff = new Date(Date.now() - RUNNER_LIVENESS_TIMEOUT_MS).toISOString();
@@ -194,18 +196,6 @@ export class RunnerCoordinator {
     for (const runner of deadRunners) {
       console.warn(`[coordinator] Runner ${runner.id} missed heartbeat — marking sessions paused`);
       await this.handleDeadRunner(runner.id);
-    }
-
-    // Purge stale local cache entries: backends for runners no longer in DB.
-    // This handles the case where another coordinator removed the runner.
-    if (this.backends.size > 0) {
-      const liveRunnerIds = new Set((await listAllRunners()).map(r => r.id));
-      for (const [id, backend] of this.backends) {
-        if (!liveRunnerIds.has(id)) {
-          backend.close();
-          this.backends.delete(id);
-        }
-      }
     }
   }
 
@@ -256,22 +246,8 @@ export class RunnerCoordinator {
     }));
   }
 
-  /**
-   * Legacy sync method — returns info from local cache only.
-   * Prefer getRunnerInfoFromDb() for monitoring.
-   */
-  getRunnerInfo(): Array<{ runnerId: string; host: string; port: number; active: number; max: number; lastHeartbeat: number }> {
-    const result = [];
-    for (const [runnerId, backend] of this.backends) {
-      result.push({
-        runnerId,
-        host: '',
-        port: 0,
-        active: backend.activeCount,
-        max: 0,
-        lastHeartbeat: Date.now(),
-      });
-    }
-    return result;
+  /** Number of locally cached backend connections. */
+  get cachedBackendCount(): number {
+    return this.backends.size;
   }
 }

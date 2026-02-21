@@ -88,11 +88,15 @@ export class DrizzleDb implements Db {
 
   async selectBestRunner(cutoffIso: string): Promise<RunnerRecord | null> {
     const { runners } = this.schema;
+    const available = sql`${runners.maxSandboxes} - ${runners.activeCount} - ${runners.warmingCount}`;
     const rows = await this.drizzle
       .select()
       .from(runners)
-      .where(gt(runners.lastHeartbeatAt, cutoffIso))
-      .orderBy(desc(sql`${runners.maxSandboxes} - ${runners.activeCount} - ${runners.warmingCount}`))
+      .where(and(
+        gt(runners.lastHeartbeatAt, cutoffIso),
+        gt(available, 0),  // Only runners with spare capacity
+      ))
+      .orderBy(desc(available))
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0];
