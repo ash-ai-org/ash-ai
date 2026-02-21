@@ -25,8 +25,9 @@ Do these in order. Each one is independently shippable.
 | 6 | [06-measure](./06-measure.md) | Instrument the hot path | Can't optimize blind |
 | 7 | [07-session-resume](./07-session-resume.md) | Implement session resume (the whole point) | This is the product |
 | 8 | [08-split-when-full](./08-split-when-full.md) | Re-split server/runner when one machine isn't enough | Scale |
+| 9 | [09-multi-coordinator](./09-multi-coordinator.md) | Multiple coordinators behind a load balancer (requires CRDB) | Redundancy + scale |
 
-Steps 1-6 are infrastructure. Step 4b is security — resource limits (04) and isolation (04b) are orthogonal concerns. Step 7 is the feature. Step 8 is when you need it, not before.
+Steps 1-6 are infrastructure. Step 4b is security — resource limits (04) and isolation (04b) are orthogonal concerns. Step 7 is the feature. Step 8 is when you need it, not before. Step 9 is when one coordinator isn't enough — move runner registry to CRDB, make coordinators stateless, put them behind an LB.
 
 **Immediate action**: The `...process.env` leak in `manager.ts` line 55 is a 5-minute fix. Do it before anything else. See [04b-sandbox-isolation](./04b-sandbox-isolation.md).
 
@@ -51,7 +52,7 @@ The rule: **no step is done until the tests for that step pass.** Write the test
 ## Non-Goals (For Now)
 
 - S3 state sync (SQLite + WAL is enough for one machine)
-- Multi-runner fleet (see step 8)
+- Multi-runner fleet (see step 8, multi-coordinator see step 9)
 - Auth / API keys (single-tenant, single machine)
 - Pre-warming pool (measure first, optimize second)
 - Kubernetes / CloudFormation / Terraform

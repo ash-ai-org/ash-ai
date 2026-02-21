@@ -150,3 +150,4 @@ CREATE TABLE sessions (
 - **No automatic session migration**. If a runner is overloaded, existing sessions stay on it. Only new sessions get routed elsewhere.
 - **In-memory runner state**. The runner uses an in-memory sandbox DB. If the runner process restarts, all its sandbox tracking is lost. Sessions on the server side are still in the server's database and can be resumed.
 - **No authentication** on internal runner endpoints. Deploy runners on a private network.
+- **Single coordinator is a SPOF.** For horizontal coordinator scaling, see [Step 09: Multi-Coordinator](../jeff-dean-plan/09-multi-coordinator.md). Requires CRDB.

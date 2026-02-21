@@ -58,8 +58,15 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
 }
 
 /**
+ * Per-session prompt history for mock. Tracks all prompts sent to each session
+ * so multi-turn tests can verify conversation context persists.
+ */
+const mockSessionHistory = new Map<string, string[]>();
+
+/**
  * Mock implementation — yields objects shaped like SDK Messages.
  * When includePartialMessages is true, emits stream events before complete messages.
+ * Tracks prompt history per session to simulate conversation context.
  */
 async function* runMockQuery(opts: QueryOptions): AsyncGenerator<unknown> {
   if (opts.signal.aborted) return;
@@ -67,9 +74,16 @@ async function* runMockQuery(opts: QueryOptions): AsyncGenerator<unknown> {
   await delay(50, opts.signal);
   if (opts.signal.aborted) return;
 
+  // Track prompt history per session
+  if (!mockSessionHistory.has(opts.sessionId)) {
+    mockSessionHistory.set(opts.sessionId, []);
+  }
+  const history = mockSessionHistory.get(opts.sessionId)!;
+  history.push(opts.prompt);
+
   const responseText = opts.resume
     ? '[Resumed session]'
-    : `[Mock] Received: ${opts.prompt}`;
+    : `[Mock] Turn ${history.length} | History: ${history.join(' | ')}`;
 
   // When streaming enabled, emit incremental stream events first
   if (opts.includePartialMessages) {

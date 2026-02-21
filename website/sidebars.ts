@@ -84,6 +84,13 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Comparisons',
+      items: [
+        'comparisons/computesdk',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Contributing',
       items: [
         'contributing/development-setup',

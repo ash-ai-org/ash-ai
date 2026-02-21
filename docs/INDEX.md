@@ -27,6 +27,7 @@
 | [jeff-dean-plan/06-measure.md](./jeff-dean-plan/06-measure.md) | Instrument the hot path |
 | [jeff-dean-plan/07-session-resume.md](./jeff-dean-plan/07-session-resume.md) | Session persistence and resume |
 | [jeff-dean-plan/08-split-when-full.md](./jeff-dean-plan/08-split-when-full.md) | Multi-machine split |
+| [jeff-dean-plan/09-multi-coordinator.md](./jeff-dean-plan/09-multi-coordinator.md) | Multi-coordinator with CRDB (horizontal control plane) |
 
 ## Testing
 
@@ -48,6 +49,7 @@
 |-----|-------------|
 | [decisions/0001-sdk-passthrough-types.md](./decisions/0001-sdk-passthrough-types.md) | Use SDK types directly instead of custom bridge/SSE event types |
 | [decisions/0002-http-over-grpc-for-runner.md](./decisions/0002-http-over-grpc-for-runner.md) | HTTP + SSE for runner communication (not gRPC) |
+| [decisions/0003-drizzle-over-prisma.md](./decisions/0003-drizzle-over-prisma.md) | Drizzle ORM over Prisma for unified DB backend |
 
 *Additional decisions added as they are made. Format: `docs/decisions/NNNN-short-title.md`*
 
