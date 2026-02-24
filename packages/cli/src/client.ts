@@ -111,6 +111,36 @@ export async function getSessionEvents(sessionId: string, opts?: { after?: numbe
   return (await res.json() as { events: Array<{ id: string; sequence: number; type: string; data: string; createdAt: string }> }).events;
 }
 
+export async function getSessionFiles(sessionId: string): Promise<{ files: Array<{ path: string; size: number; modifiedAt: string }>; source: string }> {
+  const res = await request('GET', `/api/sessions/${sessionId}/files`);
+  if (!res.ok) {
+    const err = await res.json() as { error: string };
+    throw new Error(err.error);
+  }
+  return await res.json() as { files: Array<{ path: string; size: number; modifiedAt: string }>; source: string };
+}
+
+export async function getSessionFile(sessionId: string, filePath: string): Promise<string> {
+  const res = await request('GET', `/api/sessions/${sessionId}/files/${filePath}?format=json`);
+  if (!res.ok) {
+    const err = await res.json() as { error: string };
+    throw new Error(err.error);
+  }
+  const data = await res.json() as { content: string };
+  return data.content;
+}
+
+export async function execInSession(sessionId: string, command: string, timeout?: number): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const body: { command: string; timeout?: number } = { command };
+  if (timeout) body.timeout = timeout;
+  const res = await request('POST', `/api/sessions/${sessionId}/exec`, body);
+  if (!res.ok) {
+    const err = await res.json() as { error: string };
+    throw new Error(err.error);
+  }
+  return await res.json() as { exitCode: number; stdout: string; stderr: string };
+}
+
 export async function getHealth() {
   const res = await request('GET', '/health');
   return await res.json();

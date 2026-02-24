@@ -206,6 +206,16 @@ module.exports = function llmTxtPlugin(_context, _options) {
       const llmFullTxtPath = path.join(outDir, 'llm_full.txt');
       fs.writeFileSync(llmFullTxtPath, llmFullTxt, 'utf-8');
       console.log(`[llm-txt] Wrote ${llmFullTxtPath} (${llmFullTxt.length} bytes)`);
+
+      // Copy OpenAPI spec to build output
+      const openApiSrc = path.join(__dirname, '..', '..', 'packages', 'server', 'openapi.json');
+      if (fs.existsSync(openApiSrc)) {
+        const openApiDst = path.join(outDir, 'openapi.json');
+        fs.copyFileSync(openApiSrc, openApiDst);
+        console.log(`[llm-txt] Copied ${openApiDst}`);
+      } else {
+        console.warn('[llm-txt] Warning: openapi.json not found at', openApiSrc);
+      }
     },
   };
 };

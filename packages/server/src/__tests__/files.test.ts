@@ -157,7 +157,7 @@ describe('file routes', () => {
   });
 
   describe('GET /api/sessions/:id/files/*path', () => {
-    it('reads a single file', async () => {
+    it('returns raw file bytes by default', async () => {
       populateWorkspace();
       const session = await createTestSession();
       const app = await buildApp(mockCoordinator(workspaceDir));
@@ -165,6 +165,23 @@ describe('file routes', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/sessions/${session.id}/files/src/index.ts`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toBe('text/typescript');
+      expect(res.headers['content-disposition']).toContain('index.ts');
+      expect(res.headers['x-ash-source']).toBe('sandbox');
+      expect(res.body).toBe('console.log("hello")');
+    });
+
+    it('returns JSON with ?format=json', async () => {
+      populateWorkspace();
+      const session = await createTestSession();
+      const app = await buildApp(mockCoordinator(workspaceDir));
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/sessions/${session.id}/files/src/index.ts?format=json`,
       });
 
       expect(res.statusCode).toBe(200);
@@ -200,7 +217,6 @@ describe('file routes', () => {
         url: `/api/sessions/${session.id}/files/../../../etc/passwd`,
       });
       expect([400, 404]).toContain(res.statusCode);
-      expect(res.json().content).toBeUndefined();
     });
   });
 });

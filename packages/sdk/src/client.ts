@@ -210,9 +210,25 @@ export class AshClient {
     return this.request<ListFilesResponse>('GET', `/api/sessions/${sessionId}/files`);
   }
 
-  /** Read a single file from the session's workspace. */
+  /** Read a single file from the session's workspace as JSON (content as UTF-8 string, 1 MB limit). */
   async getSessionFile(sessionId: string, path: string): Promise<GetFileResponse> {
-    return this.request<GetFileResponse>('GET', `/api/sessions/${sessionId}/files/${path}`);
+    return this.request<GetFileResponse>('GET', `/api/sessions/${sessionId}/files/${path}?format=json`);
+  }
+
+  /** Download a single file from the session's workspace as raw bytes. No size limit (up to 100 MB). */
+  async downloadSessionFile(sessionId: string, path: string): Promise<{ buffer: Buffer; mimeType: string; source: string }> {
+    const res = await fetch(`${this.serverUrl}/api/sessions/${sessionId}/files/${path}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
+      throw new Error(err.error);
+    }
+    return {
+      buffer: Buffer.from(await res.arrayBuffer()),
+      mimeType: res.headers.get('Content-Type') || 'application/octet-stream',
+      source: res.headers.get('X-Ash-Source') || 'unknown',
+    };
   }
 
   // -- Credentials ------------------------------------------------------------

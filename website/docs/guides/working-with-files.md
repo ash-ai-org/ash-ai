@@ -85,9 +85,52 @@ The `source` field indicates where the file listing came from:
 | `sandbox` | Read from the live sandbox process. The session is active or paused with its sandbox still running. |
 | `snapshot` | Read from a persisted workspace snapshot. The sandbox was reclaimed but workspace state was saved. |
 
-## Reading a File
+## Downloading a File (Raw)
 
-Retrieve the content of a single file by its path.
+Download a file as raw bytes. This is the default behavior and works for any file type — text, binary, images, PDFs, etc. Files up to 100 MB are supported.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+const { buffer, mimeType, source } = await client.downloadSessionFile(sessionId, 'output/report.pdf');
+console.log(`Type: ${mimeType}, Source: ${source}`);
+fs.writeFileSync('report.pdf', buffer);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files/output/report.pdf")
+with open("report.pdf", "wb") as f:
+    f.write(resp.content)
+print(f"Type: {resp.headers['content-type']}")
+print(f"Source: {resp.headers['x-ash-source']}")
+```
+
+</TabItem>
+</Tabs>
+
+### curl
+
+```bash
+# Download raw file
+curl -o report.pdf $ASH_SERVER_URL/api/sessions/SESSION_ID/files/output/report.pdf
+```
+
+The response includes these headers:
+
+| Header | Description |
+|--------|-------------|
+| `Content-Type` | MIME type based on file extension (e.g. `application/pdf`, `text/typescript`) |
+| `Content-Disposition` | Suggested filename for download |
+| `Content-Length` | File size in bytes |
+| `X-Ash-Source` | `sandbox` or `snapshot` |
+
+## Reading a File (JSON)
+
+For text files, you can get the content inline as a JSON response by adding `?format=json`. This is useful for building UIs that display file content directly. Limited to 1 MB.
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -104,7 +147,10 @@ console.log(file.content);
 <TabItem value="python" label="Python">
 
 ```python
-resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files/src/index.ts")
+resp = httpx.get(
+    f"http://localhost:4100/api/sessions/{session_id}/files/src/index.ts",
+    params={"format": "json"}
+)
 data = resp.json()
 print(f"Path: {data['path']}")
 print(f"Size: {data['size']} bytes")
@@ -117,7 +163,7 @@ print(data["content"])
 ### curl
 
 ```bash
-curl $ASH_SERVER_URL/api/sessions/SESSION_ID/files/src/index.ts
+curl "$ASH_SERVER_URL/api/sessions/SESSION_ID/files/src/index.ts?format=json"
 ```
 
 Response:
@@ -131,10 +177,10 @@ Response:
 }
 ```
 
-### Limitations
+### Limitations (JSON mode)
 
-- Maximum file size for inline content is 1 MB. Files larger than this return a 400 error.
-- Binary files are not supported. Content is read as UTF-8 text.
+- Maximum file size is 1 MB. For larger files, use the raw download.
+- Content is read as UTF-8 text. Binary files should use the raw download instead.
 - Path traversal (`..`) and absolute paths (`/`) are rejected with a 400 error.
 - Certain directories are excluded from listings: `node_modules`, `.git`, `__pycache__`, `.cache`, `.npm`, `.venv`, and other common dependency/cache directories.
 
@@ -187,7 +233,8 @@ resp = httpx.get(f"http://localhost:4100/api/sessions/{session.id}/files")
 for f in resp.json()["files"]:
     if f["path"].endswith(".py"):
         file_resp = httpx.get(
-            f"http://localhost:4100/api/sessions/{session.id}/files/{f['path']}"
+            f"http://localhost:4100/api/sessions/{session.id}/files/{f['path']}",
+            params={"format": "json"}
         )
         data = file_resp.json()
         print(f"--- {data['path']} ---")
@@ -197,14 +244,38 @@ for f in resp.json()["files"]:
 </TabItem>
 </Tabs>
 
-**Downloading artifacts.** If an agent generates reports, data files, or other artifacts, read them after the session completes.
+**Downloading binary artifacts.** If an agent generates images, PDFs, or other binary files, download them directly.
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
 
 ```typescript
-// Session can be ended -- files are still accessible from snapshot
+// Download a generated image
+const { buffer } = await client.downloadSessionFile(session.id, 'output/chart.png');
+fs.writeFileSync('chart.png', buffer);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# Download a generated image
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session.id}/files/output/chart.png")
+with open("chart.png", "wb") as f:
+    f.write(resp.content)
+```
+
+</TabItem>
+</Tabs>
+
+**Accessing files after a session ends.** Files remain available from the persisted snapshot.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
 await client.endSession(session.id);
+// Files still accessible from snapshot
 const report = await client.getSessionFile(session.id, 'output/report.md');
 ```
 
@@ -212,9 +283,12 @@ const report = await client.getSessionFile(session.id, 'output/report.md');
 <TabItem value="python" label="Python">
 
 ```python
-# Session can be ended -- files are still accessible from snapshot
 client.end_session(session.id)
-resp = httpx.get(f"http://localhost:4100/api/sessions/{session.id}/files/output/report.md")
+# Files still accessible from snapshot
+resp = httpx.get(
+    f"http://localhost:4100/api/sessions/{session.id}/files/output/report.md",
+    params={"format": "json"}
+)
 report = resp.json()
 ```
 
@@ -226,4 +300,4 @@ report = resp.json()
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/sessions/:id/files` | List all files in the session workspace |
-| `GET` | `/api/sessions/:id/files/*path` | Read a single file by path |
+| `GET` | `/api/sessions/:id/files/*path` | Download a file (raw bytes by default, JSON with `?format=json`) |

@@ -43,6 +43,7 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
       cwd: opts.workspaceDir,
       systemPrompt: opts.claudeMd || undefined,
       resume: opts.resume ? (opts.resumeSessionId || opts.sessionId) : undefined,
+      persistSession: true,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       abortController: abortControllerFromSignal(opts.signal),

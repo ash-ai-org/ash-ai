@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { createSession, sendMessage, listSessions, endSession, pauseSession, resumeSession, getSessionEvents } from '../client.js';
+import { createSession, sendMessage, listSessions, endSession, pauseSession, resumeSession, getSessionEvents, getSessionFiles, getSessionFile, execInSession } from '../client.js';
 
 // Color helpers for terminal output
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -184,6 +184,58 @@ export function sessionCommand(): Command {
       try {
         const session = await endSession(id);
         console.log(`Session ended: ${JSON.stringify(session, null, 2)}`);
+      } catch (err: unknown) {
+        console.error(`Failed: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      }
+    });
+
+  cmd
+    .command('files')
+    .description('List files or read a file from session workspace')
+    .argument('<id>', 'Session ID')
+    .argument('[path]', 'File path to read (omit to list all files)')
+    .action(async (id: string, filePath?: string) => {
+      try {
+        if (filePath) {
+          const content = await getSessionFile(id, filePath);
+          process.stdout.write(content);
+        } else {
+          const { files, source } = await getSessionFiles(id);
+          if (files.length === 0) {
+            console.log(dim('No files in workspace'));
+            return;
+          }
+          console.log(dim(`Source: ${source}\n`));
+          // Table header
+          const pathWidth = Math.max(4, ...files.map((f) => f.path.length));
+          console.log(`${'PATH'.padEnd(pathWidth)}  ${'SIZE'.padStart(8)}  MODIFIED`);
+          console.log(`${'─'.repeat(pathWidth)}  ${'─'.repeat(8)}  ${'─'.repeat(19)}`);
+          for (const f of files) {
+            const size = f.size < 1024 ? `${f.size} B` : f.size < 1048576 ? `${(f.size / 1024).toFixed(1)} KB` : `${(f.size / 1048576).toFixed(1)} MB`;
+            const modified = new Date(f.modifiedAt).toLocaleString();
+            console.log(`${f.path.padEnd(pathWidth)}  ${size.padStart(8)}  ${modified}`);
+          }
+          console.log(dim(`\n${files.length} file(s)`));
+        }
+      } catch (err: unknown) {
+        console.error(`Failed: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      }
+    });
+
+  cmd
+    .command('exec')
+    .description('Execute a command in the session sandbox')
+    .argument('<id>', 'Session ID')
+    .argument('<command>', 'Shell command to run')
+    .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
+    .action(async (id: string, command: string, opts: { timeout: string }) => {
+      try {
+        const result = await execInSession(id, command, parseInt(opts.timeout, 10));
+        if (result.stdout) process.stdout.write(result.stdout);
+        if (result.stderr) process.stderr.write(result.stderr);
+        process.exit(result.exitCode);
       } catch (err: unknown) {
         console.error(`Failed: ${err instanceof Error ? err.message : err}`);
         process.exit(1);
