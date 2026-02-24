@@ -117,6 +117,12 @@ function buildLlmTxt() {
     lines.push('');
   }
 
+  lines.push('## Full Documentation');
+  lines.push('');
+  lines.push(`- [llms-full.txt](${BASE_URL}/llms-full.txt): Complete documentation with all code examples and guides in a single file`);
+  lines.push(`- [OpenAPI Spec](${BASE_URL}/openapi.json): Machine-readable API specification (39 endpoints)`);
+  lines.push('');
+
   lines.push('## Optional');
   lines.push('');
   for (const { section, docs } of OPTIONAL_SECTIONS) {
