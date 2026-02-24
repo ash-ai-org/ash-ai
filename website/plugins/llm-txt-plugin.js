@@ -198,24 +198,14 @@ module.exports = function llmTxtPlugin(_context, _options) {
       const docsDir = path.join(__dirname, '..', 'docs');
 
       const llmTxt = buildLlmTxt();
-      const llmTxtPath = path.join(outDir, 'llm.txt');
+      const llmTxtPath = path.join(outDir, 'llms.txt');
       fs.writeFileSync(llmTxtPath, llmTxt, 'utf-8');
       console.log(`[llm-txt] Wrote ${llmTxtPath} (${llmTxt.length} bytes)`);
 
       const llmFullTxt = buildLlmFullTxt(docsDir);
-      const llmFullTxtPath = path.join(outDir, 'llm_full.txt');
+      const llmFullTxtPath = path.join(outDir, 'llms-full.txt');
       fs.writeFileSync(llmFullTxtPath, llmFullTxt, 'utf-8');
       console.log(`[llm-txt] Wrote ${llmFullTxtPath} (${llmFullTxt.length} bytes)`);
-
-      // Copy OpenAPI spec to build output
-      const openApiSrc = path.join(__dirname, '..', '..', 'packages', 'server', 'openapi.json');
-      if (fs.existsSync(openApiSrc)) {
-        const openApiDst = path.join(outDir, 'openapi.json');
-        fs.copyFileSync(openApiSrc, openApiDst);
-        console.log(`[llm-txt] Copied ${openApiDst}`);
-      } else {
-        console.warn('[llm-txt] Warning: openapi.json not found at', openApiSrc);
-      }
     },
   };
 };

@@ -241,4 +241,4 @@ Before running your code, verify:
 
 ## Fallback
 
-For complete documentation: https://docs.ash-cloud.ai/llm.txt
+For complete documentation: https://docs.ash-cloud.ai/llms.txt

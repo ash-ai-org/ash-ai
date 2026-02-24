@@ -91,7 +91,7 @@ const config: Config = {
           items: [
             {
               label: 'Getting Started',
-              to: '/',
+              to: '/getting-started/quickstart',
             },
             {
               label: 'API Reference',
@@ -102,12 +102,16 @@ const config: Config = {
               to: '/cli/overview',
             },
             {
-              label: 'llm.txt',
-              href: 'https://docs.ash-cloud.ai/llm.txt',
+              label: 'llms.txt',
+              href: 'https://docs.ash-cloud.ai/llms.txt',
             },
             {
-              label: 'llm_full.txt',
-              href: 'https://docs.ash-cloud.ai/llm_full.txt',
+              label: 'llms-full.txt',
+              href: 'https://docs.ash-cloud.ai/llms-full.txt',
+            },
+            {
+              label: 'openapi.json',
+              href: 'https://docs.ash-cloud.ai/openapi.json',
             },
           ],
         },
