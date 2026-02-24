@@ -1,5 +1,15 @@
 # @ash-ai/sdk
 
+## 0.0.5 - 2026-02-23
+
+### Added
+
+- File operation methods: `listSessionFiles`, `getSessionFile`, `uploadSessionFile`
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.5
+
 ## 0.0.4 - 2026-02-21
 
 ### Added

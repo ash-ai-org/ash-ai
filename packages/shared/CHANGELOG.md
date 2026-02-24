@@ -1,5 +1,15 @@
 # @ash-ai/shared
 
+## 0.0.5 - 2026-02-23
+
+### Added
+
+- Multi-tenant auth types and server extraction types
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.4 - 2026-02-21
 
 ### Added

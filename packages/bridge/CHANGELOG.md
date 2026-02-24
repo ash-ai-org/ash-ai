@@ -1,5 +1,15 @@
 # @ash-ai/bridge
 
+## 0.0.5 - 2026-02-23
+
+### Added
+
+- `persistSession: true` flag for session persistence across restarts
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.5
+
 ## 0.0.4 - 2026-02-21
 
 ### Changed
