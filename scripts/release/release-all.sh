@@ -22,12 +22,12 @@ echo ""
 
 # Step 3: Stage and commit
 echo "--- Committing version bumps ---"
-pkgs=$(git diff --name-only packages/*/package.json packages/*/CHANGELOG.md 2>/dev/null | xargs)
+pkgs=$(git diff --name-only packages/*/package.json packages/*/pyproject.toml packages/*/CHANGELOG.md 2>/dev/null | xargs)
 if [ -z "$pkgs" ]; then
   echo "No changes to commit."
   exit 0
 fi
-git add packages/*/package.json packages/*/CHANGELOG.md
+git add packages/*/package.json packages/*/pyproject.toml packages/*/CHANGELOG.md 2>/dev/null
 summary=$(git diff --cached --name-only packages/*/package.json | sed 's|packages/||;s|/package.json||' | xargs -I{} sh -c 'echo "@ash-ai/{} v$(node -p "require(\"packages/{}/package.json\").version")"' | paste -sd', ' -)
 git commit -m "release: ${summary}"
 echo ""

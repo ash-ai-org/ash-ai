@@ -40,6 +40,14 @@ else
       DIRS+=("$(basename "$dir")")
     fi
   done
+  # Include Python packages (pyproject.toml without package.json)
+  for pyproject in "$ROOT"/packages/*/pyproject.toml; do
+    dir="$(dirname "$pyproject")"
+    dir_name="$(basename "$dir")"
+    if [ ! -f "$dir/package.json" ]; then
+      DIRS+=("$dir_name")
+    fi
+  done
 fi
 
 echo "Bumping $BUMP version for: ${DIRS[*]}"
@@ -47,24 +55,34 @@ echo ""
 
 for dir_name in "${DIRS[@]}"; do
   pkg_json="$ROOT/packages/$dir_name/package.json"
-  if [ ! -f "$pkg_json" ]; then
-    echo "SKIP: $dir_name (no package.json)"
+  pyproject="$ROOT/packages/$dir_name/pyproject.toml"
+
+  if [ -f "$pkg_json" ]; then
+    name=$(node -p "require('$pkg_json').name")
+    old_version=$(node -p "require('$pkg_json').version")
+    new_version=$(bump_version "$old_version" "$BUMP")
+
+    node -e "
+      const fs = require('fs');
+      const pkg = JSON.parse(fs.readFileSync('$pkg_json', 'utf8'));
+      pkg.version = '$new_version';
+      fs.writeFileSync('$pkg_json', JSON.stringify(pkg, null, 2) + '\n');
+    "
+
+    printf "  %-25s %s -> %s\n" "$name" "$old_version" "$new_version"
+  elif [ -f "$pyproject" ]; then
+    name=$(grep '^name' "$pyproject" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+    old_version=$(grep '^version' "$pyproject" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+    new_version=$(bump_version "$old_version" "$BUMP")
+
+    sed -i.bak "s/^version = \"$old_version\"/version = \"$new_version\"/" "$pyproject"
+    rm -f "$pyproject.bak"
+
+    printf "  %-25s %s -> %s\n" "$name" "$old_version" "$new_version"
+  else
+    echo "SKIP: $dir_name (no package.json or pyproject.toml)"
     continue
   fi
-
-  name=$(node -p "require('$pkg_json').name")
-  old_version=$(node -p "require('$pkg_json').version")
-  new_version=$(bump_version "$old_version" "$BUMP")
-
-  # Update package.json in-place
-  node -e "
-    const fs = require('fs');
-    const pkg = JSON.parse(fs.readFileSync('$pkg_json', 'utf8'));
-    pkg.version = '$new_version';
-    fs.writeFileSync('$pkg_json', JSON.stringify(pkg, null, 2) + '\n');
-  "
-
-  printf "  %-25s %s -> %s\n" "$name" "$old_version" "$new_version"
 done
 
 echo ""
