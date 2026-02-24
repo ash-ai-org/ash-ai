@@ -26,7 +26,6 @@ const sidebars: SidebarsConfig = {
       href: 'https://github.com/ash-ai-org/ash-ai/releases',
       className: 'sidebar-link-changelog',
     },
-    'introduction',
     {
       type: 'category',
       label: 'Getting Started',
