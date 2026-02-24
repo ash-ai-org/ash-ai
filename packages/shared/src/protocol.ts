@@ -29,11 +29,18 @@ export interface ShutdownCommand {
   cmd: 'shutdown';
 }
 
+export interface ExecCommand {
+  cmd: 'exec';
+  command: string;
+  timeout?: number;
+}
+
 export type BridgeCommand =
   | QueryCommand
   | ResumeCommand
   | InterruptCommand
-  | ShutdownCommand;
+  | ShutdownCommand
+  | ExecCommand;
 
 // -- Events: bridge → server --------------------------------------------------
 // SDK messages are passed through as-is in the `data` field of a 'message' event.
@@ -58,11 +65,19 @@ export interface DoneEvent {
   sessionId: string;
 }
 
+export interface ExecResultEvent {
+  ev: 'exec_result';
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
 export type BridgeEvent =
   | ReadyEvent
   | MessageEvent
   | ErrorEvent
-  | DoneEvent;
+  | DoneEvent
+  | ExecResultEvent;
 
 // -- Wire encoding/decoding ---------------------------------------------------
 

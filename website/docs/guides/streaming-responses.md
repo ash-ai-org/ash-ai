@@ -3,6 +3,9 @@ sidebar_position: 4
 title: Streaming Responses
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Streaming Responses
 
 When you send a message to a session, the response is delivered as a Server-Sent Events (SSE) stream. Events arrive in real time as the agent thinks, uses tools, and generates text.
@@ -29,7 +32,10 @@ data: {"sessionId": "a1b2c3d4-..."}
 
 The `data` field of `message` events carries raw SDK message objects passed through from the Claude Code SDK. The shape varies by message type (`assistant`, `user`, `result`, `stream_event`).
 
-## TypeScript SDK
+## Basic Streaming
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 The `sendMessageStream` method returns an async generator of typed events:
 
@@ -59,9 +65,39 @@ for await (const event of client.sendMessageStream(session.id, 'Explain TCP in o
 }
 ```
 
-### Display Items
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from ash_sdk import AshClient
+
+client = AshClient("http://localhost:4100")
+session = client.create_session("my-agent")
+
+for event in client.send_message_stream(session.id, "Explain TCP in one paragraph."):
+    if event.type == "message":
+        data = event.data
+        # Extract text from assistant messages
+        if data.get("type") == "assistant":
+            content = data.get("message", {}).get("content", [])
+            for block in content:
+                if block.get("type") == "text":
+                    print(block["text"], end="")
+    elif event.type == "error":
+        print(f"Error: {event.data.get('error')}")
+    elif event.type == "done":
+        print("\nDone.")
+```
+
+</TabItem>
+</Tabs>
+
+## Display Items
 
 For richer output that includes tool use and tool results, use `extractDisplayItems`:
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 for await (const event of client.sendMessageStream(session.id, 'List files in /tmp')) {
@@ -86,9 +122,34 @@ for await (const event of client.sendMessageStream(session.id, 'List files in /t
 }
 ```
 
-### Partial Messages (Real-Time Streaming)
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+for event in client.send_message_stream(session.id, "List files in /tmp"):
+    if event.type == "message":
+        data = event.data
+        if data.get("type") == "assistant":
+            for block in data.get("message", {}).get("content", []):
+                if block.get("type") == "text":
+                    print(block["text"])
+                elif block.get("type") == "tool_use":
+                    print(f"[Tool: {block['name']}] {block.get('input', '')}")
+        elif data.get("type") == "result":
+            for block in data.get("content", []):
+                if block.get("type") == "text":
+                    print(f"[Result] {block['text']}")
+```
+
+</TabItem>
+</Tabs>
+
+## Partial Messages (Real-Time Streaming)
 
 By default, `message` events contain complete SDK messages. To receive incremental text deltas as the agent types, enable `includePartialMessages`:
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 for await (const event of client.sendMessageStream(
@@ -107,30 +168,8 @@ for await (const event of client.sendMessageStream(
 
 The `extractStreamDelta` helper extracts text from `content_block_delta` stream events. It returns `null` for non-delta events, so you can safely call it on every message.
 
-## Python SDK
-
-```python
-from ash_sdk import AshClient
-
-client = AshClient("http://localhost:4100")
-session = client.create_session("my-agent")
-
-for event in client.send_message_stream(session.id, "Explain TCP in one paragraph."):
-    if event.type == "message":
-        data = event.data
-        # Extract text from assistant messages
-        if data.get("type") == "assistant":
-            content = data.get("message", {}).get("content", [])
-            for block in content:
-                if block.get("type") == "text":
-                    print(block["text"], end="")
-    elif event.type == "error":
-        print(f"Error: {event.data.get('error')}")
-    elif event.type == "done":
-        print("\nDone.")
-```
-
-Enable partial messages for real-time deltas:
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 for event in client.send_message_stream(
@@ -147,6 +186,9 @@ for event in client.send_message_stream(
                 if delta.get("type") == "text_delta":
                     print(delta.get("text", ""), end="", flush=True)
 ```
+
+</TabItem>
+</Tabs>
 
 ## Browser (Raw Fetch)
 
@@ -198,7 +240,7 @@ while (true) {
 Use the `-N` flag to disable output buffering so events print as they arrive:
 
 ```bash
-curl -N -X POST http://localhost:4100/api/sessions/SESSION_ID/messages \
+curl -N -X POST $ASH_SERVER_URL/api/sessions/SESSION_ID/messages \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello!"}'
 ```

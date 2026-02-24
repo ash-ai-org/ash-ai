@@ -1,5 +1,16 @@
 # @ash-ai/server
 
+## 0.0.5 - 2026-02-23
+
+### Added
+
+- File operations API: list, read, and upload files for sessions
+- Expanded file route with directory listing and content retrieval
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.5, @ash-ai/sandbox@0.0.5
+
 ## 0.0.4 - 2026-02-21
 
 ### Added

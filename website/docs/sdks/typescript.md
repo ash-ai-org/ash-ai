@@ -3,17 +3,36 @@ sidebar_position: 1
 title: TypeScript SDK
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # TypeScript SDK
 
 The `@ash-ai/sdk` package provides a typed TypeScript client for the Ash REST API.
 
 ## Installation
 
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
 ```bash
 npm install @ash-ai/sdk
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```bash
+pip install ash-ai
+```
+
+</TabItem>
+</Tabs>
+
 ## Client Setup
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
@@ -28,9 +47,31 @@ The `serverUrl` is the base URL of your Ash server. Trailing slashes are strippe
 
 When `ASH_API_KEY` is not set on the server, authentication is disabled and the `apiKey` parameter can be omitted.
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from ash_ai import AshClient
+
+client = AshClient(
+    server_url="http://localhost:4100",
+    api_key="your-api-key",  # optional in local dev mode
+)
+```
+
+The `server_url` is the base URL of your Ash server.
+
+When `ASH_API_KEY` is not set on the server, authentication is disabled and the `api_key` parameter can be omitted.
+
+</TabItem>
+</Tabs>
+
 ## Methods Reference
 
 ### Agents
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // Deploy an agent from a directory path on the server
@@ -46,7 +87,30 @@ const agent = await client.getAgent('my-agent');
 await client.deleteAgent('my-agent');
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# Deploy an agent from a directory path on the server
+agent = client.deploy_agent(name="my-agent", path="/path/to/agent")
+
+# List all deployed agents
+agents = client.list_agents()
+
+# Get a specific agent by name
+agent = client.get_agent("my-agent")
+
+# Delete an agent (also deletes its sessions)
+client.delete_agent("my-agent")
+```
+
+</TabItem>
+</Tabs>
+
 ### Sessions
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // Create a new session for an agent
@@ -69,20 +133,41 @@ const resumed = await client.resumeSession(sessionId);
 const ended = await client.endSession(sessionId);
 ```
 
-### Messages
+</TabItem>
+<TabItem value="python" label="Python">
 
-#### `sendMessage(sessionId, content, opts?)` -- Raw Response
+```python
+# Create a new session for an agent
+session = client.create_session("my-agent")
 
-Returns a raw `Response` object with an SSE stream body. Use this when you need full control over the stream.
+# List all sessions (optionally filter by agent name)
+sessions = client.list_sessions()
+agent_sessions = client.list_sessions(agent="my-agent")
 
-```typescript
-const response = await client.sendMessage(sessionId, 'Hello, agent');
-// response.body is a ReadableStream<Uint8Array> containing SSE frames
+# Get a session by ID
+session = client.get_session(session_id)
+
+# Pause a session (persists workspace state)
+paused = client.pause_session(session_id)
+
+# Resume a paused or errored session
+resumed = client.resume_session(session_id)
+
+# End a session permanently
+ended = client.end_session(session_id)
 ```
 
-#### `sendMessageStream(sessionId, content, opts?)` -- Async Generator
+</TabItem>
+</Tabs>
 
-Returns an async generator that yields parsed `AshStreamEvent` objects. This is the recommended way to consume messages.
+### Messages
+
+#### Streaming Messages (Recommended)
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+`sendMessageStream(sessionId, content, opts?)` returns an async generator that yields parsed `AshStreamEvent` objects:
 
 ```typescript
 for await (const event of client.sendMessageStream(sessionId, 'Analyze this code')) {
@@ -96,9 +181,39 @@ for await (const event of client.sendMessageStream(sessionId, 'Analyze this code
 }
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+`send_message_stream(session_id, content, **kwargs)` returns an iterator of parsed events:
+
+```python
+for event in client.send_message_stream(session_id, "Analyze this code"):
+    if event.type == "message":
+        print("SDK message:", event.data)
+    elif event.type == "error":
+        print(f"Error: {event.data['error']}")
+    elif event.type == "done":
+        print(f"Turn complete for session: {event.data['sessionId']}")
+```
+
+</TabItem>
+</Tabs>
+
+#### Raw Response (TypeScript only)
+
+`sendMessage(sessionId, content, opts?)` returns a raw `Response` object with an SSE stream body. Use this when you need full control over the stream.
+
+```typescript
+const response = await client.sendMessage(sessionId, 'Hello, agent');
+// response.body is a ReadableStream<Uint8Array> containing SSE frames
+```
+
 #### Options
 
-Both `sendMessage` and `sendMessageStream` accept an optional `SendMessageOptions` object:
+Both methods accept options for partial message streaming:
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 interface SendMessageOptions {
@@ -110,7 +225,33 @@ interface SendMessageOptions {
 
 When `includePartialMessages` is `true`, the stream includes `stream_event` messages with `content_block_delta` events. Use `extractStreamDelta()` to pull text chunks from these events for real-time streaming UIs.
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# Enable partial message streaming with the include_partial_messages kwarg
+for event in client.send_message_stream(
+    session_id,
+    "Write a haiku.",
+    include_partial_messages=True,
+):
+    if event.type == "message":
+        data = event.data
+        if data.get("type") == "stream_event":
+            evt = data.get("event", {})
+            if evt.get("type") == "content_block_delta":
+                delta = evt.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    print(delta.get("text", ""), end="", flush=True)
+```
+
+</TabItem>
+</Tabs>
+
 ### Messages History
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // List persisted messages for a session
@@ -123,7 +264,24 @@ const messages = await client.listMessages(sessionId, {
 });
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# List persisted messages for a session
+messages = client.list_messages(session_id)
+
+# With pagination
+messages = client.list_messages(session_id, limit=50, after_sequence=10)
+```
+
+</TabItem>
+</Tabs>
+
 ### Session Events (Timeline)
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // List timeline events for a session
@@ -137,9 +295,26 @@ const textEvents = await client.listSessionEvents(sessionId, {
 });
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# List timeline events for a session
+events = client.list_session_events(session_id)
+
+# Filter by type and paginate
+text_events = client.list_session_events(session_id, type="text", limit=100, after_sequence=0)
+```
+
+</TabItem>
+</Tabs>
+
 Event types: `text`, `tool_start`, `tool_result`, `reasoning`, `error`, `turn_complete`, `lifecycle`.
 
 ### Files
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // List files in a session's workspace
@@ -150,7 +325,29 @@ const { files, source } = await client.getSessionFiles(sessionId);
 const { path, content, size, source } = await client.getSessionFile(sessionId, 'src/index.ts');
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+import httpx
+
+# List files in a session's workspace
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files")
+data = resp.json()
+# data["source"] is "sandbox" (live) or "snapshot" (persisted)
+
+# Read a specific file
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files/src/index.ts")
+file_data = resp.json()
+```
+
+</TabItem>
+</Tabs>
+
 ### Health
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const health = await client.health();
@@ -163,7 +360,27 @@ const health = await client.health();
 // }
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+health = client.health()
+# {
+#   "status": "ok",
+#   "activeSessions": 3,
+#   "activeSandboxes": 2,
+#   "uptime": 3600,
+#   "pool": { "total": 5, "cold": 2, "warming": 0, "warm": 1, ... }
+# }
+```
+
+</TabItem>
+</Tabs>
+
 ## Full Streaming Example
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 import { AshClient, extractTextFromEvent, extractStreamDelta, extractDisplayItems } from '@ash-ai/sdk';
@@ -212,6 +429,54 @@ for await (const event of client.sendMessageStream(session.id, 'Write a haiku', 
 await client.endSession(session.id);
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from ash_ai import AshClient
+
+client = AshClient(server_url="http://localhost:4100")
+
+# Deploy and create session
+agent = client.deploy_agent(name="helper", path="/path/to/agent")
+session = client.create_session("helper")
+
+# Stream with partial messages for real-time output
+for event in client.send_message_stream(session.id, "Write a haiku",
+    include_partial_messages=True,
+):
+    if event.type == "message":
+        data = event.data
+
+        # Extract incremental text deltas for real-time display
+        if data.get("type") == "stream_event":
+            evt = data.get("event", {})
+            if evt.get("type") == "content_block_delta":
+                delta = evt.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    print(delta.get("text", ""), end="", flush=True)
+                    continue
+
+        # Extract complete text from finished assistant messages
+        if data.get("type") == "assistant":
+            for block in data.get("message", {}).get("content", []):
+                if block.get("type") == "text":
+                    print(f"\nComplete: {block['text']}")
+                elif block.get("type") == "tool_use":
+                    print(f"Tool: {block['name']} ({block.get('input', '')})")
+
+    elif event.type == "error":
+        print(f"Error: {event.data.get('error')}")
+    elif event.type == "done":
+        print("Done.")
+
+# Clean up
+client.end_session(session.id)
+```
+
+</TabItem>
+</Tabs>
+
 ## Helper Functions
 
 The SDK re-exports these helpers from `@ash-ai/shared`:
@@ -247,6 +512,9 @@ FileEntry, ListFilesResponse, GetFileResponse
 
 ## Error Handling
 
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
 All methods throw on non-2xx responses. The error message is extracted from the API response body.
 
 ```typescript
@@ -273,3 +541,35 @@ try {
   console.error('Connection error:', err.message);
 }
 ```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+All methods raise on non-2xx responses:
+
+```python
+from ash_ai import AshApiError
+
+try:
+    session = client.create_session(agent="nonexistent")
+except AshApiError as e:
+    print(f"API error ({e.status_code}): {e.message}")
+except Exception as e:
+    print(f"Connection error: {e}")
+```
+
+For streaming, errors can arrive both as exceptions (connection failures) and as `error` events within the stream (agent-level errors):
+
+```python
+try:
+    for event in client.send_message_stream(session_id, "hello"):
+        if event.type == "error":
+            # Agent-level error (e.g., sandbox crash, SDK error)
+            print(f"Stream error: {event.data.get('error')}")
+except Exception as e:
+    # Connection-level error (e.g., network failure, 404)
+    print(f"Connection error: {e}")
+```
+
+</TabItem>
+</Tabs>

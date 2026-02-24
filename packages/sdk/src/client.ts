@@ -36,6 +36,12 @@ export interface SendMessageOptions {
   includePartialMessages?: boolean;
 }
 
+export interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
 export class AshClient {
   private serverUrl: string;
   private apiKey?: string;
@@ -88,9 +94,11 @@ export class AshClient {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async createSession(agent: string, opts?: { credentialId?: string }): Promise<Session> {
+  async createSession(agent: string, opts?: { credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string }): Promise<Session> {
     const body: Record<string, unknown> = { agent };
     if (opts?.credentialId) body.credentialId = opts.credentialId;
+    if (opts?.extraEnv) body.extraEnv = opts.extraEnv;
+    if (opts?.startupScript) body.startupScript = opts.startupScript;
     const res = await this.request<{ session: Session }>('POST', '/api/sessions', body);
     return res.session;
   }
@@ -161,6 +169,13 @@ export class AshClient {
     return res.session;
   }
 
+  /** Execute a shell command in the session's sandbox. Returns stdout, stderr, and exit code. */
+  async exec(sessionId: string, command: string, opts?: { timeout?: number }): Promise<ExecResult> {
+    const body: Record<string, unknown> = { command };
+    if (opts?.timeout) body.timeout = opts.timeout;
+    return this.request<ExecResult>('POST', `/api/sessions/${sessionId}/exec`, body);
+  }
+
   // -- Messages ---------------------------------------------------------------
 
   /** List persisted messages for a session. */
@@ -195,9 +210,25 @@ export class AshClient {
     return this.request<ListFilesResponse>('GET', `/api/sessions/${sessionId}/files`);
   }
 
-  /** Read a single file from the session's workspace. */
+  /** Read a single file from the session's workspace as JSON (content as UTF-8 string, 1 MB limit). */
   async getSessionFile(sessionId: string, path: string): Promise<GetFileResponse> {
-    return this.request<GetFileResponse>('GET', `/api/sessions/${sessionId}/files/${path}`);
+    return this.request<GetFileResponse>('GET', `/api/sessions/${sessionId}/files/${path}?format=json`);
+  }
+
+  /** Download a single file from the session's workspace as raw bytes. No size limit (up to 100 MB). */
+  async downloadSessionFile(sessionId: string, path: string): Promise<{ buffer: Buffer; mimeType: string; source: string }> {
+    const res = await fetch(`${this.serverUrl}/api/sessions/${sessionId}/files/${path}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
+      throw new Error(err.error);
+    }
+    return {
+      buffer: Buffer.from(await res.arrayBuffer()),
+      mimeType: res.headers.get('Content-Type') || 'application/octet-stream',
+      source: res.headers.get('X-Ash-Source') || 'unknown',
+    };
   }
 
   // -- Credentials ------------------------------------------------------------

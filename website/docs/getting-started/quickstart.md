@@ -3,6 +3,9 @@ sidebar_position: 2
 title: Quickstart
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Quickstart
 
 Deploy an agent and chat with it. This takes about two minutes, assuming you have completed [Installation](installation.md).
@@ -77,7 +80,8 @@ ash session end SESSION_ID
 
 The CLI is convenient for testing. For applications, use one of the SDKs.
 
-### TypeScript
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```bash
 npm install @ash-ai/sdk
@@ -102,7 +106,8 @@ for await (const event of client.sendMessageStream(session.id, 'What is a closur
 await client.endSession(session.id);
 ```
 
-### Python
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```bash
 pip install ash-ai
@@ -125,21 +130,24 @@ for event in client.send_message_stream(session.id, "What is a closure?"):
 client.end_session(session.id)
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
 # Create a session
-curl -s -X POST http://localhost:4100/api/sessions \
+curl -s -X POST $ASH_SERVER_URL/api/sessions \
   -H 'Content-Type: application/json' \
   -d '{"agent":"my-agent"}'
 
 # Send a message (returns an SSE stream)
-curl -N -X POST http://localhost:4100/api/sessions/SESSION_ID/messages \
+curl -N -X POST $ASH_SERVER_URL/api/sessions/SESSION_ID/messages \
   -H 'Content-Type: application/json' \
   -d '{"content":"What is a closure?"}'
 
 # End the session
-curl -s -X DELETE http://localhost:4100/api/sessions/SESSION_ID
+curl -s -X DELETE $ASH_SERVER_URL/api/sessions/SESSION_ID
 ```
 
 ---
@@ -158,7 +166,7 @@ The sandbox is an isolated child process with a restricted environment -- only a
 ## Next Steps
 
 - [Key Concepts](concepts.md) -- Understand agents, sessions, sandboxes, bridges, and the server
-- [CLI Reference](/docs/cli/overview) -- All commands and flags
-- [API Reference](/docs/api/overview) -- REST endpoints, SSE format, request/response schemas
-- [TypeScript SDK](/docs/sdks/typescript) -- Full TypeScript client documentation
-- [Python SDK](/docs/sdks/python) -- Full Python client documentation
+- [CLI Reference](/cli/overview) -- All commands and flags
+- [API Reference](/api/overview) -- REST endpoints, SSE format, request/response schemas
+- [TypeScript SDK](/sdks/typescript) -- Full TypeScript client documentation
+- [Python SDK](/sdks/python) -- Full Python client documentation

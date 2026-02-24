@@ -75,6 +75,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         properties: {
           agent: { type: 'string' },
           credentialId: { type: 'string' },
+          extraEnv: { type: 'object', additionalProperties: { type: 'string' } },
+          startupScript: { type: 'string' },
         },
         required: ['agent'],
       },
@@ -87,7 +89,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId } = req.body as { agent: string; credentialId?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
@@ -106,6 +108,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       touchCredentialUsed(credentialId).catch(() => {});
     }
 
+    // Merge body-level extraEnv (overrides credential env on conflict)
+    if (bodyExtraEnv) {
+      extraEnv = { ...extraEnv, ...bodyExtraEnv };
+    }
+
     const sessionId = randomUUID();
 
     try {
@@ -117,6 +124,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         agentName: agentRecord.name,
         sandboxId: sessionId,
         extraEnv,
+        startupScript,
         onOomKill: () => {
           updateSessionStatus(sessionId, 'paused').catch((err) =>
             console.error(`Failed to update session status on OOM: ${err}`)
@@ -328,6 +336,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       'Connection': 'keep-alive',
     });
 
+    // Emit session_start as first SSE event — clients know which session they're streaming
+    await writeSSE(reply.raw, `event: session_start\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
+
     let eventCount = 0;
     let firstEventMs = 0;
 
@@ -400,6 +411,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       reply.raw.write(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`);
+      // Emit session_end when an error terminates the stream
+      reply.raw.write(`event: session_end\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
     } finally {
       // Mark waiting after message processing completes
       backend.markWaiting(session.sandboxId);
@@ -420,6 +433,74 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     }
 
     reply.raw.end();
+  });
+
+  // Execute a command in the session's sandbox (synchronous — waits for result)
+  app.post<{ Params: { id: string } }>('/api/sessions/:id/exec', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      body: {
+        type: 'object',
+        properties: {
+          command: { type: 'string' },
+          timeout: { type: 'integer', minimum: 1, maximum: 300000 },
+        },
+        required: ['command'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            exitCode: { type: 'integer' },
+            stdout: { type: 'string' },
+            stderr: { type: 'string' },
+          },
+          required: ['exitCode', 'stdout', 'stderr'],
+        },
+        400: { $ref: 'ApiError#' },
+        404: { $ref: 'ApiError#' },
+        500: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+    if (session.status !== 'active') {
+      return reply.status(400).send({ error: `Session is ${session.status}`, statusCode: 400 });
+    }
+
+    const { command, timeout } = req.body as { command: string; timeout?: number };
+
+    let backend;
+    try {
+      backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
+    } catch {
+      return reply.status(500).send({ error: 'Runner not available', statusCode: 500 });
+    }
+
+    const sandbox = backend.getSandbox(session.sandboxId);
+    if (!sandbox) {
+      return reply.status(500).send({ error: 'Sandbox not found', statusCode: 500 });
+    }
+
+    try {
+      const events = backend.sendCommand(session.sandboxId, { cmd: 'exec', command, timeout });
+      for await (const event of events) {
+        if (event.ev === 'exec_result') {
+          return reply.send({ exitCode: event.exitCode, stdout: event.stdout, stderr: event.stderr });
+        }
+        if (event.ev === 'error') {
+          return reply.status(500).send({ error: event.error, statusCode: 500 });
+        }
+      }
+      return reply.status(500).send({ error: 'No exec result received', statusCode: 500 });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ error: `Exec failed: ${msg}`, statusCode: 500 });
+    }
   });
 
   // Pause session

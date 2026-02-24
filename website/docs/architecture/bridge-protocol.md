@@ -105,7 +105,7 @@ interface DoneEvent {
 
 The `message` event's `data` field contains the raw SDK `Message` object exactly as returned by `@anthropic-ai/claude-code`. Ash does not translate, wrap, or modify these messages.
 
-This is a deliberate design decision ([ADR 0001](/docs/architecture/decisions#adr-0001-sdk-passthrough-types)). The benefits:
+This is a deliberate design decision ([ADR 0001](/architecture/decisions#adr-0001-sdk-passthrough-types)). The benefits:
 
 - One type system instead of three (no bridge-specific or SSE-specific message types)
 - SDK changes propagate automatically through the entire pipeline

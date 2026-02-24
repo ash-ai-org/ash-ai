@@ -46,9 +46,9 @@ export function credentialRoutes(app: FastifyInstance): void {
 
     const { type, key, label } = req.body as { type: string; key: string; label?: string };
     const id = randomUUID();
-    const { encrypted, iv, authTag } = encrypt(key, MASTER_KEY);
+    const { encrypted, iv, authTag, salt } = encrypt(key, MASTER_KEY);
 
-    const credential = await insertCredential(id, req.tenantId, type, encrypted, iv, authTag, label ?? '');
+    const credential = await insertCredential(id, req.tenantId, type, encrypted, iv, authTag, label ?? '', salt);
     return reply.status(201).send({ credential });
   });
 
@@ -118,7 +118,7 @@ export async function decryptCredential(credentialId: string, tenantId: string):
   if (!cred || cred.tenantId !== tenantId || !cred.active) return null;
 
   try {
-    const key = decrypt(cred.encryptedKey, cred.iv, cred.authTag, MASTER_KEY);
+    const key = decrypt(cred.encryptedKey, cred.iv, cred.authTag, MASTER_KEY, cred.salt);
     return { type: cred.type, key };
   } catch {
     return null;

@@ -638,16 +638,16 @@ export class DrizzleDb implements Db {
 
   // -- Credentials ------------------------------------------------------------
 
-  async insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string): Promise<Credential> {
+  async insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string, salt?: string | null): Promise<Credential> {
     const { credentials } = this.schema;
     const now = new Date().toISOString();
     await this.drizzle
       .insert(credentials)
-      .values({ id, tenantId, type, encryptedKey, iv, authTag, label, active: 1, createdAt: now, lastUsedAt: null });
+      .values({ id, tenantId, type, encryptedKey, iv, authTag, salt: salt ?? null, label, active: 1, createdAt: now, lastUsedAt: null });
     return { id, tenantId, type: type as Credential['type'], label, active: true, createdAt: now, lastUsedAt: null };
   }
 
-  async getCredential(id: string): Promise<{ id: string; tenantId: string; type: string; encryptedKey: string; iv: string; authTag: string; label: string; active: boolean; createdAt: string; lastUsedAt: string | null } | null> {
+  async getCredential(id: string): Promise<{ id: string; tenantId: string; type: string; encryptedKey: string; iv: string; authTag: string; salt: string | null; label: string; active: boolean; createdAt: string; lastUsedAt: string | null } | null> {
     const { credentials } = this.schema;
     const rows = await this.drizzle
       .select()
@@ -656,7 +656,7 @@ export class DrizzleDb implements Db {
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0] as any;
-    return { id: r.id, tenantId: r.tenantId, type: r.type, encryptedKey: r.encryptedKey, iv: r.iv, authTag: r.authTag, label: r.label, active: r.active === 1, createdAt: r.createdAt, lastUsedAt: r.lastUsedAt };
+    return { id: r.id, tenantId: r.tenantId, type: r.type, encryptedKey: r.encryptedKey, iv: r.iv, authTag: r.authTag, salt: r.salt ?? null, label: r.label, active: r.active === 1, createdAt: r.createdAt, lastUsedAt: r.lastUsedAt };
   }
 
   async listCredentials(tenantId: string): Promise<Credential[]> {

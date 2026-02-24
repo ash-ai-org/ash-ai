@@ -21,7 +21,11 @@
     "@docusaurus/theme-mermaid": "^3.7.0",
     "prism-react-renderer": "^2.3.0",
     "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react-dom": "^18.0.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "@tailwindcss/typography": "^0.5.0"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.7.0",

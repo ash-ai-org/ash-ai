@@ -22,6 +22,7 @@ export class LocalRunnerBackend implements RunnerBackend {
       limits: opts.limits,
       onOomKill: opts.onOomKill,
       extraEnv: opts.extraEnv,
+      startupScript: opts.startupScript,
     });
     return { sandboxId: sandbox.id, workspaceDir: sandbox.workspaceDir };
   }

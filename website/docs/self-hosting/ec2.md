@@ -102,7 +102,7 @@ mkdir -p ~/.ash/agents/my-agent
 # Place your CLAUDE.md, .claude/ settings, etc. in ~/.ash/agents/my-agent/
 
 # Deploy via API
-curl -X POST http://localhost:4100/api/agents \
+curl -X POST $ASH_SERVER_URL/api/agents \
   -H "Content-Type: application/json" \
   -d '{"name": "my-agent", "path": "agents/my-agent"}'
 ```

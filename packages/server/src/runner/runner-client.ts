@@ -35,6 +35,8 @@ export class RunnerClient {
     sandboxId?: string;
     skipAgentCopy?: boolean;
     limits?: Record<string, number>;
+    extraEnv?: Record<string, string>;
+    startupScript?: string;
   }): Promise<{ sandboxId: string; workspaceDir: string }> {
     const resp = await fetch(`${this.baseUrl}/runner/sandboxes`, {
       method: 'POST',
@@ -200,6 +202,8 @@ function parseSSEEvent(block: string): BridgeEvent | null {
       return { ev: 'error', error: parsed.error || 'Unknown error' };
     } else if (eventType === 'done') {
       return { ev: 'done', sessionId: parsed.sessionId || '' };
+    } else if (eventType === 'exec_result') {
+      return { ev: 'exec_result', exitCode: parsed.exitCode ?? 1, stdout: parsed.stdout ?? '', stderr: parsed.stderr ?? '' };
     }
   } catch {
     // Malformed JSON — skip

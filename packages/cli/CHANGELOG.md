@@ -1,5 +1,16 @@
 # @ash-ai/cli
 
+## 0.0.5 - 2026-02-23
+
+### Added
+
+- `ash session files` subcommand for listing and reading session files
+- File upload client support
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.5
+
 ## 0.0.4 - 2026-02-21
 
 ### Fixed

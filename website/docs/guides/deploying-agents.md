@@ -3,6 +3,9 @@ sidebar_position: 2
 title: Deploying Agents
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Deploying Agents
 
 Deploying an agent registers it with the Ash server so sessions can be created against it. The agent folder is copied to the server's data directory and validated.
@@ -53,7 +56,8 @@ Existing sessions continue using the version they started with. New sessions pic
 ash agent list
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
@@ -63,7 +67,8 @@ const agents = await client.listAgents();
 console.log(agents);
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 from ash_sdk import AshClient
@@ -73,10 +78,13 @@ agents = client.list_agents()
 print(agents)
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl http://localhost:4100/api/agents
+curl $ASH_SERVER_URL/api/agents
 ```
 
 Response:
@@ -104,22 +112,27 @@ Response:
 ash agent info research-bot
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const agent = await client.getAgent('research-bot');
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 agent = client.get_agent("research-bot")
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl http://localhost:4100/api/agents/research-bot
+curl $ASH_SERVER_URL/api/agents/research-bot
 ```
 
 ## Deleting an Agent
@@ -132,22 +145,27 @@ Deleting an agent removes its registration from the server. Existing sessions th
 ash agent delete research-bot
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 await client.deleteAgent('research-bot');
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 client.delete_agent("research-bot")
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl -X DELETE http://localhost:4100/api/agents/research-bot
+curl -X DELETE $ASH_SERVER_URL/api/agents/research-bot
 ```
 
 ## API Reference

@@ -76,7 +76,7 @@ import type { Session } from '@ash-ai/shared';
 
 ## Key Conventions
 
-1. **SDK types pass through.** Ash uses the Claude Code SDK's `Message` type directly throughout the pipeline. Do not create wrapper types for conversation data. See [ADR 0001](/docs/architecture/decisions#adr-0001-sdk-passthrough-types).
+1. **SDK types pass through.** Ash uses the Claude Code SDK's `Message` type directly throughout the pipeline. Do not create wrapper types for conversation data. See [ADR 0001](/architecture/decisions#adr-0001-sdk-passthrough-types).
 
 2. **Test boundaries, not glue.** Test API contracts, state transitions, protocol serialization, failure modes, and security invariants. Do not test trivial wrappers, type re-exports, or config loading.
 

@@ -5,9 +5,9 @@ title: Files
 
 # Files
 
-The Files API provides read access to files in a session's workspace. Each session has an isolated workspace directory where the agent operates. You can list all files and read individual file contents.
+The Files API provides read access to files in a session's workspace. Each session has an isolated workspace directory where the agent operates. You can list all files and download individual files.
 
-Files are resolved from the live sandbox when the session is active. If the sandbox has been evicted (session paused or ended), the server falls back to the most recent persisted snapshot. The `source` field in each response indicates which one was used.
+Files are resolved from the live sandbox when the session is active. If the sandbox has been evicted (session paused or ended), the server falls back to the most recent persisted snapshot. The `source` field (or `X-Ash-Source` header) in each response indicates which one was used.
 
 ---
 
@@ -75,15 +75,15 @@ Returns a list of all files in the session's workspace, recursively. Certain dir
 
 ---
 
-## Read File
+## Download File (Raw)
 
 ```
-GET /api/sessions/:id/files/*
+GET /api/sessions/:id/files/*path
 ```
 
-Returns the content of a single file from the session's workspace. The file path is specified as the wildcard portion of the URL.
+Downloads a single file from the session's workspace as raw bytes. The file path is specified as the wildcard portion of the URL.
 
-Files larger than 1 MB (1,048,576 bytes) are rejected.
+By default, the response streams the raw file content with appropriate `Content-Type` based on the file extension. Files up to 100 MB are supported.
 
 ### Path Parameters
 
@@ -92,15 +92,44 @@ Files larger than 1 MB (1,048,576 bytes) are rejected.
 | `id` | string (UUID) | Session ID |
 | `*` | string | File path relative to workspace root |
 
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `format` | string | `raw` | Response format. `raw` streams the file bytes directly. `json` returns a JSON-wrapped response (see below). |
+
 ### Example Request
 
 ```
 GET /api/sessions/f47ac10b-58cc-4372-a567-0e02b2c3d479/files/src/index.ts
 ```
 
-### Response
+### Response (Raw — Default)
 
 **200 OK**
+
+The raw file bytes are returned with these headers:
+
+| Header | Example | Description |
+|---|---|---|
+| `Content-Type` | `text/typescript` | MIME type based on file extension (fallback: `application/octet-stream`) |
+| `Content-Disposition` | `attachment; filename*=UTF-8''index.ts` | Suggests a filename for download |
+| `Content-Length` | `67` | File size in bytes |
+| `X-Ash-Source` | `sandbox` | `sandbox` if from live sandbox, `snapshot` if from persisted snapshot |
+
+```bash
+# Download raw file content
+curl -O $ASH_SERVER_URL/api/sessions/SESSION_ID/files/output/report.pdf \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Response (JSON — `?format=json`)
+
+**200 OK**
+
+```
+GET /api/sessions/:id/files/src/index.ts?format=json
+```
 
 ```json
 {
@@ -118,11 +147,13 @@ GET /api/sessions/f47ac10b-58cc-4372-a567-0e02b2c3d479/files/src/index.ts
 | `size` | integer | File size in bytes |
 | `source` | string | `"sandbox"` if read from the live sandbox, `"snapshot"` if from a persisted snapshot |
 
+JSON mode has a 1 MB file size limit. For larger files, use the default raw mode.
+
 ### Errors
 
 | Status | Condition |
 |---|---|
-| `400` | Missing file path, path contains `..` traversal, path starts with `/`, path is a directory, or file exceeds 1 MB |
+| `400` | Missing file path, path contains `..` traversal, path starts with `/`, path is a directory, or file exceeds size limit (1 MB for JSON mode, 100 MB for raw mode) |
 | `404` | Session not found, no workspace available, or file does not exist |
 
 ```json
@@ -136,15 +167,19 @@ GET /api/sessions/f47ac10b-58cc-4372-a567-0e02b2c3d479/files/src/index.ts
 
 ## Use Cases
 
-**Inspecting agent output.** After an agent writes code or generates files, use the Files API to retrieve the results without needing direct sandbox access.
+**Downloading binary artifacts.** After an agent generates images, PDFs, or compiled binaries, download them directly using the raw endpoint.
 
 ```bash
-# List what the agent created
-curl http://localhost:4100/api/sessions/SESSION_ID/files \
+# Download a generated PDF
+curl -o report.pdf $ASH_SERVER_URL/api/sessions/SESSION_ID/files/output/report.pdf \
   -H "Authorization: Bearer YOUR_API_KEY"
+```
 
-# Read a specific file
-curl http://localhost:4100/api/sessions/SESSION_ID/files/output/report.md \
+**Inspecting agent-written code.** After an agent writes code, use `?format=json` to get the content inline.
+
+```bash
+# Read a text file as JSON
+curl "$ASH_SERVER_URL/api/sessions/SESSION_ID/files/src/index.ts?format=json" \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 

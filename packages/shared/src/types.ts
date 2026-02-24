@@ -398,6 +398,10 @@ export interface CreateSessionRequest {
   agent: string;
   /** Credential ID to inject into sandbox env. */
   credentialId?: string;
+  /** Extra env vars to inject into the sandbox (merged with credential env). */
+  extraEnv?: Record<string, string>;
+  /** Shell script to run in workspace after install.sh but before the bridge starts. */
+  startupScript?: string;
 }
 
 export interface CreateSessionResponse {

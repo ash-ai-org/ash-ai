@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs';
-import { join, relative, basename } from 'node:path';
+import { readdirSync, statSync, readFileSync, existsSync, createReadStream } from 'node:fs';
+import { join, relative, basename, extname } from 'node:path';
 import { getSession } from '../db/index.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import type { FileEntry } from '@ash-ai/shared';
@@ -13,8 +13,68 @@ const SKIP_NAMES = new Set([
 
 const SKIP_EXTENSIONS = new Set(['.sock', '.lock', '.pid']);
 
-// Max file size we'll return inline (1 MB)
-const MAX_FILE_SIZE = 1_048_576;
+// Max file size for JSON mode (1 MB) — encoding huge files as JSON strings is wasteful
+const MAX_JSON_FILE_SIZE = 1_048_576;
+
+// Max file size for raw streaming (100 MB) — prevent abuse
+const MAX_RAW_FILE_SIZE = 104_857_600;
+
+/** Simple extension → MIME type map. No external dependency needed. */
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html',
+  '.htm': 'text/html',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.mjs': 'application/javascript',
+  '.json': 'application/json',
+  '.xml': 'application/xml',
+  '.csv': 'text/csv',
+  '.txt': 'text/plain',
+  '.md': 'text/markdown',
+  '.yaml': 'text/yaml',
+  '.yml': 'text/yaml',
+  '.toml': 'text/plain',
+  '.ts': 'text/typescript',
+  '.tsx': 'text/typescript',
+  '.jsx': 'text/javascript',
+  '.py': 'text/x-python',
+  '.rb': 'text/x-ruby',
+  '.rs': 'text/x-rust',
+  '.go': 'text/x-go',
+  '.java': 'text/x-java',
+  '.c': 'text/x-c',
+  '.cpp': 'text/x-c++',
+  '.h': 'text/x-c',
+  '.sh': 'text/x-shellscript',
+  '.bash': 'text/x-shellscript',
+  '.zsh': 'text/x-shellscript',
+  '.sql': 'text/x-sql',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.pdf': 'application/pdf',
+  '.zip': 'application/zip',
+  '.gz': 'application/gzip',
+  '.tar': 'application/x-tar',
+  '.wasm': 'application/wasm',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+};
+
+function getMimeType(filePath: string): string {
+  const ext = extname(filePath).toLowerCase();
+  return MIME_TYPES[ext] || 'application/octet-stream';
+}
 
 /**
  * Recursively list files in a directory, returning flat paths relative to root.
@@ -133,8 +193,8 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
     return reply.send({ files, source: workspace.source });
   });
 
-  // Get single file content
-  app.get<{ Params: { id: string; '*': string } }>('/api/sessions/:id/files/*', {
+  // Get single file content (raw by default, JSON with ?format=json)
+  app.get<{ Params: { id: string; '*': string }; Querystring: { format?: string } }>('/api/sessions/:id/files/*', {
     schema: {
       tags: ['sessions'],
       params: {
@@ -145,19 +205,11 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
         },
         required: ['id', '*'],
       },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            path: { type: 'string' },
-            content: { type: 'string' },
-            size: { type: 'integer' },
-            source: { type: 'string', enum: ['sandbox', 'snapshot'] },
-          },
-          required: ['path', 'content', 'size', 'source'],
+      querystring: {
+        type: 'object',
+        properties: {
+          format: { type: 'string', enum: ['json', 'raw'] },
         },
-        400: { $ref: 'ApiError#' },
-        404: { $ref: 'ApiError#' },
       },
     },
   }, async (req, reply) => {
@@ -199,16 +251,38 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
       return reply.status(400).send({ error: 'Path is not a file', statusCode: 400 });
     }
 
-    if (st.size > MAX_FILE_SIZE) {
-      return reply.status(400).send({ error: `File too large (${st.size} bytes, max ${MAX_FILE_SIZE})`, statusCode: 400 });
+    const format = req.query.format;
+
+    // JSON mode: backwards-compatible JSON-wrapped response
+    if (format === 'json') {
+      if (st.size > MAX_JSON_FILE_SIZE) {
+        return reply.status(400).send({ error: `File too large (${st.size} bytes, max ${MAX_JSON_FILE_SIZE})`, statusCode: 400 });
+      }
+
+      const content = readFileSync(fullPath, 'utf-8');
+      return reply.send({
+        path: filePath,
+        content,
+        size: st.size,
+        source: workspace.source,
+      });
     }
 
-    const content = readFileSync(fullPath, 'utf-8');
-    return reply.send({
-      path: filePath,
-      content,
-      size: st.size,
-      source: workspace.source,
-    });
+    // Raw mode (default): stream file bytes with proper headers
+    if (st.size > MAX_RAW_FILE_SIZE) {
+      return reply.status(400).send({ error: `File too large (${st.size} bytes, max ${MAX_RAW_FILE_SIZE})`, statusCode: 400 });
+    }
+
+    const fileName = basename(filePath);
+    const mimeType = getMimeType(filePath);
+
+    void reply
+      .header('Content-Type', mimeType)
+      .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`)
+      .header('Content-Length', st.size)
+      .header('X-Ash-Source', workspace.source);
+
+    const stream = createReadStream(fullPath);
+    return reply.send(stream);
   });
 }

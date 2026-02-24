@@ -102,6 +102,7 @@ export const credentials = pgTable('credentials', {
   encryptedKey: text('encrypted_key').notNull(),
   iv: text('iv').notNull(),
   authTag: text('auth_tag').notNull(),
+  salt: text('salt'),  // PBKDF2 salt — null for legacy SHA-256 derived credentials
   label: text('label').notNull().default(''),
   active: integer('active').notNull().default(1),
   createdAt: text('created_at').notNull(),

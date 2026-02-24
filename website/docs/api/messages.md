@@ -103,7 +103,7 @@ The server applies backpressure on the SSE stream. If the client stops reading a
 #### curl
 
 ```bash
-curl -N -X POST http://localhost:4100/api/sessions/SESSION_ID/messages \
+curl -N -X POST $ASH_SERVER_URL/api/sessions/SESSION_ID/messages \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{"content": "Hello, what can you do?"}'

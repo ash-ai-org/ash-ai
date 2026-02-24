@@ -1,0 +1,40 @@
+{
+  "name": "@ash-ai/mcp-server",
+  "version": "0.0.2",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ash-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ash-ai-org/ash-ai.git",
+    "directory": "packages/mcp-server"
+  },
+  "license": "MIT",
+  "description": "MCP server that exposes the Ash REST API as tools for AI coding agents",
+  "keywords": [
+    "ash",
+    "mcp",
+    "ai",
+    "agent",
+    "model-context-protocol"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.23.0"
+  }
+}

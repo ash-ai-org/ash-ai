@@ -195,13 +195,30 @@ describe('multi-tenant isolation', () => {
   // -- Auth integration (hashApiKey) ------------------------------------------
 
   describe('hashApiKey', () => {
-    it('produces consistent SHA-256 hashes', () => {
+    it('produces consistent SHA-256 hashes (no secret)', () => {
       const key = 'ash_test_key_xyz';
       expect(hashApiKey(key)).toBe(hashApiKey(key));
     });
 
     it('different keys produce different hashes', () => {
       expect(hashApiKey('key-a')).not.toBe(hashApiKey('key-b'));
+    });
+
+    it('HMAC hash differs from plain SHA-256 hash', () => {
+      const key = 'ash_test_key_xyz';
+      const plainHash = hashApiKey(key);
+      const hmacHash = hashApiKey(key, 'my-secret');
+      expect(plainHash).not.toBe(hmacHash);
+    });
+
+    it('HMAC hash is consistent with same secret', () => {
+      const key = 'ash_test_key_xyz';
+      expect(hashApiKey(key, 'secret')).toBe(hashApiKey(key, 'secret'));
+    });
+
+    it('different secrets produce different HMAC hashes', () => {
+      const key = 'ash_test_key_xyz';
+      expect(hashApiKey(key, 'secret-a')).not.toBe(hashApiKey(key, 'secret-b'));
     });
   });
 });

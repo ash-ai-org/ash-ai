@@ -77,8 +77,8 @@ export interface Db {
   listQueueItems(tenantId: string, status?: QueueItemStatus, limit?: number): Promise<QueueItem[]>;
   getQueueStats(tenantId: string): Promise<QueueStats>;
   // Credentials (tenant-scoped)
-  insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string): Promise<Credential>;
-  getCredential(id: string): Promise<{ id: string; tenantId: string; type: string; encryptedKey: string; iv: string; authTag: string; label: string; active: boolean; createdAt: string; lastUsedAt: string | null } | null>;
+  insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string, salt?: string | null): Promise<Credential>;
+  getCredential(id: string): Promise<{ id: string; tenantId: string; type: string; encryptedKey: string; iv: string; authTag: string; salt: string | null; label: string; active: boolean; createdAt: string; lastUsedAt: string | null } | null>;
   listCredentials(tenantId: string): Promise<Credential[]>;
   deleteCredential(id: string): Promise<boolean>;
   touchCredentialUsed(id: string): Promise<void>;
@@ -368,8 +368,8 @@ export async function getQueueStats(tenantId: string): Promise<QueueStats> {
 
 // -- Credentials --------------------------------------------------------------
 
-export async function insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string): Promise<Credential> {
-  return getDb().insertCredential(id, tenantId, type, encryptedKey, iv, authTag, label);
+export async function insertCredential(id: string, tenantId: string, type: string, encryptedKey: string, iv: string, authTag: string, label: string, salt?: string | null): Promise<Credential> {
+  return getDb().insertCredential(id, tenantId, type, encryptedKey, iv, authTag, label, salt);
 }
 
 export async function getCredential(id: string) {

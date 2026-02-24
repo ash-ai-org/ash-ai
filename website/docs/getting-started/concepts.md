@@ -97,12 +97,12 @@ stateDiagram-v2
     starting --> error : Sandbox failed
 
     active --> active : Send messages
-    active --> paused : POST /api/sessions/:id/pause
-    active --> ended : DELETE /api/sessions/:id
+    active --> paused : Pause
+    active --> ended : End session
     active --> error : Sandbox crashed
 
-    paused --> active : POST /api/sessions/:id/resume
-    error --> active : POST /api/sessions/:id/resume
+    paused --> active : Resume
+    error --> active : Resume
 
     ended --> [*]
 ```
@@ -144,5 +144,5 @@ The environment allowlist ensures only explicitly permitted variables reach the 
 ## Next Steps
 
 - [Quickstart](quickstart.md) -- Deploy your first agent
-- [CLI Reference](/docs/cli/overview) -- All commands and flags
-- [Architecture](/docs/architecture/overview) -- Deep dive into the system design
+- [CLI Reference](/cli/overview) -- All commands and flags
+- [Architecture](/architecture/overview) -- Deep dive into the system design
