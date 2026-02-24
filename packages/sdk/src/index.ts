@@ -1,5 +1,5 @@
 export { AshClient } from './client.js';
-export type { AshClientOptions, SendMessageOptions } from './client.js';
+export type { AshClientOptions, SendMessageOptions, ExecResult } from './client.js';
 export { parseSSEStream } from './sse.js';
 export { extractTextFromEvent, extractStreamDelta, extractDisplayItems } from '@ash-ai/shared';
 export type {

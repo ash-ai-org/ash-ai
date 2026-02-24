@@ -343,7 +343,7 @@ The runner registry lives in the `runners` table in the shared database. All coo
 - **Liveness sweep:** All coordinators run the sweep independently (every 30s + random 0-5s jitter). Operations are idempotent — multiple coordinators marking the same dead runner's sessions as paused is harmless.
 - **Auth:** When `ASH_INTERNAL_SECRET` is set, all `/api/internal/*` endpoints require `Authorization: Bearer <secret>`.
 
-For more details on the scaling architecture, see [Scaling Architecture](/docs/architecture/scaling).
+For more details on the scaling architecture, see [Scaling Architecture](/architecture/scaling).
 
 ## Limitations
 

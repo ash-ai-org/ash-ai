@@ -3,6 +3,9 @@ sidebar_position: 5
 title: Working with Files
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Working with Files
 
 Each session runs inside an isolated sandbox with its own workspace directory. Files the agent creates, modifies, or downloads during a session are accessible through the files API. This lets you review agent-written code, download generated artifacts, or inspect the workspace state.
@@ -11,7 +14,8 @@ Each session runs inside an isolated sandbox with its own workspace directory. F
 
 Retrieve a flat list of all files in a session's workspace.
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
@@ -25,24 +29,28 @@ for (const file of result.files) {
 }
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 from ash_sdk import AshClient
+import httpx
 
 client = AshClient("http://localhost:4100")
 # The Python SDK uses the raw API response
-import httpx
 resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files")
 data = resp.json()
 for f in data["files"]:
     print(f"{f['path']} ({f['size']} bytes)")
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl http://localhost:4100/api/sessions/SESSION_ID/files
+curl $ASH_SERVER_URL/api/sessions/SESSION_ID/files
 ```
 
 Response:
@@ -81,7 +89,8 @@ The `source` field indicates where the file listing came from:
 
 Retrieve the content of a single file by its path.
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const file = await client.getSessionFile(sessionId, 'src/index.ts');
@@ -91,10 +100,24 @@ console.log(`Source: ${file.source}`);
 console.log(file.content);
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files/src/index.ts")
+data = resp.json()
+print(f"Path: {data['path']}")
+print(f"Size: {data['size']} bytes")
+print(data["content"])
+```
+
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl http://localhost:4100/api/sessions/SESSION_ID/files/src/index.ts
+curl $ASH_SERVER_URL/api/sessions/SESSION_ID/files/src/index.ts
 ```
 
 Response:
@@ -127,6 +150,9 @@ When a session is paused or ended, the workspace state is persisted as a snapsho
 
 **Reviewing agent-written code.** After an agent writes code in response to a prompt, list the workspace files and read specific files to review what was generated.
 
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
 ```typescript
 const session = await client.createSession('code-writer');
 
@@ -146,13 +172,54 @@ for (const f of files.files) {
 }
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+session = client.create_session("code-writer")
+
+# Ask the agent to write something
+for event in client.send_message_stream(session.id, "Write a Python fibonacci function"):
+    pass  # wait for completion
+
+# Review what was written
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session.id}/files")
+for f in resp.json()["files"]:
+    if f["path"].endswith(".py"):
+        file_resp = httpx.get(
+            f"http://localhost:4100/api/sessions/{session.id}/files/{f['path']}"
+        )
+        data = file_resp.json()
+        print(f"--- {data['path']} ---")
+        print(data["content"])
+```
+
+</TabItem>
+</Tabs>
+
 **Downloading artifacts.** If an agent generates reports, data files, or other artifacts, read them after the session completes.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // Session can be ended -- files are still accessible from snapshot
 await client.endSession(session.id);
 const report = await client.getSessionFile(session.id, 'output/report.md');
 ```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# Session can be ended -- files are still accessible from snapshot
+client.end_session(session.id)
+resp = httpx.get(f"http://localhost:4100/api/sessions/{session.id}/files/output/report.md")
+report = resp.json()
+```
+
+</TabItem>
+</Tabs>
 
 ## API Reference
 

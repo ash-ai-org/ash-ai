@@ -1,8 +1,12 @@
 import net from 'node:net';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { exec as execCb } from 'node:child_process';
+import { promisify } from 'node:util';
 import { encode, decode, type BridgeCommand, type BridgeEvent, timingEnabled, startTimer, logTiming } from '@ash-ai/shared';
 import { runQuery } from './sdk.js';
+
+const execAsync = promisify(execCb);
 
 const socketPath = process.env.ASH_BRIDGE_SOCKET!;
 const agentDir = process.env.ASH_AGENT_DIR!;
@@ -22,6 +26,10 @@ try {
 }
 
 let currentAbort: AbortController | null = null;
+// Track which sessions have had at least one query, so we resume on subsequent turns
+const sessionQueryCount = new Map<string, number>();
+// Map Ash session IDs to SDK session IDs (captured from result messages)
+const sdkSessionIds = new Map<string, string>();
 
 async function send(conn: net.Socket, event: BridgeEvent): Promise<void> {
   const canWrite = conn.write(encode(event));
@@ -43,6 +51,7 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
     for await (const message of runQuery({
       prompt,
       sessionId,
+      resumeSessionId: sdkSessionIds.get(sessionId),
       workspaceDir,
       claudeMd,
       resume,
@@ -52,6 +61,11 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
       eventCount++;
       if (eventCount === 1 && elapsed) {
         sdkFirstTokenMs = elapsed();
+      }
+      // Capture the SDK's session_id from result messages for future resume
+      const msg = message as Record<string, unknown>;
+      if (msg.session_id && typeof msg.session_id === 'string') {
+        sdkSessionIds.set(sessionId, msg.session_id);
       }
       await send(conn, { ev: 'message', data: message });
     }
@@ -79,11 +93,32 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
 
 async function handleCommand(conn: net.Socket, cmd: BridgeCommand): Promise<void> {
   switch (cmd.cmd) {
-    case 'query':
-      return runAndStream(conn, cmd.prompt, cmd.sessionId, false, cmd.includePartialMessages);
+    case 'query': {
+      const count = sessionQueryCount.get(cmd.sessionId) ?? 0;
+      sessionQueryCount.set(cmd.sessionId, count + 1);
+      const shouldResume = count > 0;
+      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, cmd.includePartialMessages);
+    }
 
     case 'resume':
       return runAndStream(conn, '', cmd.sessionId, true);
+
+    case 'exec': {
+      const timeout = cmd.timeout ?? 30000;
+      try {
+        const { stdout, stderr } = await execAsync(cmd.command, {
+          cwd: workspaceDir,
+          timeout,
+          maxBuffer: 10 * 1024 * 1024,
+        });
+        await send(conn, { ev: 'exec_result', exitCode: 0, stdout: stdout ?? '', stderr: stderr ?? '' });
+      } catch (err: unknown) {
+        const e = err as { code?: number; killed?: boolean; stdout?: string; stderr?: string };
+        await send(conn, { ev: 'exec_result', exitCode: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' });
+      }
+      await send(conn, { ev: 'done', sessionId: '' });
+      return;
+    }
 
     case 'interrupt':
       currentAbort?.abort();

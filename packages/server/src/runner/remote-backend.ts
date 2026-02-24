@@ -22,6 +22,8 @@ export class RemoteRunnerBackend implements RunnerBackend {
       sandboxId: opts.sandboxId,
       skipAgentCopy: opts.skipAgentCopy,
       limits: opts.limits as Record<string, number> | undefined,
+      extraEnv: opts.extraEnv,
+      startupScript: opts.startupScript,
     });
 
     const handle: SandboxHandle = {

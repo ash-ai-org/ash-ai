@@ -42,6 +42,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
       sandboxId?: string;
       skipAgentCopy?: boolean;
       limits?: Record<string, number>;
+      extraEnv?: Record<string, string>;
+      startupScript?: string;
     };
 
     try {
@@ -52,6 +54,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
         agentName: body.agentName,
         skipAgentCopy: body.skipAgentCopy,
         limits: body.limits,
+        extraEnv: body.extraEnv,
+        startupScript: body.startupScript,
       });
 
       return reply.status(201).send({
@@ -104,6 +108,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
           await writeSSE(reply.raw, `event: error\ndata: ${JSON.stringify({ error: event.error })}\n\n`);
         } else if (event.ev === 'done') {
           await writeSSE(reply.raw, `event: done\ndata: ${JSON.stringify({ sessionId: event.sessionId })}\n\n`);
+        } else if (event.ev === 'exec_result') {
+          await writeSSE(reply.raw, `event: exec_result\ndata: ${JSON.stringify({ exitCode: event.exitCode, stdout: event.stdout, stderr: event.stderr })}\n\n`);
         }
       }
     } catch (err: unknown) {

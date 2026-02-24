@@ -7,7 +7,13 @@ import Heading from '@theme/Heading';
 function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
   return (
-    <header className={clsx('hero hero--primary')} style={{ padding: '4rem 0' }}>
+    <header
+      className={clsx('hero hero--primary')}
+      style={{
+        padding: '5rem 0 4rem',
+        textAlign: 'center',
+      }}
+    >
       <div className="container">
         <Heading as="h1" className="hero__title">
           {siteConfig.title}
@@ -16,14 +22,11 @@ function HomepageHeader() {
           Deploy Claude agents as production APIs — with sessions, streaming,
           sandboxing, and persistence handled for you.
         </p>
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-          <Link className="button button--secondary button--lg" to="/docs/">
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          <Link className="button button--primary button--lg" to="/getting-started/quickstart">
             Get Started
           </Link>
-          <Link
-            className="button button--secondary button--lg"
-            to="/docs/api/overview"
-          >
+          <Link className="button button--secondary button--lg" to="/api/overview">
             API Reference
           </Link>
         </div>
@@ -54,7 +57,7 @@ function HomepageFeatures() {
   return (
     <section className="features">
       <div className="container">
-        <div className="row">
+        <div className="row" style={{ gap: '1rem' }}>
           {features.map(({ title, description }) => (
             <div className={clsx('col col--4')} key={title}>
               <div className="feature-card">
@@ -76,13 +79,21 @@ export default function Home(): JSX.Element {
       <HomepageHeader />
       <main>
         <HomepageFeatures />
-        <section style={{ padding: '2rem 0', textAlign: 'center' }}>
+        <section
+          style={{
+            padding: '3rem 0',
+            textAlign: 'center',
+            backgroundColor: 'var(--ash-surface-dark)',
+          }}
+        >
           <div className="container">
-            <Heading as="h2">Quick Start</Heading>
+            <Heading as="h2" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              Quick Start
+            </Heading>
             <div
               style={{
                 maxWidth: 600,
-                margin: '0 auto',
+                margin: '1.5rem auto 2rem',
                 textAlign: 'left',
               }}
             >
@@ -105,7 +116,10 @@ ash session send <SESSION_ID> "Hello!"`}
                 </code>
               </pre>
             </div>
-            <Link className="button button--primary button--lg" to="/docs/getting-started/quickstart">
+            <Link
+              className="button button--primary button--lg"
+              to="/getting-started/quickstart"
+            >
               Full Quickstart Guide
             </Link>
           </div>

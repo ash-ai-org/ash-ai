@@ -50,6 +50,7 @@
 | [decisions/0001-sdk-passthrough-types.md](./decisions/0001-sdk-passthrough-types.md) | Use SDK types directly instead of custom bridge/SSE event types |
 | [decisions/0002-http-over-grpc-for-runner.md](./decisions/0002-http-over-grpc-for-runner.md) | HTTP + SSE for runner communication (not gRPC) |
 | [decisions/0003-drizzle-over-prisma.md](./decisions/0003-drizzle-over-prisma.md) | Drizzle ORM over Prisma for unified DB backend |
+| [decisions/0004-oss-cloud-boundary.md](./decisions/0004-oss-cloud-boundary.md) | Open-source vs. Cloud boundary: three types of complexity |
 
 *Additional decisions added as they are made. Format: `docs/decisions/NNNN-short-title.md`*
 

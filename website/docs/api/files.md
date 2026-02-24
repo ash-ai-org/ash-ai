@@ -140,11 +140,11 @@ GET /api/sessions/f47ac10b-58cc-4372-a567-0e02b2c3d479/files/src/index.ts
 
 ```bash
 # List what the agent created
-curl http://localhost:4100/api/sessions/SESSION_ID/files \
+curl $ASH_SERVER_URL/api/sessions/SESSION_ID/files \
   -H "Authorization: Bearer YOUR_API_KEY"
 
 # Read a specific file
-curl http://localhost:4100/api/sessions/SESSION_ID/files/output/report.md \
+curl $ASH_SERVER_URL/api/sessions/SESSION_ID/files/output/report.md \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 

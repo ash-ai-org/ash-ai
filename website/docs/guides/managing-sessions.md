@@ -3,6 +3,9 @@ sidebar_position: 3
 title: Managing Sessions
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Managing Sessions
 
 A session is a stateful conversation between a client and a deployed agent. Each session runs inside an isolated sandbox with its own workspace directory. Sessions persist messages across turns and can be paused, resumed, and ended.
@@ -34,7 +37,8 @@ starting --> active --> paused --> active (resume)
 ash session create my-agent
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
@@ -45,7 +49,8 @@ console.log(session.id);     // "a1b2c3d4-..."
 console.log(session.status); // "active"
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 from ash_sdk import AshClient
@@ -56,10 +61,13 @@ print(session.id)     # "a1b2c3d4-..."
 print(session.status) # "active"
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl -X POST http://localhost:4100/api/sessions \
+curl -X POST $ASH_SERVER_URL/api/sessions \
   -H "Content-Type: application/json" \
   -d '{"agent": "my-agent"}'
 ```
@@ -89,7 +97,8 @@ Messages are sent via POST and return an SSE stream. See the [Streaming Response
 ash session send <session-id> "What is the capital of France?"
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 for await (const event of client.sendMessageStream(session.id, 'What is the capital of France?')) {
@@ -101,7 +110,8 @@ for await (const event of client.sendMessageStream(session.id, 'What is the capi
 }
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 for event in client.send_message_stream(session.id, "What is the capital of France?"):
@@ -111,10 +121,13 @@ for event in client.send_message_stream(session.id, "What is the capital of Fran
         print("Turn complete")
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl -X POST http://localhost:4100/api/sessions/<session-id>/messages \
+curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/messages \
   -H "Content-Type: application/json" \
   -d '{"content": "What is the capital of France?"}' \
   -N
@@ -123,6 +136,9 @@ curl -X POST http://localhost:4100/api/sessions/<session-id>/messages \
 ## Multi-Turn Conversations
 
 Sessions preserve full conversation context across turns. Each message builds on the previous ones.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const session = await client.createSession('my-agent');
@@ -150,6 +166,37 @@ for (const msg of messages) {
 }
 ```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+session = client.create_session("my-agent")
+
+# Turn 1
+for event in client.send_message_stream(session.id, "My name is Alice."):
+    pass  # Agent acknowledges
+
+# Turn 2 -- agent remembers context from turn 1
+for event in client.send_message_stream(session.id, "What is my name?"):
+    if event.type == "message":
+        data = event.data
+        if data.get("type") == "assistant":
+            for block in data.get("message", {}).get("content", []):
+                if block.get("type") == "text":
+                    print(block["text"])  # "Your name is Alice."
+```
+
+Messages are persisted to the database. You can retrieve them later:
+
+```python
+messages = client.list_messages(session.id)
+for msg in messages:
+    print(f"[{msg.role}] {msg.content}")
+```
+
+</TabItem>
+</Tabs>
+
 ## Pausing a Session
 
 Pausing a session marks it as idle. The sandbox may remain alive for fast resume, but the session stops accepting new messages until resumed.
@@ -160,23 +207,28 @@ Pausing a session marks it as idle. The sandbox may remain alive for fast resume
 ash session pause <session-id>
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const session = await client.pauseSession(session.id);
 console.log(session.status); // "paused"
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 session = client.pause_session(session.id)
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl -X POST http://localhost:4100/api/sessions/<session-id>/pause
+curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/pause
 ```
 
 ## Resuming a Session
@@ -193,23 +245,28 @@ Resume brings a paused or errored session back to `active`. Ash uses two resume 
 ash session resume <session-id>
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const session = await client.resumeSession(session.id);
 console.log(session.status); // "active"
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 session = client.resume_session(session.id)
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl -X POST http://localhost:4100/api/sessions/<session-id>/resume
+curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/resume
 ```
 
 Response includes the resume path taken:
@@ -234,23 +291,28 @@ Ending a session destroys the sandbox and marks the session as permanently close
 ash session end <session-id>
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 const session = await client.endSession(session.id);
 console.log(session.status); // "ended"
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 session = client.end_session(session.id)
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
-curl -X DELETE http://localhost:4100/api/sessions/<session-id>
+curl -X DELETE $ASH_SERVER_URL/api/sessions/<session-id>
 ```
 
 ## Listing Sessions
@@ -261,7 +323,8 @@ curl -X DELETE http://localhost:4100/api/sessions/<session-id>
 ash session list
 ```
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 ```typescript
 // All sessions
@@ -271,20 +334,24 @@ const sessions = await client.listSessions();
 const sessions = await client.listSessions('my-agent');
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 sessions = client.list_sessions()
 ```
 
+</TabItem>
+</Tabs>
+
 ### curl
 
 ```bash
 # All sessions
-curl http://localhost:4100/api/sessions
+curl $ASH_SERVER_URL/api/sessions
 
 # Filter by agent
-curl http://localhost:4100/api/sessions?agent=my-agent
+curl "$ASH_SERVER_URL/api/sessions?agent=my-agent"
 ```
 
 ## API Reference

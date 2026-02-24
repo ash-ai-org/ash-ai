@@ -1,5 +1,5 @@
 import { type ChildProcess, execSync, execFileSync } from 'node:child_process';
-import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync } from 'node:fs';
+import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -29,6 +29,8 @@ export interface CreateSandboxOpts {
   onOomKill?: (sandboxId: string) => void;
   /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
   extraEnv?: Record<string, string>;
+  /** Shell script to run in workspace after install.sh but before the bridge starts. */
+  startupScript?: string;
 }
 
 // Internal tracking — keeps cleanup handles out of the public interface
@@ -123,6 +125,30 @@ export class SandboxManager {
           const msg = err instanceof Error ? err.message : String(err);
           throw new Error(`install.sh failed for sandbox ${shortId}: ${msg}`);
         }
+      }
+    }
+
+    // Run startup script if provided (only on fresh creation, not resume)
+    if (!opts.skipAgentCopy && opts.startupScript) {
+      const startupPath = join(workspaceDir, 'startup.sh');
+      writeFileSync(startupPath, opts.startupScript, 'utf-8');
+      chmodSync(startupPath, 0o755);
+      console.log(`[sandbox:${shortId}] Running startup.sh...`);
+      try {
+        const startupOutput = execFileSync(startupPath, [], {
+          cwd: workspaceDir,
+          env,
+          timeout: INSTALL_SCRIPT_TIMEOUT_MS,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          ...(sandboxUid !== undefined && { uid: sandboxUid, gid: sandboxGid }),
+        });
+        if (startupOutput.length > 0) {
+          console.log(`[sandbox:${shortId}:startup] ${startupOutput.toString().trimEnd()}`);
+        }
+        console.log(`[sandbox:${shortId}] startup.sh completed`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`startup.sh failed for sandbox ${shortId}: ${msg}`);
       }
     }
 

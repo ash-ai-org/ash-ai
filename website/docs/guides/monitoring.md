@@ -12,7 +12,7 @@ Ash exposes health checks, Prometheus metrics, debug timing, and structured logs
 `GET /health` returns the server's current status. This endpoint does not require authentication.
 
 ```bash
-curl http://localhost:4100/health
+curl $ASH_SERVER_URL/health
 ```
 
 Response:
@@ -55,7 +55,7 @@ Response:
 `GET /metrics` returns metrics in Prometheus text exposition format. This endpoint does not require authentication.
 
 ```bash
-curl http://localhost:4100/metrics
+curl $ASH_SERVER_URL/metrics
 ```
 
 Response:

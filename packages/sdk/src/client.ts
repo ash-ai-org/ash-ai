@@ -36,6 +36,12 @@ export interface SendMessageOptions {
   includePartialMessages?: boolean;
 }
 
+export interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
 export class AshClient {
   private serverUrl: string;
   private apiKey?: string;
@@ -88,9 +94,11 @@ export class AshClient {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async createSession(agent: string, opts?: { credentialId?: string }): Promise<Session> {
+  async createSession(agent: string, opts?: { credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string }): Promise<Session> {
     const body: Record<string, unknown> = { agent };
     if (opts?.credentialId) body.credentialId = opts.credentialId;
+    if (opts?.extraEnv) body.extraEnv = opts.extraEnv;
+    if (opts?.startupScript) body.startupScript = opts.startupScript;
     const res = await this.request<{ session: Session }>('POST', '/api/sessions', body);
     return res.session;
   }
@@ -159,6 +167,13 @@ export class AshClient {
   async endSession(id: string): Promise<Session> {
     const res = await this.request<{ session: Session }>('DELETE', `/api/sessions/${id}`);
     return res.session;
+  }
+
+  /** Execute a shell command in the session's sandbox. Returns stdout, stderr, and exit code. */
+  async exec(sessionId: string, command: string, opts?: { timeout?: number }): Promise<ExecResult> {
+    const body: Record<string, unknown> = { command };
+    if (opts?.timeout) body.timeout = opts.timeout;
+    return this.request<ExecResult>('POST', `/api/sessions/${sessionId}/exec`, body);
   }
 
   // -- Messages ---------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Db } from './db/index.js';
 
@@ -12,8 +12,15 @@ declare module 'fastify' {
   }
 }
 
-/** SHA-256 hash of an API key — used to look up keys without storing the raw value. */
-export function hashApiKey(key: string): string {
+/**
+ * HMAC-SHA256 hash of an API key using a server-side secret.
+ * Prevents rainbow table attacks on stored key hashes.
+ * Falls back to plain SHA-256 if no secret is available (local dev mode).
+ */
+export function hashApiKey(key: string, secret?: string): string {
+  if (secret) {
+    return createHmac('sha256', secret).update(key).digest('hex');
+  }
   return createHash('sha256').update(key).digest('hex');
 }
 
@@ -29,6 +36,8 @@ export function hashApiKey(key: string): string {
  * 6. No match → 401
  */
 export function registerAuth(app: FastifyInstance, apiKey: string | undefined, db?: Db): void {
+  const hmacSecret = process.env.ASH_CREDENTIAL_KEY;
+
   // Decorate request with tenantId so it's always available
   app.decorateRequest('tenantId', 'default');
 
@@ -66,8 +75,20 @@ export function registerAuth(app: FastifyInstance, apiKey: string | undefined, d
 
     // Try api_keys table first (multi-tenant path)
     if (db) {
-      const keyHash = hashApiKey(bearerKey);
-      const apiKeyRecord = await db.getApiKeyByHash(keyHash);
+      // Try HMAC hash first (new keys), then fall back to plain SHA-256 (legacy keys)
+      const hmacHash = hmacSecret ? hashApiKey(bearerKey, hmacSecret) : null;
+      const legacyHash = hashApiKey(bearerKey);
+
+      if (hmacHash) {
+        const apiKeyRecord = await db.getApiKeyByHash(hmacHash);
+        if (apiKeyRecord) {
+          request.tenantId = apiKeyRecord.tenantId;
+          return;
+        }
+      }
+
+      // Fall back to legacy hash for keys created before HMAC migration
+      const apiKeyRecord = await db.getApiKeyByHash(legacyHash);
       if (apiKeyRecord) {
         request.tenantId = apiKeyRecord.tenantId;
         return;

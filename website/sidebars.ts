@@ -2,6 +2,30 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   docs: [
+    {
+      type: 'link',
+      label: 'Dashboard',
+      href: 'https://ash-cloud.ai',
+      className: 'sidebar-link-dashboard',
+    },
+    {
+      type: 'link',
+      label: 'GitHub',
+      href: 'https://github.com/ash-ai-org/ash',
+      className: 'sidebar-link-github',
+    },
+    {
+      type: 'link',
+      label: 'npm',
+      href: 'https://www.npmjs.com/package/@ash-ai/cli',
+      className: 'sidebar-link-npm',
+    },
+    {
+      type: 'link',
+      label: 'Changelog',
+      href: 'https://github.com/ash-ai-org/ash-ai/releases',
+      className: 'sidebar-link-changelog',
+    },
     'introduction',
     {
       type: 'category',

@@ -8,6 +8,8 @@
 export interface QueryOptions {
   prompt: string;
   sessionId: string;
+  /** The SDK's own session ID to resume from (captured from a previous result message). */
+  resumeSessionId?: string;
   workspaceDir: string;
   claudeMd: string;
   resume: boolean;
@@ -40,7 +42,7 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
     options: {
       cwd: opts.workspaceDir,
       systemPrompt: opts.claudeMd || undefined,
-      resume: opts.resume ? opts.sessionId : undefined,
+      resume: opts.resume ? (opts.resumeSessionId || opts.sessionId) : undefined,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       abortController: abortControllerFromSignal(opts.signal),

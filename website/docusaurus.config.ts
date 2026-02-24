@@ -1,5 +1,5 @@
-import { themes as prismThemes } from 'prism-react-renderer';
-import type { Config } from '@docusaurus/types';
+import {themes as prismThemes} from 'prism-react-renderer';
+import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
@@ -7,7 +7,16 @@ const config: Config = {
   tagline: 'Deploy and orchestrate AI agents',
   favicon: 'img/favicon.ico',
 
-  url: 'https://ash.dev',
+  future: {
+    v4: true,
+  },
+
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+
+  url: 'https://docs.ash-cloud.ai',
   baseUrl: '/',
 
   organizationName: 'ash-ai-org',
@@ -21,11 +30,7 @@ const config: Config = {
     locales: ['en'],
   },
 
-  markdown: {
-    mermaid: true,
-  },
-
-  themes: ['@docusaurus/theme-mermaid'],
+  plugins: ['./plugins/llm-txt-plugin.js'],
 
   presets: [
     [
@@ -34,6 +39,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/ash-ai-org/ash/tree/main/website/',
+          routeBasePath: '/',
         },
         blog: false,
         theme: {
@@ -44,8 +50,19 @@ const config: Config = {
   ],
 
   themeConfig: {
+    image: 'img/ash-logo.png',
+    colorMode: {
+      defaultMode: 'dark',
+      disableSwitch: true,
+      respectPrefersColorScheme: false,
+    },
     navbar: {
       title: 'Ash',
+      logo: {
+        alt: 'Ash Logo',
+        src: 'img/ash-logo.png',
+        style: { borderRadius: '8px', height: '32px' },
+      },
       items: [
         {
           type: 'docSidebar',
@@ -54,14 +71,15 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: '/docs/api/overview',
-          label: 'API',
-          position: 'left',
-        },
-        {
           href: 'https://github.com/ash-ai-org/ash',
           label: 'GitHub',
           position: 'right',
+        },
+        {
+          href: 'https://ash-cloud.ai',
+          label: 'Dashboard',
+          position: 'right',
+          className: 'navbar-dashboard-link',
         },
       ],
     },
@@ -69,22 +87,39 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: 'Documentation',
           items: [
-            { label: 'Getting Started', to: '/docs/' },
-            { label: 'API Reference', to: '/docs/api/overview' },
-            { label: 'CLI Reference', to: '/docs/cli/overview' },
+            {
+              label: 'Getting Started',
+              to: '/',
+            },
+            {
+              label: 'API Reference',
+              to: '/api/overview',
+            },
+            {
+              label: 'CLI Reference',
+              to: '/cli/overview',
+            },
+            {
+              label: 'llm.txt',
+              href: 'https://docs.ash-cloud.ai/llm.txt',
+            },
+            {
+              label: 'llm_full.txt',
+              href: 'https://docs.ash-cloud.ai/llm_full.txt',
+            },
           ],
         },
         {
           title: 'SDKs',
           items: [
-            { label: 'TypeScript', to: '/docs/sdks/typescript' },
-            { label: 'Python', to: '/docs/sdks/python' },
+            { label: 'TypeScript', to: '/sdks/typescript' },
+            { label: 'Python', to: '/sdks/python' },
           ],
         },
         {
-          title: 'More',
+          title: 'Community',
           items: [
             {
               label: 'GitHub',
@@ -97,12 +132,57 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright ${new Date().getFullYear()} Ash. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Ash. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
-      additionalLanguages: ['bash', 'json', 'python', 'yaml', 'sql', 'promql'],
+      additionalLanguages: ['bash', 'json', 'typescript', 'python', 'yaml', 'sql'],
+    },
+    mermaid: {
+      theme: { light: 'dark', dark: 'dark' },
+      options: {
+        themeVariables: {
+          background: '#0a0a0a',
+          primaryColor: '#1a1a1a',
+          secondaryColor: '#111111',
+          tertiaryColor: '#0c0c0c',
+          primaryBorderColor: '#ccff00',
+          secondaryBorderColor: 'rgba(255, 255, 255, 0.2)',
+          tertiaryBorderColor: 'rgba(255, 255, 255, 0.1)',
+          lineColor: 'rgba(255, 255, 255, 0.4)',
+          primaryTextColor: 'rgba(255, 255, 255, 0.9)',
+          secondaryTextColor: 'rgba(255, 255, 255, 0.7)',
+          tertiaryTextColor: 'rgba(255, 255, 255, 0.5)',
+          textColor: 'rgba(255, 255, 255, 0.9)',
+          nodeBorder: '#ccff00',
+          nodeTextColor: 'rgba(255, 255, 255, 0.9)',
+          mainBkg: '#1a1a1a',
+          clusterBkg: '#111111',
+          clusterBorder: 'rgba(255, 255, 255, 0.15)',
+          actorBkg: '#1a1a1a',
+          actorBorder: '#ccff00',
+          actorTextColor: 'rgba(255, 255, 255, 0.9)',
+          actorLineColor: 'rgba(255, 255, 255, 0.3)',
+          signalColor: 'rgba(255, 255, 255, 0.7)',
+          signalTextColor: 'rgba(255, 255, 255, 0.9)',
+          labelBoxBkgColor: '#1a1a1a',
+          labelBoxBorderColor: 'rgba(255, 255, 255, 0.2)',
+          labelTextColor: 'rgba(255, 255, 255, 0.9)',
+          loopTextColor: 'rgba(255, 255, 255, 0.7)',
+          noteBorderColor: '#ccff00',
+          noteBkgColor: 'rgba(204, 255, 0, 0.1)',
+          noteTextColor: 'rgba(255, 255, 255, 0.9)',
+          activationBorderColor: '#ccff00',
+          activationBkgColor: 'rgba(204, 255, 0, 0.15)',
+          sequenceNumberColor: '#000000',
+          attributeBackgroundColorOdd: '#111111',
+          attributeBackgroundColorEven: '#0c0c0c',
+          edgeLabelBackground: '#0a0a0a',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+          fontSize: '14px',
+        },
+      },
     },
   } satisfies Preset.ThemeConfig,
 };

@@ -97,6 +97,20 @@ export async function deleteAgent(name: string) {
   return true;
 }
 
+export async function getSessionEvents(sessionId: string, opts?: { after?: number; type?: string; limit?: number }) {
+  const params = new URLSearchParams();
+  if (opts?.after !== undefined) params.set('after', String(opts.after));
+  if (opts?.type) params.set('type', opts.type);
+  if (opts?.limit) params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  const res = await request('GET', `/api/sessions/${sessionId}/events${qs ? `?${qs}` : ''}`);
+  if (!res.ok) {
+    const err = await res.json() as { error: string };
+    throw new Error(err.error);
+  }
+  return (await res.json() as { events: Array<{ id: string; sequence: number; type: string; data: string; createdAt: string }> }).events;
+}
+
 export async function getHealth() {
   const res = await request('GET', '/health');
   return await res.json();

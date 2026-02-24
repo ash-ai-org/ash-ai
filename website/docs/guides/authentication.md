@@ -3,6 +3,9 @@ sidebar_position: 6
 title: Authentication
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Authentication
 
 Ash uses Bearer token authentication to protect API endpoints. All requests to `/api/*` routes require a valid API key when authentication is enabled.
@@ -35,7 +38,8 @@ When `ASH_API_KEY` is set, every request to `/api/*` must include a matching Bea
 
 ## Sending Authenticated Requests
 
-### TypeScript SDK
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
 
 Pass the API key when creating the client:
 
@@ -51,7 +55,8 @@ const client = new AshClient({
 const agents = await client.listAgents();
 ```
 
-### Python SDK
+</TabItem>
+<TabItem value="python" label="Python">
 
 ```python
 from ash_sdk import AshClient
@@ -63,6 +68,9 @@ client = AshClient(
 
 agents = client.list_agents()
 ```
+
+</TabItem>
+</Tabs>
 
 ### CLI
 
@@ -84,7 +92,7 @@ ASH_API_KEY="your-generated-key-here" ash agent list
 Include the `Authorization` header with the `Bearer` scheme:
 
 ```bash
-curl http://localhost:4100/api/agents \
+curl $ASH_SERVER_URL/api/agents \
   -H "Authorization: Bearer your-generated-key-here"
 ```
 
