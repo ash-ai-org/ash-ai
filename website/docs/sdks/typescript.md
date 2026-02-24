@@ -23,7 +23,7 @@ npm install @ash-ai/sdk
 <TabItem value="python" label="Python">
 
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 </TabItem>

@@ -128,7 +128,7 @@ await client.endSession(session.id);
 ### Option C: Python SDK
 
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 ```python

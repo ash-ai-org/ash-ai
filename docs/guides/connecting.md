@@ -152,7 +152,7 @@ for await (const event of client.sendMessageStream(sessionId, 'Hello')) {
 ### Install
 
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 ### Connect and Chat

@@ -110,7 +110,7 @@ await client.endSession(session.id);
 <TabItem value="python" label="Python">
 
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 ```python
@@ -131,24 +131,25 @@ client.end_session(session.id)
 ```
 
 </TabItem>
-</Tabs>
-
-### curl
+<TabItem value="curl" label="curl">
 
 ```bash
 # Create a session
-curl -s -X POST $ASH_SERVER_URL/api/sessions \
+curl -s -X POST http://localhost:4100/api/sessions \
   -H 'Content-Type: application/json' \
   -d '{"agent":"my-agent"}'
 
 # Send a message (returns an SSE stream)
-curl -N -X POST $ASH_SERVER_URL/api/sessions/SESSION_ID/messages \
+curl -N -X POST http://localhost:4100/api/sessions/SESSION_ID/messages \
   -H 'Content-Type: application/json' \
   -d '{"content":"What is a closure?"}'
 
 # End the session
-curl -s -X DELETE $ASH_SERVER_URL/api/sessions/SESSION_ID
+curl -s -X DELETE http://localhost:4100/api/sessions/SESSION_ID
 ```
+
+</TabItem>
+</Tabs>
 
 ---
 

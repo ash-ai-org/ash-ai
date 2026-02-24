@@ -132,7 +132,7 @@ research-agent/
 | **REST API + OpenAPI** | Full API with Swagger UI at `/docs`. Auth, CORS, typed endpoints — production-ready out of the box. |
 | **Sandbox pool** | DB-backed pool with capacity limits, LRU eviction, idle sweep. Sandboxes reused across messages. |
 | **Multi-runner** | Scale horizontally. Add runner nodes, the coordinator routes sessions to the least-loaded one. |
-| **TypeScript + Python SDKs** | First-class clients for both languages. `npm install @ash-ai/sdk` / `pip install ash-ai` |
+| **TypeScript + Python SDKs** | First-class clients for both languages. `npm install @ash-ai/sdk` / `pip install ash-ai-sdk` |
 | **One-command cloud deploy** | Deploy to EC2 or GCE with included scripts. Or run anywhere Docker runs. |
 
 ## Using the SDK
@@ -160,7 +160,7 @@ await client.endSession(session.id);
 Python:
 
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 ```python
