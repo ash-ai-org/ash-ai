@@ -57,6 +57,13 @@
       "when": 1771706256403,
       "tag": "0007_quick_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1771973630503,
+      "tag": "0008_living_spitfire",
+      "breakpoints": true
     }
   ]
 }

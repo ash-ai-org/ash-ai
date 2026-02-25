@@ -10,8 +10,8 @@
 | [api-reference.md](./api-reference.md) | REST endpoints, SSE format, TypeScript types, SDK usage |
 | [architecture.md](./architecture.md) | System design, data flow, sandbox isolation, protocol |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | Building from source, running tests, project structure |
-| [guides/ec2-deployment.md](./guides/ec2-deployment.md) | Deploy Ash to EC2 (ops guide) |
-| [guides/gce-deployment.md](./guides/gce-deployment.md) | Deploy Ash to GCP Compute Engine (ops guide) |
+| [guides/ec2-deployment.md](./guides/ec2-deployment.md) | Deploy Ash to EC2 (example scripts in `examples/deploy/ec2/`) |
+| [guides/gce-deployment.md](./guides/gce-deployment.md) | Deploy Ash to GCP Compute Engine (example scripts in `examples/deploy/gce/`) |
 
 ## Plan
 

@@ -84,10 +84,11 @@ When asked about yourself, say you are the Research Assistant powered by Ash.
 
 ### .claude/settings.json
 
-Controls which tools the agent is allowed to use without asking for confirmation. This maps directly to the Claude Code SDK's permission system.
+Controls which tools the agent is allowed to use without asking for confirmation, and optionally sets the default model. This maps directly to the Claude Code SDK's permission system.
 
 ```json title="research-assistant/.claude/settings.json"
 {
+  "model": "claude-sonnet-4-5-20250929",
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
@@ -103,6 +104,8 @@ Controls which tools the agent is allowed to use without asking for confirmation
   }
 }
 ```
+
+The `model` field sets the default model for the agent. This is the model the SDK uses unless overridden at the API level (see [Model Precedence](#model-precedence) below).
 
 The `allow` list uses glob patterns. Each entry permits the agent to use that tool without human approval. Tools not listed will be blocked or require approval depending on the session's permission mode.
 
@@ -170,7 +173,7 @@ The filename (minus `.md`) becomes the skill name. The agent can invoke it when 
 agent-name/
   CLAUDE.md                  # Required. Agent system prompt.
   .claude/
-    settings.json            # Optional. Tool permissions.
+    settings.json            # Optional. Tool permissions + default model.
     skills/
       skill-name.md          # Optional. Reusable workflows.
   .mcp.json                  # Optional. MCP server configuration.
@@ -190,3 +193,15 @@ When you run `ash deploy ./my-agent --name my-agent`:
 4. If an agent with that name already exists, its version is incremented
 
 The agent folder becomes the working directory for every session sandbox. Files the agent creates during a session are written to the sandbox workspace, not back to the agent definition.
+
+## Model Precedence
+
+The model used for a conversation is resolved with the following precedence (highest to lowest):
+
+1. **Per-message model** — passed in the `model` field of `POST /api/sessions/:id/messages`
+2. **Session-level model** — set when creating the session via `POST /api/sessions`
+3. **Agent record model** — set on the agent via the API
+4. **Agent settings file** — the `model` field in `.claude/settings.json`
+5. **SDK default** — the Claude Code SDK's built-in default model
+
+This means you can deploy an agent with a default model in `.claude/settings.json`, override it for specific sessions, and override it again for individual messages — all without redeploying the agent. When a new model comes out, you can start using it immediately by passing it at the session or message level.

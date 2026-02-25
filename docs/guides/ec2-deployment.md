@@ -21,17 +21,17 @@ cp .env.example .env
 # Edit .env — fill in the required values (see below)
 
 # 3. Deploy to EC2
-./scripts/deploy-ec2.sh
+./examples/deploy/ec2/deploy.sh
 
 # 4. Run the smoke test
-./scripts/smoke-test-ec2.sh
+./examples/deploy/smoke-test.sh
 
 # 5. Connect the QA Bot UI to your EC2 server
 ASH_SERVER_URL=http://<your-ec2-ip>:4100 pnpm --filter qa-bot dev
 # Open http://localhost:3100
 
 # 6. When done, tear down
-./scripts/teardown-ec2.sh
+./examples/deploy/ec2/teardown.sh
 ```
 
 ## Configuration
@@ -86,7 +86,7 @@ Your AWS credentials need these permissions:
 
 ## What the Deploy Script Does
 
-`scripts/deploy-ec2.sh` automates the full deployment:
+`examples/deploy/ec2/deploy.sh` automates the full deployment:
 
 1. **Finds the latest Ubuntu 22.04 AMI** in your region
 2. **Creates a security group** (if not provided) with ports 22 (SSH) and 4100 (Ash API) open
@@ -228,10 +228,10 @@ The smoke test verifies the deployed server works end-to-end:
 
 ```bash
 # Auto-detects the EC2 IP from .ec2-instance
-./scripts/smoke-test-ec2.sh
+./examples/deploy/smoke-test.sh
 
 # Or pass the URL explicitly
-./scripts/smoke-test-ec2.sh http://<your-ec2-ip>:4100
+./examples/deploy/smoke-test.sh http://<your-ec2-ip>:4100
 ```
 
 It tests: health check, agent registry, session create, message streaming (SSE), pause, resume, and session end.
@@ -299,7 +299,7 @@ cat /var/log/cloud-init-output.log
 ## Tearing Down
 
 ```bash
-./scripts/teardown-ec2.sh
+./examples/deploy/ec2/teardown.sh
 ```
 
 This terminates the EC2 instance and deletes the auto-created security group. The `.ec2-instance` state file is removed.
@@ -312,4 +312,4 @@ This terminates the EC2 instance and deletes the auto-created security group. Th
 | 30 GB gp3 EBS | ~$2.40/month |
 | Data transfer (first 100GB) | Free tier |
 
-Remember to run `./scripts/teardown-ec2.sh` when you're done to avoid ongoing charges.
+Remember to run `./examples/deploy/ec2/teardown.sh` when you're done to avoid ongoing charges.

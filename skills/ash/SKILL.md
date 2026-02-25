@@ -5,7 +5,7 @@ description: |
   deploying agents, managing sessions (create, pause, resume, end), sending messages,
   streaming SSE responses, sandbox isolation, multi-turn conversations, real-time
   text deltas, error handling, and working with files in agent workspaces.
-  Works with TypeScript (@ash-ai/sdk) and Python (ash-ai) SDKs.
+  Works with TypeScript (@ash-ai/sdk) and Python (ash-ai-sdk) SDKs.
 keywords:
   - ash
   - ai agent
@@ -50,7 +50,7 @@ npm install @ash-ai/sdk
 
 **Python:**
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 ### Step 1: Create Client

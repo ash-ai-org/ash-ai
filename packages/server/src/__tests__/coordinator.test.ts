@@ -73,7 +73,7 @@ describe('RunnerCoordinator (DB-backed)', () => {
 
       await coordinator.heartbeat('runner-1', {
         total: 10, cold: 0, warming: 2, warm: 3, waiting: 3, running: 5,
-        maxCapacity: 50, resumeWarmHits: 0, resumeColdHits: 0,
+        maxCapacity: 50, resumeWarmHits: 0, resumeColdHits: 0, preWarmHits: 0,
       });
 
       const info = await coordinator.getRunnerInfoFromDb();
@@ -100,6 +100,7 @@ describe('RunnerCoordinator (DB-backed)', () => {
         recordWarmHit: vi.fn(),
         recordColdHit: vi.fn(),
         persistState: vi.fn(),
+        getLogs: vi.fn().mockReturnValue([]),
         getStats: vi.fn(),
         activeCount: 0,
       };
@@ -128,13 +129,13 @@ describe('RunnerCoordinator (DB-backed)', () => {
       // runner-1 has 40 active sandboxes (10 available)
       await coordinator.heartbeat('runner-1', {
         total: 50, cold: 0, warming: 5, warm: 0, waiting: 5, running: 40,
-        maxCapacity: 50, resumeWarmHits: 0, resumeColdHits: 0,
+        maxCapacity: 50, resumeWarmHits: 0, resumeColdHits: 0, preWarmHits: 0,
       });
 
       // runner-2 has 10 active sandboxes (90 available)
       await coordinator.heartbeat('runner-2', {
         total: 100, cold: 0, warming: 0, warm: 0, waiting: 0, running: 10,
-        maxCapacity: 100, resumeWarmHits: 0, resumeColdHits: 0,
+        maxCapacity: 100, resumeWarmHits: 0, resumeColdHits: 0, preWarmHits: 0,
       });
 
       const result = await coordinator.selectBackend();

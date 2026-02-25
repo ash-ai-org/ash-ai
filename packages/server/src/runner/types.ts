@@ -1,4 +1,5 @@
 import type { BridgeCommand, BridgeEvent, PoolStats, SandboxLimits } from '@ash-ai/shared';
+import type { LogEntry } from '@ash-ai/sandbox';
 
 export interface CreateSandboxRequest {
   sessionId: string;
@@ -47,6 +48,9 @@ export interface RunnerBackend {
   recordColdHit(): void;
 
   persistState(sandboxId: string, sessionId: string, agentName: string): boolean;
+
+  /** Get buffered log entries for a sandbox, optionally after a given index. */
+  getLogs(sandboxId: string, after?: number): LogEntry[];
 
   getStats(): Promise<PoolStats>;
   readonly activeCount: number;

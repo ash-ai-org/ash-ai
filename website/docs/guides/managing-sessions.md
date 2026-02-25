@@ -31,12 +31,6 @@ starting --> active --> paused --> active (resume)
 
 ## Creating a Session
 
-### CLI
-
-```bash
-ash session create my-agent
-```
-
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
 
@@ -62,9 +56,14 @@ print(session.status) # "active"
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash session create my-agent
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl -X POST $ASH_SERVER_URL/api/sessions \
@@ -81,21 +80,56 @@ Response (201):
     "agentName": "my-agent",
     "sandboxId": "a1b2c3d4-...",
     "status": "active",
+    "model": null,
     "createdAt": "2025-01-15T10:30:00.000Z",
     "lastActiveAt": "2025-01-15T10:30:00.000Z"
   }
 }
 ```
 
+</TabItem>
+</Tabs>
+
+### Creating a Session with a Model Override
+
+You can specify a model when creating a session. This overrides the agent's default model for the entire session.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+const session = await client.createSession('my-agent', { model: 'claude-opus-4-6' });
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+session = client.create_session("my-agent", model="claude-opus-4-6")
+```
+
+</TabItem>
+<TabItem value="cli" label="CLI">
+
+```bash
+ash session create my-agent --model claude-opus-4-6
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl -X POST $ASH_SERVER_URL/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"agent": "my-agent", "model": "claude-opus-4-6"}'
+```
+
+</TabItem>
+</Tabs>
+
 ## Sending Messages
 
 Messages are sent via POST and return an SSE stream. See the [Streaming Responses](./streaming-responses.md) guide for full details on consuming the stream.
-
-### CLI
-
-```bash
-ash session send <session-id> "What is the capital of France?"
-```
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -122,9 +156,14 @@ for event in client.send_message_stream(session.id, "What is the capital of Fran
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash session send <session-id> "What is the capital of France?"
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/messages \
@@ -132,6 +171,45 @@ curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/messages \
   -d '{"content": "What is the capital of France?"}' \
   -N
 ```
+
+</TabItem>
+</Tabs>
+
+### Per-Message Model Override
+
+You can override the model for a single message. This takes the highest precedence — it overrides both the session model and the agent's default. Useful for using a more capable model on hard tasks or a cheaper model on simple ones.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+for await (const event of client.sendMessageStream(session.id, 'Analyze this complex codebase', {
+  model: 'claude-opus-4-6',
+})) {
+  // This message uses Opus regardless of the session/agent default
+}
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+for event in client.send_message_stream(session.id, "Analyze this complex codebase", model="claude-opus-4-6"):
+    pass  # This message uses Opus regardless of the session/agent default
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/messages \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Analyze this complex codebase", "model": "claude-opus-4-6"}' \
+  -N
+```
+
+</TabItem>
+</Tabs>
 
 ## Multi-Turn Conversations
 
@@ -201,12 +279,6 @@ for msg in messages:
 
 Pausing a session marks it as idle. The sandbox may remain alive for fast resume, but the session stops accepting new messages until resumed.
 
-### CLI
-
-```bash
-ash session pause <session-id>
-```
-
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
 
@@ -223,13 +295,21 @@ session = client.pause_session(session.id)
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash session pause <session-id>
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/pause
 ```
+
+</TabItem>
+</Tabs>
 
 ## Resuming a Session
 
@@ -238,12 +318,6 @@ Resume brings a paused or errored session back to `active`. Ash uses two resume 
 **Fast path (warm resume):** If the original sandbox is still alive, the session resumes instantly with no state loss. This is the common case when resuming shortly after pausing.
 
 **Cold path (cold resume):** If the sandbox was reclaimed (idle timeout, OOM, server restart), Ash creates a new sandbox. Workspace state is restored from the persisted snapshot if available. Conversation history is preserved in the database regardless.
-
-### CLI
-
-```bash
-ash session resume <session-id>
-```
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -261,9 +335,14 @@ session = client.resume_session(session.id)
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash session resume <session-id>
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl -X POST $ASH_SERVER_URL/api/sessions/<session-id>/resume
@@ -281,15 +360,12 @@ Response includes the resume path taken:
 }
 ```
 
+</TabItem>
+</Tabs>
+
 ## Ending a Session
 
 Ending a session destroys the sandbox and marks the session as permanently closed. The session's messages and events remain in the database for retrieval, but no new messages can be sent.
-
-### CLI
-
-```bash
-ash session end <session-id>
-```
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -307,21 +383,23 @@ session = client.end_session(session.id)
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash session end <session-id>
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl -X DELETE $ASH_SERVER_URL/api/sessions/<session-id>
 ```
 
+</TabItem>
+</Tabs>
+
 ## Listing Sessions
-
-### CLI
-
-```bash
-ash session list
-```
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -342,9 +420,14 @@ sessions = client.list_sessions()
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash session list
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 # All sessions
@@ -353,6 +436,9 @@ curl $ASH_SERVER_URL/api/sessions
 # Filter by agent
 curl "$ASH_SERVER_URL/api/sessions?agent=my-agent"
 ```
+
+</TabItem>
+</Tabs>
 
 ## API Reference
 

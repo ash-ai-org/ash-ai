@@ -12,6 +12,7 @@ import { statusCommand } from './commands/status.js';
 import { logsCommand } from './commands/logs.js';
 import { chatCommand } from './commands/chat.js';
 import { loginCommand, logoutCommand } from './commands/login.js';
+import { connectCommand, disconnectCommand } from './commands/connect.js';
 
 export const isDevMode = basename(process.argv[1] ?? '').startsWith('ash-dev');
 
@@ -29,6 +30,8 @@ program.addCommand(deployCommand());
 program.addCommand(sessionCommand());
 program.addCommand(agentCommand());
 program.addCommand(healthCommand());
+program.addCommand(connectCommand());
+program.addCommand(disconnectCommand());
 program.addCommand(loginCommand());
 program.addCommand(logoutCommand());
 

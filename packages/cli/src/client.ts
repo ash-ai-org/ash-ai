@@ -1,6 +1,6 @@
-import { DEFAULT_PORT } from '@ash-ai/shared';
+import { getServerUrl } from './config.js';
 
-const serverUrl = process.env.ASH_SERVER_URL || `http://localhost:${DEFAULT_PORT}`;
+const serverUrl = getServerUrl();
 
 async function request(method: string, path: string, body?: unknown): Promise<Response> {
   const res = await fetch(`${serverUrl}${path}`, {

@@ -33,7 +33,7 @@ export interface Db {
   listAgents(tenantId?: string): Promise<Agent[]>;
   deleteAgent(name: string, tenantId?: string): Promise<boolean>;
   // Sessions (tenant-scoped)
-  insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string): Promise<Session>;
+  insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string): Promise<Session>;
   insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session>;
   updateSessionStatus(id: string, status: SessionStatus): Promise<void>;
   updateSessionSandbox(id: string, sandboxId: string): Promise<void>;
@@ -173,8 +173,8 @@ export async function deleteAgent(name: string, tenantId?: string): Promise<bool
   return getDb().deleteAgent(name, tenantId);
 }
 
-export async function insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string): Promise<Session> {
-  return getDb().insertSession(id, agentName, sandboxId, tenantId, parentSessionId);
+export async function insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string): Promise<Session> {
+  return getDb().insertSession(id, agentName, sandboxId, tenantId, parentSessionId, model);
 }
 
 export async function insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session> {

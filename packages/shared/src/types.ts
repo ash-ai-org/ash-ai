@@ -13,6 +13,32 @@ export interface Agent {
   path: string;
   createdAt: string;
   updatedAt: string;
+  /** URL-safe identifier. Falls back to name if not set. */
+  slug?: string;
+  /** Human-readable description. */
+  description?: string | null;
+  /** Model identifier (e.g. 'claude-sonnet-4-5-20250929'). */
+  model?: string | null;
+  /** Backend provider (e.g. 'claude', 'openai', 'custom'). */
+  backend?: string | null;
+  /** System prompt for the agent. */
+  systemPrompt?: string | null;
+  /** Agent lifecycle status. */
+  status?: 'active' | 'inactive' | 'archived';
+  /** Arbitrary config blob. */
+  config?: Record<string, unknown>;
+}
+
+/** Fields that can be updated on an existing agent via PATCH. */
+export interface AgentUpdate {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  model?: string | null;
+  backend?: string | null;
+  systemPrompt?: string | null;
+  status?: 'active' | 'inactive' | 'archived';
+  config?: Record<string, unknown>;
 }
 
 // -- Sessions -----------------------------------------------------------------
@@ -31,6 +57,8 @@ export interface Session {
   runnerId?: string | null;
   /** Parent session this was forked from. Null if not a fork. */
   parentSessionId?: string | null;
+  /** Model override for this session. Null = use agent default (.claude/settings.json). */
+  model?: string | null;
 }
 
 // -- Sandboxes ----------------------------------------------------------------
@@ -264,6 +292,18 @@ export interface PoolStats {
   maxCapacity: number;
   resumeWarmHits: number;
   resumeColdHits: number;
+  preWarmHits: number;
+}
+
+// -- Sandbox Startup Timings --------------------------------------------------
+
+export interface SandboxTimings {
+  agentCopyMs: number;
+  installScriptMs: number;
+  startupScriptMs: number;
+  bridgeSpawnMs: number;
+  bridgeConnectMs: number;
+  totalMs: number;
 }
 
 // -- Resource Limits ----------------------------------------------------------
@@ -294,6 +334,74 @@ export interface GetFileResponse {
   content: string;
   size: number;
   source: 'sandbox' | 'snapshot';
+}
+
+// -- Session Logs -------------------------------------------------------------
+
+export interface SandboxLogEntry {
+  index: number;
+  level: 'stdout' | 'stderr' | 'system';
+  text: string;
+  ts: string;
+}
+
+export interface ListSessionLogsResponse {
+  logs: SandboxLogEntry[];
+  source: string;
+}
+
+// -- Agent Files --------------------------------------------------------------
+
+export interface ListAgentFilesResponse {
+  files: FileEntry[];
+}
+
+export interface GetAgentFileResponse {
+  path: string;
+  content: string;
+  size: number;
+}
+
+// -- Project Files ------------------------------------------------------------
+
+export type ProjectFileTtl = '1h' | '24h' | '7d' | '30d' | 'permanent';
+
+export interface ProjectFile {
+  id: string;
+  tenantId?: string;
+  filename: string;
+  storagePath: string;
+  mimeType?: string | null;
+  size: number;
+  ttl?: ProjectFileTtl | null;
+  expiresAt?: string | null;
+  createdAt: string;
+}
+
+export interface UploadFileInput {
+  filename: string;
+  /** Base64-encoded file content. */
+  content: string;
+  mimeType?: string;
+  ttl?: ProjectFileTtl;
+}
+
+export interface ListProjectFilesResponse {
+  files: ProjectFile[];
+}
+
+// -- Session Listing Options --------------------------------------------------
+
+export interface ListSessionsOptions {
+  agent?: string;
+  status?: SessionStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListSessionsWithTotalResponse {
+  sessions: Session[];
+  total: number;
 }
 
 // -- Credentials --------------------------------------------------------------
@@ -402,6 +510,8 @@ export interface CreateSessionRequest {
   extraEnv?: Record<string, string>;
   /** Shell script to run in workspace after install.sh but before the bridge starts. */
   startupScript?: string;
+  /** Model override for this session. Overrides agent's .claude/settings.json default. */
+  model?: string;
 }
 
 export interface CreateSessionResponse {
@@ -412,6 +522,8 @@ export interface SendMessageRequest {
   content: string;
   /** Enable partial message streaming. When true, yields incremental StreamEvent messages with raw API deltas in addition to complete messages. */
   includePartialMessages?: boolean;
+  /** Model override for this query. Overrides session and agent defaults. */
+  model?: string;
 }
 
 export interface DeployAgentRequest {

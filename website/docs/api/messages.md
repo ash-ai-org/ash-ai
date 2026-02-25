@@ -28,7 +28,8 @@ Sends a message to the agent running in the specified session. The response is a
 ```json
 {
   "content": "What files are in the current directory?",
-  "includePartialMessages": false
+  "includePartialMessages": false,
+  "model": "claude-opus-4-6"
 }
 ```
 
@@ -36,6 +37,7 @@ Sends a message to the agent running in the specified session. The response is a
 |---|---|---|---|
 | `content` | string | Yes | The message text to send to the agent |
 | `includePartialMessages` | boolean | No | When `true`, the stream includes incremental `stream_event` messages with raw API deltas in addition to complete messages. Useful for building real-time streaming UIs. Default: `false`. |
+| `model` | string | No | Model override for this specific message. Takes precedence over the session-level and agent-level model. Any valid model identifier accepted. |
 
 ### Response
 

@@ -1,5 +1,17 @@
 # @ash-ai/server
 
+## 0.0.6 - 2026-02-24
+
+### Added
+
+- Agent CRUD routes: POST/GET/DELETE `/api/agents` with recursive file listing
+- DB migration 0008: `credentials.salt` column for encryption KDF, `sessions.model` for per-session model override
+- OpenAPI spec regenerated with all 39 endpoints
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.6, @ash-ai/sandbox@0.0.6
+
 ## 0.0.5 - 2026-02-23
 
 ### Added

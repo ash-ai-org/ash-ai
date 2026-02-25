@@ -99,7 +99,7 @@ export function startContainer(opts: StartContainerOptions = {}): void {
     'run', '-d',
     '--name', ASH_CONTAINER_NAME,
     '--init',
-    '--cgroupns=host',
+    '--privileged',
     '-p', `${port}:4100`,
     '-v', `${dataDir}:/data`,
   ];

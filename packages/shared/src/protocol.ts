@@ -14,6 +14,8 @@ export interface QueryCommand {
   prompt: string;
   sessionId: string;
   includePartialMessages?: boolean;
+  /** Override the model for this query. Overrides agent's .claude/settings.json. */
+  model?: string;
 }
 
 export interface ResumeCommand {
@@ -72,12 +74,20 @@ export interface ExecResultEvent {
   stderr: string;
 }
 
+export interface LogEvent {
+  ev: 'log';
+  level: 'stdout' | 'stderr' | 'system';
+  text: string;
+  ts: string;
+}
+
 export type BridgeEvent =
   | ReadyEvent
   | MessageEvent
   | ErrorEvent
   | DoneEvent
-  | ExecResultEvent;
+  | ExecResultEvent
+  | LogEvent;
 
 // -- Wire encoding/decoding ---------------------------------------------------
 

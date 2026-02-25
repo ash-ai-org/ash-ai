@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 
 # Python SDK
 
-The `ash-ai` Python package provides a client for the Ash REST API. It is auto-generated from the OpenAPI specification.
+The `ash-ai-sdk` Python package provides a client for the Ash REST API. It is auto-generated from the OpenAPI specification.
 
 ## Installation
 
@@ -16,7 +16,7 @@ The `ash-ai` Python package provides a client for the Ash REST API. It is auto-g
 <TabItem value="python" label="Python" default>
 
 ```bash
-pip install ash-ai
+pip install ash-ai-sdk
 ```
 
 </TabItem>

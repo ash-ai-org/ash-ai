@@ -16,6 +16,7 @@ interface Session {
   agentName: string;       // Name of the agent this session runs
   sandboxId: string;       // ID of the sandbox process
   status: SessionStatus;   // Current lifecycle state
+  model: string | null;    // Model override for this session (null = use agent default)
   runnerId: string | null; // Runner hosting the sandbox (null in standalone mode)
   createdAt: string;       // ISO 8601 timestamp
   lastActiveAt: string;    // ISO 8601 timestamp, updated on each message
@@ -48,13 +49,15 @@ Creates a new session for the specified agent. The server allocates a sandbox, c
 
 ```json
 {
-  "agent": "qa-bot"
+  "agent": "qa-bot",
+  "model": "claude-opus-4-6"
 }
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `agent` | string | Yes | Name of a previously deployed agent |
+| `model` | string | No | Model to use for this session. Overrides the agent's default model. Any valid model identifier accepted (e.g. `claude-sonnet-4-5-20250929`, `claude-opus-4-6`). |
 
 ### Response
 
@@ -68,6 +71,7 @@ Creates a new session for the specified agent. The server allocates a sandbox, c
     "agentName": "qa-bot",
     "sandboxId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "status": "active",
+    "model": "claude-opus-4-6",
     "runnerId": null,
     "createdAt": "2025-06-15T10:30:00.000Z",
     "lastActiveAt": "2025-06-15T10:30:00.000Z"
@@ -113,6 +117,7 @@ Returns all sessions for the authenticated tenant. Optionally filter by agent na
       "agentName": "qa-bot",
       "sandboxId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
       "status": "active",
+      "model": "claude-opus-4-6",
       "runnerId": null,
       "createdAt": "2025-06-15T10:30:00.000Z",
       "lastActiveAt": "2025-06-15T10:35:00.000Z"
@@ -123,6 +128,7 @@ Returns all sessions for the authenticated tenant. Optionally filter by agent na
       "agentName": "code-reviewer",
       "sandboxId": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
       "status": "paused",
+      "model": null,
       "runnerId": null,
       "createdAt": "2025-06-15T09:00:00.000Z",
       "lastActiveAt": "2025-06-15T09:15:00.000Z"
@@ -165,6 +171,7 @@ Returns a single session by ID.
     "agentName": "qa-bot",
     "sandboxId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "status": "active",
+    "model": "claude-opus-4-6",
     "runnerId": null,
     "createdAt": "2025-06-15T10:30:00.000Z",
     "lastActiveAt": "2025-06-15T10:35:00.000Z"
@@ -210,6 +217,7 @@ No request body.
     "agentName": "qa-bot",
     "sandboxId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "status": "paused",
+    "model": "claude-opus-4-6",
     "runnerId": null,
     "createdAt": "2025-06-15T10:30:00.000Z",
     "lastActiveAt": "2025-06-15T10:35:00.000Z"
@@ -268,6 +276,7 @@ No request body.
     "agentName": "qa-bot",
     "sandboxId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "status": "active",
+    "model": "claude-opus-4-6",
     "runnerId": null,
     "createdAt": "2025-06-15T10:30:00.000Z",
     "lastActiveAt": "2025-06-15T10:35:00.000Z"
@@ -323,6 +332,7 @@ No request body.
     "agentName": "qa-bot",
     "sandboxId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "status": "ended",
+    "model": "claude-opus-4-6",
     "runnerId": null,
     "createdAt": "2025-06-15T10:30:00.000Z",
     "lastActiveAt": "2025-06-15T10:35:00.000Z"

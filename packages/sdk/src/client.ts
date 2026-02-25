@@ -1,6 +1,8 @@
 import type {
   Agent,
+  AgentUpdate,
   Session,
+  SessionStatus,
   Message,
   SessionEvent,
   SessionEventType,
@@ -11,18 +13,26 @@ import type {
   QueueItem,
   QueueItemStatus,
   QueueStats,
+  ProjectFile,
+  UploadFileInput,
   ListAgentsResponse,
   ListSessionsResponse,
+  ListSessionsWithTotalResponse,
+  ListSessionsOptions,
   ListMessagesResponse,
   ListSessionEventsResponse,
   ListCredentialsResponse,
   ListAttachmentsResponse,
   ListUsageResponse,
   ListQueueResponse,
+  ListProjectFilesResponse,
+  ListSessionLogsResponse,
   HealthResponse,
   AshStreamEvent,
   ListFilesResponse,
   GetFileResponse,
+  ListAgentFilesResponse,
+  GetAgentFileResponse,
 } from '@ash-ai/shared';
 import { parseSSEStream } from './sse.js';
 
@@ -92,6 +102,22 @@ export class AshClient {
     await this.request('DELETE', `/api/agents/${name}`);
   }
 
+  /** Update an existing agent's metadata. */
+  async updateAgent(name: string, updates: AgentUpdate): Promise<Agent> {
+    const res = await this.request<{ agent: Agent }>('PATCH', `/api/agents/${name}`, updates);
+    return res.agent;
+  }
+
+  /** List files in the agent's source directory. */
+  async listAgentFiles(name: string): Promise<ListAgentFilesResponse> {
+    return this.request<ListAgentFilesResponse>('GET', `/api/agents/${encodeURIComponent(name)}/files`);
+  }
+
+  /** Read a single file from the agent's source directory as JSON (UTF-8, 1 MB limit). */
+  async getAgentFile(name: string, path: string): Promise<GetAgentFileResponse> {
+    return this.request<GetAgentFileResponse>('GET', `/api/agents/${encodeURIComponent(name)}/files/${path}?format=json`);
+  }
+
   // -- Sessions ---------------------------------------------------------------
 
   async createSession(agent: string, opts?: { credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string }): Promise<Session> {
@@ -103,10 +129,30 @@ export class AshClient {
     return res.session;
   }
 
-  async listSessions(agent?: string): Promise<Session[]> {
-    const path = agent ? `/api/sessions?agent=${encodeURIComponent(agent)}` : '/api/sessions';
+  async listSessions(agentOrOpts?: string | ListSessionsOptions): Promise<Session[]> {
+    const opts: ListSessionsOptions = typeof agentOrOpts === 'string' ? { agent: agentOrOpts } : (agentOrOpts ?? {});
+    const params = new URLSearchParams();
+    if (opts.agent) params.set('agent', opts.agent);
+    if (opts.status) params.set('status', opts.status);
+    if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.offset) params.set('offset', String(opts.offset));
+    const qs = params.toString();
+    const path = `/api/sessions${qs ? `?${qs}` : ''}`;
     const res = await this.request<ListSessionsResponse>('GET', path);
     return res.sessions;
+  }
+
+  /** List sessions with total count for pagination. */
+  async listSessionsWithTotal(opts?: ListSessionsOptions): Promise<ListSessionsWithTotalResponse> {
+    const params = new URLSearchParams();
+    if (opts?.agent) params.set('agent', opts.agent);
+    if (opts?.status) params.set('status', opts.status);
+    if (opts?.limit) params.set('limit', String(opts.limit));
+    if (opts?.offset) params.set('offset', String(opts.offset));
+    params.set('includeTotal', 'true');
+    const qs = params.toString();
+    const path = `/api/sessions?${qs}`;
+    return this.request<ListSessionsWithTotalResponse>('GET', path);
   }
 
   async getSession(id: string): Promise<Session> {
@@ -203,6 +249,17 @@ export class AshClient {
     return res.events;
   }
 
+  // -- Session Logs ------------------------------------------------------------
+
+  /** Get sandbox logs for a session. Pass `after` to get only logs after that index. */
+  async getSessionLogs(sessionId: string, opts?: { after?: number }): Promise<ListSessionLogsResponse> {
+    const params = new URLSearchParams();
+    if (opts?.after != null) params.set('after', String(opts.after));
+    const qs = params.toString();
+    const path = `/api/sessions/${sessionId}/logs${qs ? `?${qs}` : ''}`;
+    return this.request<ListSessionLogsResponse>('GET', path);
+  }
+
   // -- Files ------------------------------------------------------------------
 
   /** List files in the session's workspace. Works on active, paused, and ended sessions. */
@@ -229,6 +286,18 @@ export class AshClient {
       mimeType: res.headers.get('Content-Type') || 'application/octet-stream',
       source: res.headers.get('X-Ash-Source') || 'unknown',
     };
+  }
+
+  /** Download a session file as a raw Response for streaming/proxying. */
+  async downloadSessionFileRaw(sessionId: string, path: string): Promise<Response> {
+    const res = await fetch(`${this.serverUrl}/api/sessions/${sessionId}/files/${path}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
+      throw new Error(err.error);
+    }
+    return res;
   }
 
   // -- Credentials ------------------------------------------------------------
@@ -357,6 +426,31 @@ export class AshClient {
     const qs = params.toString();
     const res = await this.request<{ stats: UsageStats }>('GET', `/api/usage/stats${qs ? `?${qs}` : ''}`);
     return res.stats;
+  }
+
+  // -- Project Files -----------------------------------------------------------
+
+  /** List uploaded project files. */
+  async listFiles(): Promise<ProjectFile[]> {
+    const res = await this.request<ListProjectFilesResponse>('GET', '/api/files');
+    return res.files;
+  }
+
+  /** Upload a new project file (base64-encoded content). */
+  async uploadFile(input: UploadFileInput): Promise<ProjectFile> {
+    const res = await this.request<{ file: ProjectFile }>('POST', '/api/files', input);
+    return res.file;
+  }
+
+  /** Get a signed download URL for a project file. */
+  async getFileUrl(fileId: string): Promise<string> {
+    const res = await this.request<{ url: string }>('GET', `/api/files/${fileId}/url`);
+    return res.url;
+  }
+
+  /** Delete a project file. */
+  async deleteFile(fileId: string): Promise<void> {
+    await this.request('DELETE', `/api/files/${fileId}`);
   }
 
   // -- Health -----------------------------------------------------------------

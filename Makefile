@@ -1,10 +1,12 @@
 .PHONY: install build clean test test-integration test-cli test-restore typecheck bench bench-sandbox bench-sandbox-crdb bench-all \
-       link \
+       link build-standalone \
        server qa-bot deploy-qa-bot \
        dev dev-no-sandbox kill logs \
        docker-build docker-start docker-stop docker-status docker-logs \
-       ec2-deploy ec2-teardown ec2-smoke-test \
-       gce-deploy gce-teardown gce-smoke-test \
+       smoke smoke-dev \
+       ec2-deploy ec2-teardown smoke-ec2 \
+       ec2-deploy-distributed ec2-teardown-distributed smoke-distributed \
+       gce-deploy gce-teardown smoke-gce \
        changeset changeset-status version-packages publish publish-dry-run \
        openapi sdk-python
 
@@ -19,6 +21,10 @@ build:
 # Build and link the CLI globally so `ash-dev` runs from source
 link: build
 	cd packages/cli && pnpm link --global
+
+# Build standalone binaries (requires bun)
+build-standalone: build
+	./scripts/build-standalone.sh
 
 clean:
 	pnpm clean
@@ -126,33 +132,53 @@ docker-status:
 docker-logs:
 	npx tsx packages/cli/src/index.ts logs
 
-# -- EC2 Deployment -----------------------------------------------------------
+# -- Smoketest ----------------------------------------------------------------
+
+# Run sandbox isolation smoke test (uses released `ash` CLI)
+smoke:
+	./scripts/smoketest-sandbox.sh
+
+# Run sandbox isolation smoke test with local dev image (uses `ash-dev` CLI)
+smoke-dev: build docker-build
+	./scripts/smoketest-sandbox.sh --dev
+
+# -- Cloud Deployment (example scripts) ---------------------------------------
 
 # Deploy Ash server to EC2 (requires .env with AWS credentials)
 ec2-deploy:
-	./scripts/deploy-ec2.sh
+	./examples/deploy/ec2/deploy.sh
 
 # Tear down EC2 instance
 ec2-teardown:
-	./scripts/teardown-ec2.sh
+	./examples/deploy/ec2/teardown.sh
 
 # Run smoke test against deployed EC2 instance
-ec2-smoke-test:
-	./scripts/smoke-test-ec2.sh
+smoke-ec2:
+	./examples/deploy/smoke-test.sh
 
-# -- GCE Deployment -----------------------------------------------------------
+# Deploy Ash in distributed mode (coordinator + runner on separate EC2 instances)
+ec2-deploy-distributed:
+	./examples/deploy/ec2-distributed/deploy.sh
+
+# Tear down distributed EC2 instances
+ec2-teardown-distributed:
+	./examples/deploy/ec2-distributed/teardown.sh
+
+# Run smoke test against distributed EC2 deployment
+smoke-distributed:
+	./examples/deploy/ec2-distributed/smoke-test.sh
 
 # Deploy Ash server to GCE (requires gcloud CLI authenticated)
 gce-deploy:
-	./scripts/deploy-gce.sh
+	./examples/deploy/gce/deploy.sh
 
 # Tear down GCE instance
 gce-teardown:
-	./scripts/teardown-gce.sh
+	./examples/deploy/gce/teardown.sh
 
 # Run smoke test against deployed GCE instance
-gce-smoke-test:
-	./scripts/smoke-test-ec2.sh
+smoke-gce:
+	./examples/deploy/smoke-test.sh
 
 # -- OpenAPI / SDK generation --------------------------------------------------
 

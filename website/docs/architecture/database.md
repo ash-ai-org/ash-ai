@@ -44,7 +44,7 @@ interface Db {
   deleteAgent(name, tenantId?): Promise<boolean>;
 
   // Sessions
-  insertSession(id, agentName, sandboxId, tenantId?): Promise<Session>;
+  insertSession(id, agentName, sandboxId, tenantId?, runnerId?, model?): Promise<Session>;
   updateSessionStatus(id, status): Promise<void>;
   getSession(id): Promise<Session | null>;
   listSessions(tenantId?, agent?): Promise<Session[]>;
@@ -127,6 +127,7 @@ CREATE TABLE sessions (
   sandbox_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'starting',
   runner_id TEXT,
+  model TEXT,
   created_at TEXT NOT NULL,
   last_active_at TEXT NOT NULL
 );

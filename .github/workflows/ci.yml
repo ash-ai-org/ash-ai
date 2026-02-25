@@ -26,3 +26,26 @@ jobs:
       - run: pnpm typecheck
 
       - run: pnpm test
+
+  python-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install openapi-python-client==0.28.2 ruff==0.11.13
+          pip install -e packages/sdk-python[dev]
+
+      - name: Verify generated SDK is up-to-date
+        run: |
+          cd packages/sdk-python
+          bash generate.sh
+          git diff --exit-code ash_sdk/ || (echo "ERROR: Generated SDK is out of date. Run 'bash generate.sh' and commit." && exit 1)
+
+      - name: Run tests
+        run: pytest packages/sdk-python/tests/ -v

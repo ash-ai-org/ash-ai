@@ -3,7 +3,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { join, resolve } from 'node:path';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
-import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner } from './db/index.js';
+import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner, listAgents } from './db/index.js';
 import { QueueProcessor } from './queue/processor.js';
 import { randomUUID } from 'node:crypto';
 import { SandboxManager, SandboxPool, persistSessionState, syncStateToCloud } from '@ash-ai/sandbox';
@@ -96,6 +96,20 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
     await pool.init();
     pool.startIdleSweep();
 
+    // Pre-warm sandboxes for agents that request it (fire-and-forget, doesn't block startup)
+    listAgents().then(async (agents) => {
+      for (const agent of agents) {
+        const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;
+        if (typeof preWarmCount === 'number' && preWarmCount > 0 && agent.path) {
+          await pool!.warmUp(agent.name, agent.path, preWarmCount, {
+            startupScript: (agent.config as Record<string, unknown> | undefined)?.startupScript as string | undefined,
+          });
+        }
+      }
+    }).catch((err) => {
+      console.error('[server] Pre-warm failed:', err);
+    });
+
     const localBackend = new LocalRunnerBackend(pool, dataDir);
     coordinator = new RunnerCoordinator({ localBackend });
   } else {
@@ -133,7 +147,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   registerAuth(app, opts.apiKey, db);
 
   // Routes
-  agentRoutes(app, dataDir);
+  agentRoutes(app, dataDir, pool);
   sessionRoutes(app, coordinator, dataDir, telemetry);
   fileRoutes(app, coordinator, dataDir);
   credentialRoutes(app);

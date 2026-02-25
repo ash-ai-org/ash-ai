@@ -1,5 +1,19 @@
 # @ash-ai/sandbox
 
+## 0.0.6 - 2026-02-24
+
+### Added
+
+- Sandbox pool state machine: warming, warm, waiting, running lifecycle
+- Session-to-sandbox indexing for fast lookup
+- Idle timeout cleanup for unused sandboxes
+- Disk monitoring and OOM detection
+- `SandboxDb` persistence abstraction: insertSandbox, updateState, getIdleSandboxes, eviction
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.6
+
 ## 0.0.5 - 2026-02-23
 
 ### Changed

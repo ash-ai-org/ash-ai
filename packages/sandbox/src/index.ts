@@ -1,5 +1,5 @@
 export { SandboxManager } from './manager.js';
-export type { ManagedSandbox, CreateSandboxOpts } from './manager.js';
+export type { ManagedSandbox, CreateSandboxOpts, LogEntry } from './manager.js';
 export { SandboxPool } from './pool.js';
 export type { PoolEntry, SandboxPoolOpts, LiveSandboxState, SandboxDb } from './pool.js';
 export { BridgeClient } from './bridge-client.js';

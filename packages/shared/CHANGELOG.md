@@ -1,5 +1,19 @@
 # @ash-ai/shared
 
+## 0.0.6 - 2026-02-24
+
+### Added
+
+- `Agent` type with full CRUD fields: slug, description, model, backend, systemPrompt, status, config
+- `AgentUpdate` type for partial agent updates
+- `SandboxState` enum: cold, warming, warm, waiting, running
+- `SandboxRecord` and `SandboxInfo` types for persistent sandbox tracking
+- `RunnerRecord` type for multi-machine runner registration
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.5 - 2026-02-23
 
 ### Added

@@ -16,7 +16,7 @@ services:
     restart: on-failure  # retry until crdb is ready
 
   ash:
-    image: ghcr.io/ash-ai/ash:0.1.0
+    image: ghcr.io/ash-ai-org/ash:latest
     ports:
       - "4100:4100"
     volumes:

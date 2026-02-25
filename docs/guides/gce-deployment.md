@@ -21,10 +21,10 @@ cp .env.example .env
 # Edit .env — fill in ANTHROPIC_API_KEY and GCP_PROJECT_ID
 
 # 3. Deploy to GCE
-./scripts/deploy-gce.sh
+./examples/deploy/gce/deploy.sh
 
 # 4. Run the smoke test
-./scripts/smoke-test-ec2.sh http://<your-gce-ip>:4100
+./examples/deploy/smoke-test.sh http://<your-gce-ip>:4100
 
 # 5. Run the benchmark
 npx tsx test/bench/remote-latency.ts --url http://<your-gce-ip>:4100
@@ -34,7 +34,7 @@ ASH_SERVER_URL=http://<your-gce-ip>:4100 pnpm --filter qa-bot dev
 # Open http://localhost:3100
 
 # 7. When done, tear down
-./scripts/teardown-gce.sh
+./examples/deploy/gce/teardown.sh
 ```
 
 ## Configuration
@@ -152,7 +152,7 @@ With AWS, you need to manage IAM access keys (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_A
 
 ## What the Deploy Script Does
 
-`scripts/deploy-gce.sh` automates the full deployment:
+`examples/deploy/gce/deploy.sh` automates the full deployment:
 
 1. **Creates a firewall rule** (if not exists) allowing TCP port 4100 tagged `ash-server`
 2. **Launches an `e2-standard-2` VM** with Ubuntu 22.04 LTS and a startup script that installs Docker, Node.js 20, and pnpm
@@ -296,12 +296,12 @@ Either a previous deployment is still running, or a failed deploy left a stale s
 gcloud compute instances describe ash-server --zone=us-east1-b 2>&1
 ```
 
-If it exists, tear it down first: `./scripts/teardown-gce.sh`. If it doesn't exist, delete the stale state file: `rm .gce-instance`.
+If it exists, tear it down first: `./examples/deploy/gce/teardown.sh`. If it doesn't exist, delete the stale state file: `rm .gce-instance`.
 
 ## Tearing Down
 
 ```bash
-./scripts/teardown-gce.sh
+./examples/deploy/gce/teardown.sh
 ```
 
 This deletes the VM instance and the `allow-ash-api` firewall rule. The `.gce-instance` state file is removed.
@@ -313,7 +313,7 @@ This deletes the VM instance and the `allow-ash-api` firewall rule. The `.gce-in
 | `e2-standard-2` (2 vCPU, 8GB) | ~$0.067/hour (~$49/month) |
 | 30 GB SSD persistent disk | ~$5.10/month |
 
-Remember to run `./scripts/teardown-gce.sh` when you're done to avoid ongoing charges.
+Remember to run `./examples/deploy/gce/teardown.sh` when you're done to avoid ongoing charges.
 
 ## EC2 vs GCE Comparison
 
@@ -324,4 +324,4 @@ Remember to run `./scripts/teardown-gce.sh` when you're done to avoid ongoing ch
 | Firewall | Security Groups | Firewall Rules + network tags |
 | Default type | `t3.large` (2 vCPU, 8GB) | `e2-standard-2` (2 vCPU, 8GB) |
 | Cost/hour | ~$0.083 | ~$0.067 |
-| Deploy script | `scripts/deploy-ec2.sh` | `scripts/deploy-gce.sh` |
+| Deploy script | `examples/deploy/ec2/deploy.sh` | `examples/deploy/gce/deploy.sh` |
