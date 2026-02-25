@@ -33,6 +33,9 @@ import type {
   GetFileResponse,
   ListAgentFilesResponse,
   GetAgentFileResponse,
+  WriteFileInput,
+  WriteSessionFilesResponse,
+  DeleteSessionFileResponse,
 } from '@ash-ai/shared';
 import { parseSSEStream } from './sse.js';
 
@@ -303,6 +306,25 @@ export class AshClient {
       throw new Error(err.error);
     }
     return res;
+  }
+
+  /**
+   * Write one or more files to the session's workspace.
+   * File content must be base64-encoded.
+   */
+  async writeSessionFiles(
+    sessionId: string,
+    files: WriteFileInput[],
+    targetPath?: string,
+  ): Promise<WriteSessionFilesResponse> {
+    const body: Record<string, unknown> = { files };
+    if (targetPath) body.targetPath = targetPath;
+    return this.request<WriteSessionFilesResponse>('POST', `/api/sessions/${sessionId}/files`, body);
+  }
+
+  /** Delete a file from the session's workspace. */
+  async deleteSessionFile(sessionId: string, path: string): Promise<DeleteSessionFileResponse> {
+    return this.request<DeleteSessionFileResponse>('DELETE', `/api/sessions/${sessionId}/files/${path}`);
   }
 
   // -- Credentials ------------------------------------------------------------

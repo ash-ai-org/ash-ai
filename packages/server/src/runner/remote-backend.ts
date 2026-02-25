@@ -82,6 +82,18 @@ export class RemoteRunnerBackend implements RunnerBackend {
     // Remote runners track their own metrics — no-op here
   }
 
+  recordColdLocalHit(): void {
+    // Remote runners track their own metrics — no-op here
+  }
+
+  recordColdCloudHit(): void {
+    // Remote runners track their own metrics — no-op here
+  }
+
+  recordColdFreshHit(): void {
+    // Remote runners track their own metrics — no-op here
+  }
+
   persistState(sandboxId: string, sessionId: string, agentName: string): boolean {
     // Fire-and-forget to runner. Returns true optimistically.
     this.client.persistState(sandboxId, sessionId, agentName).catch(() => {});

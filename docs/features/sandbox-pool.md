@@ -47,12 +47,31 @@ When capacity is reached, the pool evicts in priority order:
 3. **Waiting eviction**: Call `onBeforeEvict` (persists state, pauses session), kill process, mark DB row cold.
 4. **Running**: Never evicted. If all sandboxes are running, returns 503.
 
+## Cold Cleanup
+
+*Added: 2026-02-25*
+
+A separate periodic timer (every 5 minutes) removes cold sandbox entries that haven't been used in 2 hours. This prevents unbounded disk growth from accumulated cold entries after idle sweep eviction or server restarts.
+
+Cold cleanup deletes:
+- The live workspace directory (`data/sandboxes/<id>/`)
+- The local snapshot directory (`data/sessions/<sessionId>/workspace/`)
+- The database record
+
+**Cloud snapshots are preserved** — sessions can still be resumed from cloud storage after local cleanup.
+
+```
+pool.startColdCleanup();  // Start periodic timer
+pool.stopColdCleanup();   // Stop timer (graceful shutdown)
+```
+
 ## Configuration
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `ASH_MAX_SANDBOXES` | 1000 | Maximum total sandboxes (live + cold) |
 | `ASH_IDLE_TIMEOUT_MS` | 1800000 (30 min) | Waiting sandboxes idle longer than this are swept to cold |
+| `COLD_CLEANUP_TTL_MS` | 7200000 (2 hr) | How long a cold sandbox sits before local files are cleaned up |
 
 ## Database Schema
 
@@ -90,10 +109,29 @@ sessions.ts  -->  SandboxPool  -->  SandboxManager  -->  bridge process
 
 The pool is the only consumer of `SandboxManager` in production. Routes interact with the pool, not the manager directly.
 
+## Pool Stats
+
+The pool exposes statistics for the health endpoint and Prometheus metrics:
+
+```typescript
+const stats = pool.stats;
+// {
+//   total, cold, warming, warm, waiting, running,
+//   maxCapacity,
+//   resumeWarmHits,        // Warm resume (sandbox alive)
+//   resumeColdHits,        // Cold resume total
+//   resumeColdLocalHits,   // Cold resume from local disk
+//   resumeColdCloudHits,   // Cold resume from cloud (S3/GCS)
+//   resumeColdFreshHits,   // Cold resume with no state
+//   preWarmHits,           // Sessions that claimed a pre-warmed sandbox
+// }
+```
+
+The cold resume source counters break down where the workspace came from during a cold resume. See [metrics.md](./metrics.md) for the full Prometheus metrics and log line format.
+
 ## Known Limitations
 
 - No pre-warming (warm state exists but unused proactively)
 - No per-agent capacity limits
-- No Prometheus metrics export
 - No workspace size tracking per sandbox
 - Cold sandbox resume requires re-spawning the full process (no process hibernation)

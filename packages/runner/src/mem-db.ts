@@ -72,6 +72,16 @@ export class InMemorySandboxDb implements SandboxDb {
     return result.sort((a, b) => a.lastUsedAt.localeCompare(b.lastUsedAt));
   }
 
+  async getColdSandboxes(olderThan: string): Promise<SandboxRecord[]> {
+    const result: SandboxRecord[] = [];
+    for (const record of this.sandboxes.values()) {
+      if (record.state === 'cold' && record.lastUsedAt < olderThan) {
+        result.push(record);
+      }
+    }
+    return result.sort((a, b) => a.lastUsedAt.localeCompare(b.lastUsedAt));
+  }
+
   async deleteSandbox(id: string): Promise<void> {
     this.sandboxes.delete(id);
   }

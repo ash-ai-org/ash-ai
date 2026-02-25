@@ -43,6 +43,7 @@ Content-Type: text/plain; version=0.0.4; charset=utf-8
 | `ash_pool_sandboxes` | gauge | `state` | Sandbox count by state (`cold`, `warming`, `warm`, `waiting`, `running`) |
 | `ash_pool_max_capacity` | gauge | — | Maximum sandbox limit |
 | `ash_resume_total` | counter | `path` | Total resumes: `warm` (sandbox alive) or `cold` (new sandbox spawned) |
+| `ash_resume_cold_total` | counter | `source` | Cold resume workspace source: `local` (disk), `cloud` (S3/GCS), `fresh` (no state) |
 
 ### Prometheus Configuration
 
@@ -70,6 +71,15 @@ ash_pool_sandboxes{state="running"} / ash_pool_max_capacity
 
 # Alert: cold resumes spiking (possible sandbox instability)
 rate(ash_resume_total{path="cold"}[5m]) > 0.1
+
+# Cold resume source breakdown
+rate(ash_resume_cold_total{source="local"}[5m])   # From local disk
+rate(ash_resume_cold_total{source="cloud"}[5m])    # From S3/GCS
+rate(ash_resume_cold_total{source="fresh"}[5m])    # No backup (state loss)
+
+# Ratio of cold resumes that found a backup vs started fresh
+(ash_resume_cold_total{source="local"} + ash_resume_cold_total{source="cloud"})
+  / ash_resume_cold_total
 ```
 
 ## Structured Log Lines
@@ -78,7 +88,8 @@ Every session resume emits a JSON line to stderr, always on (not gated by `ASH_D
 
 ```json
 {"type":"resume_hit","path":"warm","sessionId":"abc-123","agentName":"qa-bot","ts":"2026-02-18T20:15:30.000Z"}
-{"type":"resume_hit","path":"cold","sessionId":"def-456","agentName":"qa-bot","ts":"2026-02-18T20:16:45.000Z"}
+{"type":"resume_hit","path":"cold","source":"local","sessionId":"def-456","agentName":"qa-bot","ts":"2026-02-18T20:16:45.000Z"}
+{"type":"resume_hit","path":"cold","source":"cloud","sessionId":"ghi-789","agentName":"qa-bot","ts":"2026-02-18T20:17:00.000Z"}
 ```
 
 ### Fields
@@ -87,6 +98,7 @@ Every session resume emits a JSON line to stderr, always on (not gated by `ASH_D
 |-------|------|-------------|
 | `type` | `"resume_hit"` | Event discriminator |
 | `path` | `"warm"` \| `"cold"` | Which resume path was taken |
+| `source` | `"local"` \| `"cloud"` \| `"fresh"` | Where the workspace came from (cold path only) |
 | `sessionId` | UUID | Session that was resumed |
 | `agentName` | string | Agent the session belongs to |
 | `ts` | ISO 8601 | When the resume happened |
@@ -138,10 +150,16 @@ The `/health` endpoint also includes the resume counters in its response:
     "running": 1,
     "maxCapacity": 1000,
     "resumeWarmHits": 42,
-    "resumeColdHits": 7
+    "resumeColdHits": 7,
+    "resumeColdLocalHits": 4,
+    "resumeColdCloudHits": 2,
+    "resumeColdFreshHits": 1,
+    "preWarmHits": 3
   }
 }
 ```
+
+The cold resume source counters (`resumeColdLocalHits`, `resumeColdCloudHits`, `resumeColdFreshHits`) break down where the workspace came from during cold resumes. Their sum equals `resumeColdHits`.
 
 These are monotonic in-memory counters that reset on server restart. For persistent history, use the log lines or Prometheus with persistent storage.
 

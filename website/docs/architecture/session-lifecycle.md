@@ -85,12 +85,19 @@ If the original sandbox process is still alive (the session was paused but not e
 
 If the sandbox was evicted or crashed, a new sandbox is created:
 
-1. Check for workspace on local disk (`data/sandboxes/<id>/workspace/`)
-2. If not found, check for persisted snapshot (`data/sessions/<id>/workspace/`)
-3. If not found, try restoring from cloud storage (`ASH_SNAPSHOT_URL`)
-4. Create a new sandbox, reusing the restored workspace if available
-5. Update session with new sandbox ID and runner ID
+1. Check for workspace on local disk (`data/sandboxes/<id>/workspace/`) → **source: local**
+2. If not found, check for persisted snapshot (`data/sessions/<id>/workspace/`) → **source: local**
+3. If not found, try restoring from cloud storage (`ASH_SNAPSHOT_URL`) → **source: cloud**
+4. If no backup exists, create from fresh agent definition → **source: fresh**
+5. Create a new sandbox, reusing the restored workspace if available
+6. Update session with new sandbox ID and runner ID
+
+The resume source is tracked in metrics (`ash_resume_cold_total{source="..."}`) so you can monitor how often each path is hit. See [State Persistence & Restore](./state-persistence.md) for the full storage architecture.
 
 ## Cloud Persistence
 
 When `ASH_SNAPSHOT_URL` is set to an S3 or GCS URL, workspace snapshots are automatically synced to cloud storage after each completed agent turn and before eviction. This enables resume across server restarts and machine migrations.
+
+## Cold Cleanup
+
+Cold sandbox entries (no live process) are automatically cleaned up after 2 hours of inactivity. Local workspace files and database records are deleted, but **cloud snapshots are preserved** — so sessions can still be resumed from cloud storage after local cleanup. See [Sandbox Pool](./sandbox-pool.md#cold-cleanup) for details.

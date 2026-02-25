@@ -46,6 +46,7 @@ const pool = new SandboxPool({
 });
 await pool.init();
 pool.startIdleSweep();
+pool.startColdCleanup();
 
 const app = Fastify({ logger: true });
 
@@ -59,6 +60,7 @@ async function shutdown() {
   app.log.info('Runner shutting down...');
   await stopRegistration();
   pool.stopIdleSweep();
+  pool.stopColdCleanup();
   await pool.destroyAll();
   await app.close();
   process.exit(0);

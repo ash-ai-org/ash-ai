@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import { readdirSync, statSync, readFileSync, existsSync, createReadStream } from 'node:fs';
-import { join, relative, basename, extname } from 'node:path';
+import { readdirSync, statSync, readFileSync, existsSync, createReadStream, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { join, relative, basename, extname, dirname, resolve, normalize } from 'node:path';
 import { getSession } from '../db/index.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
-import type { FileEntry } from '@ash-ai/shared';
+import type { FileEntry, WriteFileInput, WriteFileResult } from '@ash-ai/shared';
 
 // Always skip — these are large/noisy and never useful to browse
 const ALWAYS_SKIP = new Set([
@@ -22,6 +22,15 @@ const MAX_JSON_FILE_SIZE = 1_048_576;
 
 // Max file size for raw streaming (100 MB) — prevent abuse
 const MAX_RAW_FILE_SIZE = 104_857_600;
+
+// Max decoded size for a single file write (50 MB)
+const MAX_WRITE_FILE_SIZE = 52_428_800;
+
+// Max total decoded size per batch write request (100 MB)
+const MAX_WRITE_BATCH_SIZE = 104_857_600;
+
+// Max files per batch write
+const MAX_WRITE_BATCH_FILES = 500;
 
 /** Simple extension → MIME type map. No external dependency needed. */
 const MIME_TYPES: Record<string, string> = {
@@ -299,5 +308,160 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
 
     const stream = createReadStream(fullPath);
     return reply.send(stream);
+  });
+
+  // Write files to session workspace (batch)
+  app.post<{ Params: { id: string }; Body: { files: WriteFileInput[]; targetPath?: string } }>('/api/sessions/:id/files', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      body: {
+        type: 'object',
+        properties: {
+          files: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                path: { type: 'string' },
+                content: { type: 'string' },
+                mimeType: { type: 'string' },
+              },
+              required: ['path', 'content'],
+            },
+            minItems: 1,
+            maxItems: MAX_WRITE_BATCH_FILES,
+          },
+          targetPath: { type: 'string', default: '.' },
+        },
+        required: ['files'],
+      },
+    },
+    // Increase body limit for large file uploads (base64 expands ~33%)
+    bodyLimit: MAX_WRITE_BATCH_SIZE * 2,
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+
+    const workspace = await resolveWorkspace(coordinator, dataDir, session);
+    if (!workspace) {
+      return reply.status(404).send({ error: 'No workspace available for this session', statusCode: 404 });
+    }
+
+    const { files, targetPath = '.' } = req.body;
+    const results: WriteFileResult[] = [];
+    let totalSize = 0;
+
+    for (const file of files) {
+      const relPath = targetPath === '.' ? file.path : join(targetPath, file.path);
+
+      // Path traversal protection
+      if (relPath.includes('..') || relPath.startsWith('/')) {
+        results.push({ path: file.path, written: false, error: 'Invalid file path' });
+        continue;
+      }
+
+      const fullPath = join(workspace.dir, relPath);
+      const resolved = resolve(fullPath);
+
+      // Belt and suspenders: ensure resolved path is within workspace
+      if (!resolved.startsWith(resolve(workspace.dir))) {
+        results.push({ path: file.path, written: false, error: 'Invalid file path' });
+        continue;
+      }
+
+      try {
+        const decoded = Buffer.from(file.content, 'base64');
+
+        if (decoded.length > MAX_WRITE_FILE_SIZE) {
+          results.push({ path: file.path, written: false, error: `File too large (${decoded.length} bytes, max ${MAX_WRITE_FILE_SIZE})` });
+          continue;
+        }
+
+        totalSize += decoded.length;
+        if (totalSize > MAX_WRITE_BATCH_SIZE) {
+          results.push({ path: file.path, written: false, error: 'Batch size limit exceeded' });
+          continue;
+        }
+
+        // Ensure parent directory exists
+        mkdirSync(dirname(fullPath), { recursive: true });
+        writeFileSync(fullPath, decoded);
+
+        const st = statSync(fullPath);
+        results.push({ path: file.path, written: true, size: st.size });
+      } catch (err) {
+        results.push({
+          path: file.path,
+          written: false,
+          error: err instanceof Error ? err.message : 'Write failed',
+        });
+      }
+    }
+
+    return reply.send({ files: results });
+  });
+
+  // Delete a file from session workspace
+  app.delete<{ Params: { id: string; '*': string } }>('/api/sessions/:id/files/*', {
+    schema: {
+      tags: ['sessions'],
+      params: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          '*': { type: 'string' },
+        },
+        required: ['id', '*'],
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+
+    const filePath = req.params['*'];
+    if (!filePath) {
+      return reply.status(400).send({ error: 'File path required', statusCode: 400 });
+    }
+
+    // Path traversal protection
+    if (filePath.includes('..') || filePath.startsWith('/')) {
+      return reply.status(400).send({ error: 'Invalid file path', statusCode: 400 });
+    }
+
+    const workspace = await resolveWorkspace(coordinator, dataDir, session);
+    if (!workspace) {
+      return reply.status(404).send({ error: 'No workspace available for this session', statusCode: 404 });
+    }
+
+    const fullPath = join(workspace.dir, filePath);
+    const resolved = resolve(fullPath);
+
+    if (!resolved.startsWith(resolve(workspace.dir))) {
+      return reply.status(400).send({ error: 'Invalid file path', statusCode: 400 });
+    }
+
+    try {
+      if (!existsSync(fullPath)) {
+        return reply.status(404).send({ error: 'File not found', statusCode: 404 });
+      }
+
+      const st = statSync(fullPath);
+      if (!st.isFile()) {
+        return reply.status(400).send({ error: 'Path is not a file', statusCode: 400 });
+      }
+
+      unlinkSync(fullPath);
+      return reply.send({ path: filePath, deleted: true });
+    } catch (err) {
+      return reply.status(500).send({
+        error: err instanceof Error ? err.message : 'Delete failed',
+        statusCode: 500,
+      });
+    }
   });
 }

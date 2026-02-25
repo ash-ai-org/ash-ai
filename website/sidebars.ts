@@ -54,6 +54,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'self-hosting/docker',
         'self-hosting/ec2',
+        'self-hosting/ecs-fargate',
         'self-hosting/gce',
         'self-hosting/configuration',
         'self-hosting/multi-machine',
@@ -100,6 +101,7 @@ const sidebars: SidebarsConfig = {
         'architecture/bridge-protocol',
         'architecture/session-lifecycle',
         'architecture/sandbox-pool',
+        'architecture/state-persistence',
         'architecture/sse-backpressure',
         'architecture/database',
         'architecture/scaling',

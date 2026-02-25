@@ -59,6 +59,7 @@ describe('SandboxPool', () => {
 
   afterEach(async () => {
     pool?.stopIdleSweep();
+    pool?.stopColdCleanup();
     await closeDb();
     rmSync(dataDir, { recursive: true, force: true });
   });
@@ -431,6 +432,162 @@ describe('SandboxPool', () => {
 
       await pool.destroy('sb-1');
       expect(pool.activeCount).toBe(0);
+    });
+  });
+
+  describe('cold cleanup', () => {
+    it('sweepCold removes stale cold sandboxes from DB', async () => {
+      createPool({ coldCleanupTtlMs: 0 }); // instant TTL for testing
+
+      // Insert cold sandboxes directly in DB
+      await db.insertSandbox('cold-1', 'test-agent', '/tmp/ws1', 'sess-1');
+      await db.updateSandboxState('cold-1', 'cold');
+      await db.insertSandbox('cold-2', 'test-agent', '/tmp/ws2', 'sess-2');
+      await db.updateSandboxState('cold-2', 'cold');
+
+      // Wait a tick so that "now - 0" threshold is strictly after the lastUsedAt timestamps
+      await new Promise((r) => setTimeout(r, 10));
+
+      const cleaned = await pool.sweepCold();
+      expect(cleaned).toBe(2);
+
+      // DB rows should be gone
+      expect(await db.getSandbox('cold-1')).toBeNull();
+      expect(await db.getSandbox('cold-2')).toBeNull();
+    });
+
+    it('sweepCold skips cold sandboxes within TTL', async () => {
+      createPool({ coldCleanupTtlMs: 60 * 60 * 1000 }); // 1 hour
+
+      await db.insertSandbox('cold-1', 'test-agent', '/tmp/ws1');
+      await db.updateSandboxState('cold-1', 'cold');
+
+      const cleaned = await pool.sweepCold();
+      expect(cleaned).toBe(0);
+
+      // DB row should still exist
+      expect(await db.getSandbox('cold-1')).not.toBeNull();
+    });
+
+    it('sweepCold does not touch non-cold sandboxes', async () => {
+      await insertAgent();
+      createPool({ coldCleanupTtlMs: 0 });
+
+      // Create a live (warm) sandbox
+      await pool.create({ agentDir: '/tmp/agent', sessionId: 's1', id: 'sb-1', agentName: 'test-agent' });
+
+      const cleaned = await pool.sweepCold();
+      expect(cleaned).toBe(0);
+      expect(pool.get('sb-1')).toBeDefined();
+    });
+
+    it('startColdCleanup and stopColdCleanup manage the interval', () => {
+      createPool();
+      pool.startColdCleanup();
+      // Should not throw on double start
+      pool.startColdCleanup();
+
+      pool.stopColdCleanup();
+      // Should not throw on double stop
+      pool.stopColdCleanup();
+    });
+  });
+
+  describe('getColdSandboxes', () => {
+    it('returns cold sandboxes older than threshold', async () => {
+      createPool();
+
+      await db.insertSandbox('cold-1', 'test-agent', '/tmp/ws1');
+      await db.updateSandboxState('cold-1', 'cold');
+
+      // Query with a future threshold — should return the sandbox
+      const future = new Date(Date.now() + 60_000).toISOString();
+      const results = await db.getColdSandboxes(future);
+      expect(results.length).toBe(1);
+      expect(results[0].id).toBe('cold-1');
+    });
+
+    it('excludes cold sandboxes newer than threshold', async () => {
+      createPool();
+
+      await db.insertSandbox('cold-1', 'test-agent', '/tmp/ws1');
+      await db.updateSandboxState('cold-1', 'cold');
+
+      // Query with a past threshold — should return nothing
+      const past = new Date(Date.now() - 60_000).toISOString();
+      const results = await db.getColdSandboxes(past);
+      expect(results.length).toBe(0);
+    });
+
+    it('excludes non-cold sandboxes', async () => {
+      createPool();
+
+      await db.insertSandbox('warm-1', 'test-agent', '/tmp/ws1');
+      await db.updateSandboxState('warm-1', 'warm');
+
+      const future = new Date(Date.now() + 60_000).toISOString();
+      const results = await db.getColdSandboxes(future);
+      expect(results.length).toBe(0);
+    });
+  });
+
+  describe('resume source counters', () => {
+    it('recordColdLocalHit increments local and total cold counters', () => {
+      createPool();
+      pool.recordColdLocalHit();
+
+      const s = pool.stats;
+      expect(s.resumeColdLocalHits).toBe(1);
+      expect(s.resumeColdHits).toBe(1);
+      expect(s.resumeColdCloudHits).toBe(0);
+      expect(s.resumeColdFreshHits).toBe(0);
+    });
+
+    it('recordColdCloudHit increments cloud and total cold counters', () => {
+      createPool();
+      pool.recordColdCloudHit();
+
+      const s = pool.stats;
+      expect(s.resumeColdCloudHits).toBe(1);
+      expect(s.resumeColdHits).toBe(1);
+      expect(s.resumeColdLocalHits).toBe(0);
+      expect(s.resumeColdFreshHits).toBe(0);
+    });
+
+    it('recordColdFreshHit increments fresh and total cold counters', () => {
+      createPool();
+      pool.recordColdFreshHit();
+
+      const s = pool.stats;
+      expect(s.resumeColdFreshHits).toBe(1);
+      expect(s.resumeColdHits).toBe(1);
+      expect(s.resumeColdLocalHits).toBe(0);
+      expect(s.resumeColdCloudHits).toBe(0);
+    });
+
+    it('multiple source hits accumulate correctly', () => {
+      createPool();
+      pool.recordColdLocalHit();
+      pool.recordColdLocalHit();
+      pool.recordColdCloudHit();
+      pool.recordColdFreshHit();
+
+      const s = pool.stats;
+      expect(s.resumeColdLocalHits).toBe(2);
+      expect(s.resumeColdCloudHits).toBe(1);
+      expect(s.resumeColdFreshHits).toBe(1);
+      expect(s.resumeColdHits).toBe(4);
+    });
+
+    it('statsAsync includes resume source counters', async () => {
+      createPool();
+      pool.recordColdLocalHit();
+      pool.recordColdCloudHit();
+
+      const s = await pool.statsAsync();
+      expect(s.resumeColdLocalHits).toBe(1);
+      expect(s.resumeColdCloudHits).toBe(1);
+      expect(s.resumeColdFreshHits).toBe(0);
     });
   });
 });
