@@ -11,6 +11,8 @@ import {
   waitForHealthy,
   ensureDataDir,
   ashDataDir,
+  isImageStale,
+  findRepoRoot,
 } from '../docker.js';
 import { isDevMode } from '../index.js';
 import { getCredentials } from './login.js';
@@ -49,6 +51,18 @@ export function startCommand(): Command {
       if (status.running) {
         console.log(`Ash server is already running (container: ${status.containerId}, image: ${status.image})`);
         console.log(`  URL: http://localhost:${port}`);
+
+        // In dev mode, check if image is stale
+        if (isDevMode) {
+          const check = isImageStale();
+          if (check.stale) {
+            console.log('');
+            console.log(`  WARNING: Local source is newer than running image`);
+            console.log(`    Image built: ${check.imageAge}`);
+            console.log(`    Source changed: ${check.sourceAge}`);
+            console.log(`    Run "ash-dev rebuild" to update.`);
+          }
+        }
         return;
       }
 
@@ -97,9 +111,14 @@ export function startCommand(): Command {
 
       // Dev mode: build local Docker image and use it
       if (isDevMode && !opts.image) {
+        const repoRoot = findRepoRoot();
+        if (!repoRoot) {
+          console.error('Cannot find ash repo root. Run from the ash repo or set ASH_REPO_ROOT.');
+          process.exit(1);
+        }
         console.log('Dev mode: building local Docker image (ash-dev)...');
         try {
-          execSync('docker build -t ash-dev .', { stdio: 'inherit' });
+          execSync('docker build -t ash-dev .', { cwd: repoRoot, stdio: 'inherit' });
         } catch {
           console.error('Docker build failed.');
           process.exit(1);

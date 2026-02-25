@@ -70,10 +70,29 @@ export function buildFileTree(files: Array<{ path: string; size: number; modifie
 }
 
 /**
- * Parse content blocks (from Anthropic SDK format) into text + tool calls.
- * Handles both JSON string content and pre-parsed arrays.
+ * Unwrap a message envelope object into content blocks or plain text.
+ * Handles Claude Code conversation formats like:
+ *   { type: "user", content: "hello" }
+ *   { type: "assistant", message: { content: [...blocks] } }
+ *   { type: "result", result: "text" }
  */
-export function parseContentBlocks(content: unknown): { text: string; toolCalls: ToolCall[] } {
+function unwrapMessageObject(obj: Record<string, unknown>): unknown {
+  if (obj.message && typeof obj.message === 'object') {
+    const msg = obj.message as Record<string, unknown>;
+    if (Array.isArray(msg.content)) return msg.content;
+  }
+  if (Array.isArray(obj.content)) return obj.content;
+  if (typeof obj.content === 'string') return obj.content;
+  if (typeof obj.result === 'string') return obj.result;
+  return '';
+}
+
+/**
+ * Parse content blocks (from Anthropic SDK format) into text + tool calls + thinking.
+ * Handles both JSON string content and pre-parsed arrays, as well as
+ * wrapped message envelopes from Claude Code conversations.
+ */
+export function parseContentBlocks(content: unknown): { text: string; toolCalls: ToolCall[]; thinking: string[] } {
   let blocks: unknown[] | null = null;
 
   if (typeof content === 'string') {
@@ -81,20 +100,25 @@ export function parseContentBlocks(content: unknown): { text: string; toolCalls:
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed)) {
         blocks = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        return parseContentBlocks(unwrapMessageObject(parsed));
       }
     } catch {
-      return { text: content, toolCalls: [] };
+      return { text: content, toolCalls: [], thinking: [] };
     }
   } else if (Array.isArray(content)) {
     blocks = content;
+  } else if (content && typeof content === 'object') {
+    return parseContentBlocks(unwrapMessageObject(content as Record<string, unknown>));
   }
 
   if (!blocks) {
-    return { text: typeof content === 'string' ? content : '', toolCalls: [] };
+    return { text: typeof content === 'string' ? content : '', toolCalls: [], thinking: [] };
   }
 
   let text = '';
   const toolCalls: ToolCall[] = [];
+  const thinking: string[] = [];
 
   for (const block of blocks) {
     const b = block as Record<string, unknown>;
@@ -114,10 +138,13 @@ export function parseContentBlocks(content: unknown): { text: string; toolCalls:
         match.isError = (b.is_error as boolean) ?? false;
         match.state = b.is_error ? 'error' : 'completed';
       }
+    } else if (b.type === 'thinking') {
+      const t = (b.thinking as string) || (b.text as string) || '';
+      if (t) thinking.push(t);
     }
   }
 
-  return { text, toolCalls };
+  return { text, toolCalls, thinking };
 }
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico']);

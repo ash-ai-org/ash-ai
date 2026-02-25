@@ -2,7 +2,7 @@ import { cn } from '../utils.js';
 import { formatTime } from '../utils.js';
 import type { ChatMessage as ChatMessageType } from '../types.js';
 import { Bot, User } from '../icons.js';
-import { ToolCallBlock } from './ToolCallBlock.js';
+import { ToolCallBlock, ThinkingBlock } from './ToolCallBlock.js';
 
 export interface ChatMessageProps {
   message: ChatMessageType;
@@ -32,6 +32,10 @@ export function ChatMessage({ message: msg }: ChatMessageProps) {
         'max-w-[75%] rounded-2xl px-4 py-2.5',
         isUser ? 'bg-accent/10 border border-accent/20 text-white' : 'bg-white/5 border border-white/10 text-white/80'
       )}>
+        {/* Thinking */}
+        {msg.thinking && msg.thinking.length > 0 && (
+          <ThinkingBlock thinking={msg.thinking} />
+        )}
         {/* Text content */}
         {msg.content && (
           <div className="whitespace-pre-wrap text-sm leading-relaxed">

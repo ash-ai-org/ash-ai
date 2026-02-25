@@ -5,10 +5,14 @@ import { getSession } from '../db/index.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import type { FileEntry } from '@ash-ai/shared';
 
-// Same skip list as state-persistence.ts — no value showing these to clients
-const SKIP_NAMES = new Set([
-  'node_modules', '.git', '__pycache__', '.cache', '.npm',
-  '.pnpm-store', '.yarn', '.venv', 'venv', '.tmp', 'tmp',
+// Always skip — these are large/noisy and never useful to browse
+const ALWAYS_SKIP = new Set([
+  'node_modules', '.git', '__pycache__',
+]);
+
+// Additional dirs to skip when includeHidden is false
+const HIDDEN_SKIP = new Set([
+  '.cache', '.npm', '.pnpm-store', '.yarn', '.venv', 'venv', '.tmp', 'tmp',
 ]);
 
 const SKIP_EXTENSIONS = new Set(['.sock', '.lock', '.pid']);
@@ -78,8 +82,10 @@ function getMimeType(filePath: string): string {
 
 /**
  * Recursively list files in a directory, returning flat paths relative to root.
+ * When includeHidden is true (the default), only ALWAYS_SKIP dirs are filtered.
+ * When false, HIDDEN_SKIP dirs are also filtered out.
  */
-function listFiles(dir: string, root: string): FileEntry[] {
+function listFiles(dir: string, root: string, includeHidden = true): FileEntry[] {
   const entries: FileEntry[] = [];
 
   let items: string[];
@@ -90,7 +96,8 @@ function listFiles(dir: string, root: string): FileEntry[] {
   }
 
   for (const name of items) {
-    if (SKIP_NAMES.has(name)) continue;
+    if (ALWAYS_SKIP.has(name)) continue;
+    if (!includeHidden && HIDDEN_SKIP.has(name)) continue;
     if (SKIP_EXTENSIONS.has(name.slice(name.lastIndexOf('.')))) continue;
 
     const fullPath = join(dir, name);
@@ -102,7 +109,7 @@ function listFiles(dir: string, root: string): FileEntry[] {
     }
 
     if (st.isDirectory()) {
-      entries.push(...listFiles(fullPath, root));
+      entries.push(...listFiles(fullPath, root, includeHidden));
     } else if (st.isFile()) {
       entries.push({
         path: relative(root, fullPath),
@@ -151,10 +158,16 @@ const idParam = {
 
 export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, dataDir: string): void {
   // List files in session workspace
-  app.get<{ Params: { id: string } }>('/api/sessions/:id/files', {
+  app.get<{ Params: { id: string }; Querystring: { includeHidden?: string } }>('/api/sessions/:id/files', {
     schema: {
       tags: ['sessions'],
       params: idParam,
+      querystring: {
+        type: 'object',
+        properties: {
+          includeHidden: { type: 'string', enum: ['true', 'false'] },
+        },
+      },
       response: {
         200: {
           type: 'object',
@@ -189,7 +202,9 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
       return reply.status(404).send({ error: 'No workspace available for this session', statusCode: 404 });
     }
 
-    const files = listFiles(workspace.dir, workspace.dir);
+    // Default to true — show hidden dirs like .claude
+    const includeHidden = req.query.includeHidden !== 'false';
+    const files = listFiles(workspace.dir, workspace.dir, includeHidden);
     return reply.send({ files, source: workspace.source });
   });
 

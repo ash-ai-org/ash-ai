@@ -1,7 +1,8 @@
 import { Command } from 'commander';
 import { DEFAULT_PORT } from '@ash-ai/shared';
-import { getContainerStatus } from '../docker.js';
+import { getContainerStatus, isImageStale } from '../docker.js';
 import { getHealth } from '../client.js';
+import { isDevMode } from '../index.js';
 
 export function statusCommand(): Command {
   return new Command('status')
@@ -27,6 +28,18 @@ export function statusCommand(): Command {
           console.log(`  Uptime:           ${h.uptime ?? 'unknown'}s`);
         } catch {
           console.log('  Health check failed (server may still be starting)');
+        }
+
+        // In dev mode, check if image is stale
+        if (isDevMode) {
+          const check = isImageStale();
+          if (check.stale) {
+            console.log('');
+            console.log(`  WARNING: Local source is newer than running image`);
+            console.log(`    Image built: ${check.imageAge}`);
+            console.log(`    Source changed: ${check.sourceAge}`);
+            console.log(`    Run "ash-dev rebuild" to update.`);
+          }
         }
       }
     });

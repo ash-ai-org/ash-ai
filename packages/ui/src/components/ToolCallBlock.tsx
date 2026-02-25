@@ -1,7 +1,38 @@
 import { useState } from 'react';
 import { cn } from '../utils.js';
 import type { ToolCall } from '../types.js';
-import { Wrench, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight } from '../icons.js';
+import { Brain, Wrench, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight } from '../icons.js';
+
+export function ThinkingBlock({ thinking }: { thinking: string[] }) {
+  const [open, setOpen] = useState(false);
+  const combined = thinking.join('\n\n');
+
+  return (
+    <div className="my-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-amber-500/5 transition-colors"
+      >
+        <Brain className="h-3.5 w-3.5 shrink-0 text-amber-500/60" />
+        <span className="text-xs font-medium text-amber-400/70">Thinking</span>
+        <span className="ml-auto flex items-center gap-1.5">
+          {open ? (
+            <ChevronDown className="h-3 w-3 text-white/30" />
+          ) : (
+            <ChevronRight className="h-3 w-3 text-white/30" />
+          )}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-amber-500/10 px-3 py-2">
+          <pre className="whitespace-pre-wrap text-xs text-white/50 leading-relaxed max-h-96 overflow-y-auto">
+            {combined}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ToolCallBlock({ tool }: { tool: ToolCall }) {
   const [open, setOpen] = useState(false);

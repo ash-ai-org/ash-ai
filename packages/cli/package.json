@@ -1,12 +1,12 @@
 {
   "name": "@ash-ai/cli",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "ash": "dist/index.js",
-    "ash-dev": "dist/index.js"
+    "ash-dev": "dist/dev.js"
   },
   "files": [
     "dist",

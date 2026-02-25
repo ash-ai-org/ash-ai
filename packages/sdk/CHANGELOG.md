@@ -1,5 +1,15 @@
 # @ash-ai/sdk
 
+## 0.0.7 - 2026-02-24
+
+### Added
+
+- `includeHidden` option on `getSessionFiles()` — defaults to true so `.claude` and other hidden dirs are visible (#18)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.7
+
 ## 0.0.6 - 2026-02-24
 
 ### Added

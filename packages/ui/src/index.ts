@@ -14,7 +14,7 @@ export type { ChatInputProps } from './components/ChatInput.js';
 export { ChatMessage } from './components/ChatMessage.js';
 export type { ChatMessageProps } from './components/ChatMessage.js';
 
-export { ToolCallBlock } from './components/ToolCallBlock.js';
+export { ToolCallBlock, ThinkingBlock } from './components/ToolCallBlock.js';
 
 export { Terminal } from './components/Terminal.js';
 export type { TerminalProps } from './components/Terminal.js';
