@@ -1,5 +1,16 @@
 # @ash-ai/server
 
+## 0.0.7 - 2026-02-24
+
+### Added
+
+- `includeHidden` query param on `GET /sessions/:id/files` — hidden dirs like `.claude` are now visible by default (#18)
+
+### Changed
+
+- Split file skip lists into ALWAYS_SKIP (node_modules, .git) and HIDDEN_SKIP (.cache, .npm, etc.)
+- Updated dependencies: @ash-ai/shared@0.0.7, @ash-ai/sandbox@0.0.7
+
 ## 0.0.6 - 2026-02-24
 
 ### Added

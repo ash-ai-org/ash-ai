@@ -1,5 +1,14 @@
 # @ash-ai/ui
 
+## 0.0.3 - 2026-02-24
+
+### Added
+
+- `ThinkingBlock` component: collapsible display for Claude thinking content blocks (#18)
+- `Brain` icon for thinking indicator
+- `thinking` field on `ChatMessage` type
+- Parse `thinking` content blocks from Claude SDK messages in `parseContentBlocks`
+
 ## 0.0.2 - 2026-02-24
 
 ### Added

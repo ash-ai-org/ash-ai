@@ -1,5 +1,11 @@
 # @ash-ai/shared
 
+## 0.0.7 - 2026-02-24
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.6 - 2026-02-24
 
 ### Added

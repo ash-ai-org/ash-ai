@@ -1,5 +1,19 @@
 # @ash-ai/cli
 
+## 0.0.7 - 2026-02-24
+
+### Added
+
+- `ash-dev rebuild` command: rebuild Docker image and restart server in one step (#18)
+- Stale image detection on `ash-dev start` and `ash-dev status` — warns when local source is newer than running image
+- Separate `dev.ts` entry point for reliable dev mode detection
+- `findRepoRoot()` helper so Docker build works from any directory
+
+### Changed
+
+- `ash-dev` bin now points to `dist/dev.js` instead of `dist/index.js`
+- Updated dependencies: @ash-ai/shared@0.0.7
+
 ## 0.0.6 - 2026-02-24
 
 ### Added
