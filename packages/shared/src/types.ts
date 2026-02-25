@@ -336,6 +336,42 @@ export interface GetFileResponse {
   source: 'sandbox' | 'snapshot';
 }
 
+/** Input for writing a single file to a session workspace. */
+export interface WriteFileInput {
+  /** Relative path within the workspace, e.g. "src/Root.tsx". */
+  path: string;
+  /** Base64-encoded file content. */
+  content: string;
+  /** Optional MIME type hint. */
+  mimeType?: string;
+}
+
+/** Request body for POST /api/sessions/:id/files (batch write). */
+export interface WriteSessionFilesRequest {
+  files: WriteFileInput[];
+  /** Base directory within the workspace. Defaults to ".". */
+  targetPath?: string;
+}
+
+/** Per-file result from a write operation. */
+export interface WriteFileResult {
+  path: string;
+  written: boolean;
+  size?: number;
+  error?: string;
+}
+
+/** Response from POST /api/sessions/:id/files (batch write). */
+export interface WriteSessionFilesResponse {
+  files: WriteFileResult[];
+}
+
+/** Response from DELETE /api/sessions/:id/files/:path. */
+export interface DeleteSessionFileResponse {
+  path: string;
+  deleted: boolean;
+}
+
 // -- Session Logs -------------------------------------------------------------
 
 export interface SandboxLogEntry {
