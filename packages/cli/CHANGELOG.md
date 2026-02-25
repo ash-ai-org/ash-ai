@@ -1,5 +1,17 @@
 # @ash-ai/cli
 
+## 0.0.6 - 2026-02-24
+
+### Added
+
+- `ash connect <url>` command for persistent remote server configuration
+- `ash disconnect` command to clear saved server config
+- Config persistence at `~/.ash/config.json` with `ASH_SERVER_URL` env override
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.6
+
 ## 0.0.5 - 2026-02-23
 
 ### Added

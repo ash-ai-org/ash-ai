@@ -1,5 +1,18 @@
 # @ash-ai/sdk
 
+## 0.0.6 - 2026-02-24
+
+### Added
+
+- `deployAgent`, `listAgents`, `getAgent` methods for agent management
+- Streaming helpers with `includePartialMessages` support
+- `apiKey` option on `AshClientOptions` for authenticated requests
+- Re-exported agent and session types from `@ash-ai/shared`
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.6
+
 ## 0.0.5 - 2026-02-23
 
 ### Added
