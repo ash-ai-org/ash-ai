@@ -13,8 +13,13 @@ import { logsCommand } from './commands/logs.js';
 import { chatCommand } from './commands/chat.js';
 import { loginCommand, logoutCommand } from './commands/login.js';
 import { connectCommand, disconnectCommand } from './commands/connect.js';
+import { rebuildCommand } from './commands/rebuild.js';
 
-export const isDevMode = basename(process.argv[1] ?? '').startsWith('ash-dev');
+// Detect dev mode: flag from dev.ts entry point, argv[1], or ASH_DEV env var
+export const isDevMode =
+  !!(globalThis as Record<string, unknown>).__ASH_DEV_MODE__ ||
+  basename(process.argv[1] ?? '').startsWith('ash-dev') ||
+  !!process.env.ASH_DEV;
 
 const program = new Command()
   .name(isDevMode ? 'ash-dev' : 'ash')
@@ -34,5 +39,9 @@ program.addCommand(connectCommand());
 program.addCommand(disconnectCommand());
 program.addCommand(loginCommand());
 program.addCommand(logoutCommand());
+
+if (isDevMode) {
+  program.addCommand(rebuildCommand());
+}
 
 program.parse();

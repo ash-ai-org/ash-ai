@@ -12,6 +12,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   toolCalls?: ToolCall[];
+  thinking?: string[];
   timestamp?: string;
   isStreaming?: boolean;
 }

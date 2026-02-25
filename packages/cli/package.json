@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "bin": {
     "ash": "dist/index.js",
-    "ash-dev": "dist/index.js"
+    "ash-dev": "dist/dev.js"
   },
   "files": [
     "dist",

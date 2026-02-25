@@ -263,8 +263,13 @@ export class AshClient {
   // -- Files ------------------------------------------------------------------
 
   /** List files in the session's workspace. Works on active, paused, and ended sessions. */
-  async getSessionFiles(sessionId: string): Promise<ListFilesResponse> {
-    return this.request<ListFilesResponse>('GET', `/api/sessions/${sessionId}/files`);
+  async getSessionFiles(sessionId: string, opts?: { includeHidden?: boolean }): Promise<ListFilesResponse> {
+    const params = new URLSearchParams();
+    // Default to true — show hidden dirs like .claude
+    const includeHidden = opts?.includeHidden ?? true;
+    if (!includeHidden) params.set('includeHidden', 'false');
+    const qs = params.toString();
+    return this.request<ListFilesResponse>('GET', `/api/sessions/${sessionId}/files${qs ? `?${qs}` : ''}`);
   }
 
   /** Read a single file from the session's workspace as JSON (content as UTF-8 string, 1 MB limit). */

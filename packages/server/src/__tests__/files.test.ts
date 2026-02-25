@@ -45,11 +45,16 @@ describe('file routes', () => {
     mkdirSync(join(workspaceDir, 'src'), { recursive: true });
     writeFileSync(join(workspaceDir, 'src', 'index.ts'), 'console.log("hello")');
     writeFileSync(join(workspaceDir, 'src', 'util.ts'), 'export const x = 1;');
-    // Filtered dirs
+    // Always-filtered dirs
     mkdirSync(join(workspaceDir, 'node_modules', 'pkg'), { recursive: true });
     writeFileSync(join(workspaceDir, 'node_modules', 'pkg', 'index.js'), '');
     mkdirSync(join(workspaceDir, '.git'), { recursive: true });
     writeFileSync(join(workspaceDir, '.git', 'HEAD'), 'ref');
+    // Hidden dirs (skipped only when includeHidden=false)
+    mkdirSync(join(workspaceDir, '.cache'), { recursive: true });
+    writeFileSync(join(workspaceDir, '.cache', 'data.json'), '{}');
+    mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
+    writeFileSync(join(workspaceDir, '.claude', 'settings.json'), '{"model":"opus"}');
   }
 
   async function buildApp(coordinator: RunnerCoordinator) {
@@ -153,6 +158,46 @@ describe('file routes', () => {
         url: `/api/sessions/${session.id}/files`,
       });
       expect(res.statusCode).toBe(404);
+    });
+
+    it('includes hidden dirs like .claude by default (includeHidden=true)', async () => {
+      populateWorkspace();
+      const session = await createTestSession();
+      const app = await buildApp(mockCoordinator(workspaceDir));
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/sessions/${session.id}/files`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const paths = res.json().files.map((f: any) => f.path);
+      expect(paths).toContain('.claude/settings.json');
+      expect(paths).toContain('.cache/data.json');
+      // Always-skip dirs should still be filtered
+      expect(paths.find((p: string) => p.includes('node_modules'))).toBeUndefined();
+      expect(paths.find((p: string) => p.includes('.git'))).toBeUndefined();
+    });
+
+    it('filters hidden dirs when includeHidden=false', async () => {
+      populateWorkspace();
+      const session = await createTestSession();
+      const app = await buildApp(mockCoordinator(workspaceDir));
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/sessions/${session.id}/files?includeHidden=false`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const paths = res.json().files.map((f: any) => f.path);
+      // .cache is in HIDDEN_SKIP — should be filtered
+      expect(paths.find((p: string) => p.includes('.cache'))).toBeUndefined();
+      // .claude is NOT in HIDDEN_SKIP — should still appear
+      expect(paths).toContain('.claude/settings.json');
+      // Regular files should still be present
+      expect(paths).toContain('CLAUDE.md');
+      expect(paths).toContain('src/index.ts');
     });
   });
 

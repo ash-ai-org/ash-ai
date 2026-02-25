@@ -1,6 +1,6 @@
 import { execSync, execFileSync, spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -170,4 +170,86 @@ export async function waitForHealthy(port: number, timeout?: number): Promise<bo
     await new Promise((r) => setTimeout(r, ASH_HEALTH_POLL_INTERVAL_MS));
   }
   return false;
+}
+
+/** Walk up from the CLI package dist dir to find the monorepo root (contains pnpm-workspace.yaml). */
+export function findRepoRoot(): string | null {
+  // Prefer explicit env var (set during `make link`)
+  if (process.env.ASH_REPO_ROOT) {
+    return process.env.ASH_REPO_ROOT;
+  }
+
+  // Walk up from __dirname (packages/cli/dist) looking for pnpm-workspace.yaml
+  let dir = __dirname;
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+/** Get the creation time of a Docker image. */
+export function getImageCreatedAt(image: string): Date | null {
+  try {
+    const out = execFileSync('docker', [
+      'inspect', '--format', '{{.Created}}', image,
+    ], { stdio: 'pipe', encoding: 'utf-8' }).trim();
+    const date = new Date(out);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+/** Get the timestamp of the latest git commit touching packages/. */
+export function getSourceLastModified(): Date | null {
+  const repoRoot = findRepoRoot();
+  if (!repoRoot) return null;
+  try {
+    const out = execFileSync('git', [
+      'log', '-1', '--format=%cI', '--', 'packages/',
+    ], { stdio: 'pipe', encoding: 'utf-8', cwd: repoRoot }).trim();
+    if (!out) return null;
+    const date = new Date(out);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+export interface StalenessCheck {
+  stale: boolean;
+  imageAge?: string;
+  sourceAge?: string;
+}
+
+/** Compare Docker image build time against latest source commit. */
+export function isImageStale(): StalenessCheck {
+  const imageDate = getImageCreatedAt('ash-dev');
+  const sourceDate = getSourceLastModified();
+
+  if (!imageDate || !sourceDate) {
+    return { stale: false };
+  }
+
+  return {
+    stale: sourceDate > imageDate,
+    imageAge: timeAgo(imageDate),
+    sourceAge: timeAgo(sourceDate),
+  };
 }
