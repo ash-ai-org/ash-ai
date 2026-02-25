@@ -1,5 +1,12 @@
 # @ash-ai/shared
 
+## 0.0.8 - 2026-02-25
+
+### Added
+
+- `WriteFileInput`, `WriteFileResult`, `WriteSessionFilesRequest`, `WriteSessionFilesResponse` types for batch file write API
+- `DeleteSessionFileResponse` type for file delete API
+
 ## 0.0.7 - 2026-02-24
 
 ### Changed

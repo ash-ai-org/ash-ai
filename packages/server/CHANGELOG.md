@@ -1,5 +1,16 @@
 # @ash-ai/server
 
+## 0.0.8 - 2026-02-25
+
+### Added
+
+- `POST /api/sessions/:id/files` — batch write files to session workspace with base64 content, path traversal protection, and size limits (#19)
+- `DELETE /api/sessions/:id/files/*` — delete a file from session workspace (#19)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.8
+
 ## 0.0.7 - 2026-02-24
 
 ### Added
