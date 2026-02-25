@@ -1,0 +1,3 @@
+project_name_override: ash-ai-sdk
+package_name_override: ash_sdk
+literal_enums: true
