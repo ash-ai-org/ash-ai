@@ -1,0 +1,32 @@
+Ash has been deployed.
+
+1. Get the application URL:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "ash.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  kubectl get --namespace {{ .Release.Namespace }} svc {{ include "ash.fullname" . }} -w
+{{- else }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "ash.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  echo http://localhost:{{ .Values.service.port }}
+{{- end }}
+
+2. Check server health:
+  curl http://localhost:{{ .Values.service.port }}/health
+
+3. View Prometheus metrics:
+  curl http://localhost:{{ .Values.service.port }}/metrics
+
+{{- if not .Values.auth.apiKey }}
+{{- if not .Values.auth.existingSecret }}
+
+WARNING: No API key is configured. Ash endpoints are unprotected.
+Set auth.apiKey or auth.existingSecret for production use.
+{{- end }}
+{{- end }}

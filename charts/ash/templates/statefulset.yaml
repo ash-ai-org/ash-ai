@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ash.fullname" . }}
+  labels:
+    {{- include "ash.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "ash.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "ash.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "ash.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ash.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ash.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "ash.fullname" . }}
+            - secretRef:
+                name: {{ include "ash.secretName" . }}
+          {{- with .Values.ash.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 3"]
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        {{- with .Values.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

@@ -232,6 +232,21 @@ ash start --database-url "postgresql://localhost:5432/ash"
 
 Ash auto-creates its tables on first startup. No migrations needed.
 
+### Option E: Kubernetes (Helm Chart)
+
+Deploy Ash to any Kubernetes cluster with the official Helm chart:
+
+```bash
+kubectl create secret generic ash-secrets \
+  --from-literal=ANTHROPIC_API_KEY=sk-ant-... \
+  --from-literal=ASH_API_KEY=$(openssl rand -hex 32)
+
+helm install ash ./charts/ash \
+  --set auth.existingSecret=ash-secrets
+```
+
+See the full [Kubernetes Deployment Guide](guides/kubernetes-deployment.md) for production configuration, external database setup, and enterprise integration.
+
 ## Next Steps
 
 - [Connecting to a Server](guides/connecting.md) — use the SDK, CLI, Python, or curl against any Ash server
@@ -240,3 +255,4 @@ Ash auto-creates its tables on first startup. No migrations needed.
 - [Architecture](architecture.md) — how the pieces fit together
 - [Deploy to EC2](guides/ec2-deployment.md) — run your own server on AWS
 - [Deploy to GCE](guides/gce-deployment.md) — run your own server on GCP
+- [Deploy to Kubernetes](guides/kubernetes-deployment.md) — Helm chart for enterprise self-hosting

@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ash.fullname" . }}
+  labels:
+    {{- include "ash.labels" . | nindent 4 }}
+data:
+  ASH_PORT: {{ .Values.ash.port | quote }}
+  ASH_HOST: "0.0.0.0"
+  ASH_DATA_DIR: "/data"
+  ASH_MODE: {{ .Values.ash.mode | quote }}
+  ASH_MAX_SANDBOXES: {{ .Values.ash.maxSandboxes | quote }}
+  ASH_IDLE_TIMEOUT_MS: {{ .Values.ash.idleTimeoutMs | quote }}
+  {{- if .Values.ash.databaseUrl }}
+  ASH_DATABASE_URL: {{ .Values.ash.databaseUrl | quote }}
+  {{- end }}
+  {{- if .Values.ash.snapshotUrl }}
+  ASH_SNAPSHOT_URL: {{ .Values.ash.snapshotUrl | quote }}
+  {{- end }}
+  {{- if .Values.ash.s3Region }}
+  ASH_S3_REGION: {{ .Values.ash.s3Region | quote }}
+  {{- end }}

@@ -1,0 +1,261 @@
+# -- Number of Ash server replicas.
+# With SQLite (default), only 1 replica is supported.
+# With an external database (postgres/cockroachdb), you can scale to multiple replicas.
+replicaCount: 1
+
+image:
+  # -- Container image repository
+  repository: ghcr.io/ash-ai-org/ash
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag (default: Chart appVersion)
+  tag: ""
+
+# -- Image pull secrets for private registries
+imagePullSecrets: []
+
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full release name
+fullnameOverride: ""
+
+# =============================================================================
+# Ash Server Configuration
+# =============================================================================
+
+ash:
+  # -- Server port (inside the container)
+  port: 4100
+
+  # -- Server mode: "standalone" (default) or "coordinator" (multi-runner)
+  mode: standalone
+
+  # -- Maximum number of concurrent sandboxes
+  maxSandboxes: 1000
+
+  # -- Idle session timeout in milliseconds (default: 30 minutes)
+  idleTimeoutMs: 1800000
+
+  # -- External database URL (postgres or cockroachdb).
+  # If empty, uses embedded SQLite (data stored on the persistent volume).
+  # Example: postgresql://user:pass@cockroachdb:26257/ash
+  databaseUrl: ""
+
+  # -- Cloud workspace persistence URL for cross-node session resume.
+  # Supports s3://bucket/prefix/ or gs://bucket/prefix/
+  snapshotUrl: ""
+
+  # -- S3 region override (default: us-east-1)
+  s3Region: ""
+
+  # -- Extra environment variables to set on the Ash container.
+  # Use this for any config not covered by the fields above.
+  # Example:
+  #   extraEnv:
+  #     - name: ASH_DEBUG_TIMING
+  #       value: "1"
+  extraEnv: []
+
+# =============================================================================
+# Authentication
+# =============================================================================
+
+auth:
+  # -- Ash API key for protecting endpoints.
+  # Set directly here, or use existingSecret below.
+  apiKey: ""
+
+  # -- Anthropic API key for Claude agent execution.
+  # Set directly here, or use existingSecret below.
+  anthropicApiKey: ""
+
+  # -- Use an existing Kubernetes Secret instead of creating one.
+  # The secret must contain the keys specified in existingSecretKeys.
+  existingSecret: ""
+
+  # -- Key names within the existing secret.
+  existingSecretKeys:
+    # -- Key in the secret containing the Ash API key
+    ashApiKey: ASH_API_KEY
+    # -- Key in the secret containing the Anthropic API key
+    anthropicApiKey: ANTHROPIC_API_KEY
+
+# =============================================================================
+# Persistence
+# =============================================================================
+
+persistence:
+  # -- Enable persistent storage for SQLite database and session state
+  enabled: true
+  # -- Storage class (empty = cluster default)
+  storageClass: ""
+  # -- Access mode
+  accessMode: ReadWriteOnce
+  # -- Volume size
+  size: 10Gi
+  # -- Annotations for the PVC
+  annotations: {}
+
+# =============================================================================
+# Service
+# =============================================================================
+
+service:
+  # -- Service type: ClusterIP, NodePort, or LoadBalancer
+  type: ClusterIP
+  # -- Service port
+  port: 4100
+  # -- Node port (only used when type is NodePort)
+  nodePort: ""
+  # -- Additional service annotations (e.g. for service mesh, load balancer config)
+  annotations: {}
+  # -- Additional service labels
+  labels: {}
+
+# =============================================================================
+# Ingress
+# =============================================================================
+
+ingress:
+  # -- Enable ingress
+  enabled: false
+  # -- Ingress class name (e.g. nginx, traefik, alb)
+  className: ""
+  # -- Ingress annotations
+  annotations: {}
+  # -- Ingress hosts
+  hosts:
+    - host: ash.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration
+  tls: []
+  #  - secretName: ash-tls
+  #    hosts:
+  #      - ash.example.com
+
+# =============================================================================
+# Resources
+# =============================================================================
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+
+# =============================================================================
+# Security
+# =============================================================================
+
+serviceAccount:
+  # -- Create a service account
+  create: true
+  # -- Service account annotations
+  annotations: {}
+  # -- Service account name (generated if not set)
+  name: ""
+
+# -- Pod-level security context.
+# Ash requires privileged mode for cgroup v2 sandbox resource limits.
+# If you don't need per-sandbox resource limits, you can disable privileged mode.
+podSecurityContext: {}
+
+securityContext:
+  # -- Privileged mode is required for cgroup v2 delegation (sandbox resource limits).
+  # Set to false if your cluster doesn't allow privileged containers —
+  # Ash will fall back to ulimit-based limits.
+  privileged: true
+
+# =============================================================================
+# Probes
+# =============================================================================
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+startupProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 30
+
+# =============================================================================
+# Autoscaling (only useful with an external database, not SQLite)
+# =============================================================================
+
+autoscaling:
+  # -- Enable HPA. Only meaningful when using an external database
+  # (Postgres/CockroachDB), since SQLite limits you to 1 replica.
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# =============================================================================
+# Pod Disruption Budget
+# =============================================================================
+
+podDisruptionBudget:
+  # -- Enable PDB
+  enabled: false
+  # -- Minimum available pods
+  minAvailable: 1
+  # -- Maximum unavailable pods (alternative to minAvailable)
+  # maxUnavailable: 1
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+
+metrics:
+  # -- Enable Prometheus ServiceMonitor (requires prometheus-operator CRDs)
+  serviceMonitor:
+    enabled: false
+    # -- Scrape interval
+    interval: 30s
+    # -- Additional labels for the ServiceMonitor (e.g. release: prometheus)
+    additionalLabels: {}
+
+# =============================================================================
+# Scheduling
+# =============================================================================
+
+# -- Node selector
+nodeSelector: {}
+
+# -- Tolerations
+tolerations: []
+
+# -- Affinity rules
+affinity: {}
+
+# -- Pod annotations
+podAnnotations: {}
+
+# -- Pod labels
+podLabels: {}
+
+# -- Topology spread constraints
+topologySpreadConstraints: []
