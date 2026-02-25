@@ -34,6 +34,7 @@ export const sessions = pgTable('sessions', {
   status: text('status').notNull().default('starting'),
   runnerId: text('runner_id'),
   parentSessionId: text('parent_session_id'),
+  model: text('model'),
   createdAt: text('created_at').notNull(),
   lastActiveAt: text('last_active_at').notNull(),
 }, (table) => [

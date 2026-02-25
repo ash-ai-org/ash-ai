@@ -189,14 +189,14 @@ export class DrizzleDb implements Db {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default', parentSessionId?: string): Promise<Session> {
+  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default', parentSessionId?: string, model?: string): Promise<Session> {
     const { sessions } = this.schema;
     const now = new Date().toISOString();
     await this.drizzle
       .insert(sessions)
-      .values({ id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, createdAt: now, lastActiveAt: now });
+      .values({ id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, model: model ?? null, createdAt: now, lastActiveAt: now });
 
-    return { id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, model: model ?? null, createdAt: now, lastActiveAt: now };
   }
 
   async insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session> {
@@ -207,7 +207,7 @@ export class DrizzleDb implements Db {
     // 1. Create new session linked to parent
     await this.drizzle
       .insert(sessions)
-      .values({ id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused', parentSessionId: parentSession.id, createdAt: now, lastActiveAt: now });
+      .values({ id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused', parentSessionId: parentSession.id, model: parentSession.model ?? null, createdAt: now, lastActiveAt: now });
 
     // 2. Copy all messages from parent session with new IDs and session reference
     const parentMessages = await this.drizzle
@@ -229,7 +229,7 @@ export class DrizzleDb implements Db {
       await this.drizzle.insert(messages).values(copied);
     }
 
-    return { id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused' as SessionStatus, parentSessionId: parentSession.id, createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused' as SessionStatus, parentSessionId: parentSession.id, model: parentSession.model ?? null, createdAt: now, lastActiveAt: now };
   }
 
   async updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
@@ -268,7 +268,7 @@ export class DrizzleDb implements Db {
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0];
-    return { id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId, status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt };
+    return { id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId, status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt };
   }
 
   async listSessions(tenantId: string = 'default', agent?: string): Promise<Session[]> {
@@ -285,7 +285,7 @@ export class DrizzleDb implements Db {
 
     return rows.map((r: any) => ({
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
-      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
+      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
   }
 
@@ -299,7 +299,7 @@ export class DrizzleDb implements Db {
 
     return rows.map((r: any) => ({
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
-      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
+      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
   }
 

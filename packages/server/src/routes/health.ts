@@ -12,7 +12,7 @@ const coordinatorId = `${hostname()}-${process.pid}`;
 
 const EMPTY_POOL: PoolStats = {
   total: 0, cold: 0, warming: 0, warm: 0, waiting: 0, running: 0,
-  maxCapacity: 0, resumeWarmHits: 0, resumeColdHits: 0,
+  maxCapacity: 0, resumeWarmHits: 0, resumeColdHits: 0, preWarmHits: 0,
 };
 
 export function healthRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, localPool: SandboxPool | null): void {
@@ -82,6 +82,7 @@ export function healthRoutes(app: FastifyInstance, coordinator: RunnerCoordinato
       '# TYPE ash_resume_total counter',
       `ash_resume_total{path="warm"} ${pool.resumeWarmHits}`,
       `ash_resume_total{path="cold"} ${pool.resumeColdHits}`,
+      `ash_resume_total{path="prewarm"} ${pool.preWarmHits}`,
       '',
     ];
 

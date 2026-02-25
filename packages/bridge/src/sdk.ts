@@ -15,6 +15,8 @@ export interface QueryOptions {
   resume: boolean;
   signal: AbortSignal;
   includePartialMessages?: boolean;
+  /** Override the model for this query. Passed to SDK Options.model. */
+  model?: string;
 }
 
 /**
@@ -48,6 +50,7 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
       allowDangerouslySkipPermissions: true,
       abortController: abortControllerFromSignal(opts.signal),
       settingSources: ['project'],
+      ...(opts.model && { model: opts.model }),
       ...(opts.includePartialMessages && { includePartialMessages: true }),
       ...(process.env.CLAUDE_CODE_EXECUTABLE && { pathToClaudeCodeExecutable: process.env.CLAUDE_CODE_EXECUTABLE }),
       stderr: (data: string) => process.stderr.write(`[claude-code] ${data}`),

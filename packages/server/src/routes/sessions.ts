@@ -77,6 +77,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           credentialId: { type: 'string' },
           extraEnv: { type: 'object', additionalProperties: { type: 'string' } },
           startupScript: { type: 'string' },
+          model: { type: 'string', description: 'Model override for this session. Overrides agent .claude/settings.json default.' },
         },
         required: ['agent'],
       },
@@ -89,7 +90,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
@@ -132,13 +133,16 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         },
       });
 
-      const session = await insertSession(sessionId, agentRecord.name, handle.sandboxId, req.tenantId);
+      // Resolve effective model: explicit request > agent record > null (SDK default)
+      const effectiveModel = model || agentRecord.model || undefined;
+
+      const session = await insertSession(sessionId, agentRecord.name, handle.sandboxId, req.tenantId, undefined, effectiveModel);
       const effectiveRunnerId = runnerId === '__local__' ? null : runnerId;
       await updateSessionRunner(sessionId, effectiveRunnerId);
       await updateSessionStatus(sessionId, 'active');
 
       // Record lifecycle event
-      insertSessionEvent(sessionId, 'lifecycle', JSON.stringify({ action: 'created', agentName: agentRecord.name }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+      insertSessionEvent(sessionId, 'lifecycle', JSON.stringify({ action: 'created', agentName: agentRecord.name, model: effectiveModel }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
       telemetry.emit({ sessionId, agentName: agentRecord.name, type: 'lifecycle', data: { status: 'active', action: 'created' } });
 
       return reply.status(201).send({ session: { ...session, status: 'active', runnerId: effectiveRunnerId } });
@@ -275,6 +279,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         properties: {
           content: { type: 'string' },
           includePartialMessages: { type: 'boolean' },
+          model: { type: 'string', description: 'Model override for this query. Overrides session and agent defaults.' },
         },
         required: ['content'],
       },
@@ -300,7 +305,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(400).send({ error: `Session is ${session.status}`, statusCode: 400 });
     }
 
-    const { content, includePartialMessages } = req.body as { content: string; includePartialMessages?: boolean };
+    const { content, includePartialMessages, model: messageModel } = req.body as { content: string; includePartialMessages?: boolean; model?: string };
 
     let backend;
     try {
@@ -343,11 +348,15 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     let firstEventMs = 0;
 
     try {
+      // Model precedence: per-message > session-level > agent default (.claude/settings.json)
+      const queryModel = messageModel || session.model || undefined;
+
       const events = backend.sendCommand(session.sandboxId, {
         cmd: 'query',
         prompt: content,
         sessionId: session.id,
         ...(includePartialMessages && { includePartialMessages: true }),
+        ...(queryModel && { model: queryModel }),
       });
 
       for await (const event of events) {
@@ -433,6 +442,60 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     }
 
     reply.raw.end();
+  });
+
+  // Get sandbox logs for a session
+  app.get<{ Params: { id: string } }>('/api/sessions/:id/logs', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      querystring: {
+        type: 'object',
+        properties: {
+          after: { type: 'integer', minimum: -1, default: -1, description: 'Return log entries with index > after' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            logs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  index: { type: 'integer' },
+                  level: { type: 'string', enum: ['stdout', 'stderr', 'system'] },
+                  text: { type: 'string' },
+                  ts: { type: 'string' },
+                },
+                required: ['index', 'level', 'text', 'ts'],
+              },
+            },
+            source: { type: 'string' },
+          },
+          required: ['logs', 'source'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+
+    const { after } = req.query as { after?: number };
+    const afterIndex = after != null && after >= 0 ? after : undefined;
+
+    try {
+      const backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
+      const logs = backend.getLogs(session.sandboxId, afterIndex);
+      return reply.send({ logs, source: 'sandbox' });
+    } catch {
+      // Sandbox/runner not available — return empty logs
+      return reply.send({ logs: [], source: 'sandbox' });
+    }
   });
 
   // Execute a command in the session's sandbox (synchronous — waits for result)

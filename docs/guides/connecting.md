@@ -225,7 +225,15 @@ Install the CLI globally:
 npm install -g @ash-ai/cli
 ```
 
-Point it at your server:
+Connect to your server:
+
+```bash
+ash connect http://your-server:4100
+```
+
+This saves the server URL to `~/.ash/config.json`. All subsequent commands target this server until you run `ash disconnect`.
+
+You can also use the environment variable instead:
 
 ```bash
 export ASH_SERVER_URL=http://your-server:4100

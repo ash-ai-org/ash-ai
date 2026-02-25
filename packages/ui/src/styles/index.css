@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ash-accent: #6366f1;
+  --ash-bg: #0d1117;
+  --ash-surface: #161b22;
+  --ash-border: rgba(255, 255, 255, 0.1);
+}

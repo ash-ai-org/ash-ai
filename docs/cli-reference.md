@@ -3,12 +3,16 @@
 ## Installation
 
 ```bash
+# npm
 npm install -g @ash-ai/cli
+
+# One-liner (installs Node.js if needed)
+curl -fsSL https://raw.githubusercontent.com/ash-ai-org/ash-ai/main/install.sh | bash
 ```
 
 This installs the `ash` command globally.
 
-**Server URL**: Reads `ASH_SERVER_URL` from the environment. Defaults to `http://localhost:4100`.
+**Server URL**: Resolved in this order: `ASH_SERVER_URL` env var > `~/.ash/config.json` (set via `ash connect`) > `http://localhost:4100`.
 
 ---
 
@@ -72,6 +76,38 @@ Show server container logs.
 ```bash
 ash logs        # Show logs
 ash logs -f     # Follow logs
+```
+
+---
+
+## Server Connection
+
+### `ash connect <url>`
+
+Connect to a remote Ash server. Saves the URL to `~/.ash/config.json` so all subsequent commands target this server.
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<url>` | Yes | Server URL (e.g. `http://my-server:4100`) |
+
+```bash
+ash connect http://my-server:4100
+# Connected to http://my-server:4100
+# Saved to ~/.ash/config.json
+```
+
+Tests connectivity before saving. Override with `ASH_SERVER_URL` env var.
+
+---
+
+### `ash disconnect`
+
+Reset to localhost. Removes the saved server URL from `~/.ash/config.json`.
+
+```bash
+ash disconnect
+# Disconnected from http://my-server:4100
+# CLI will now target http://localhost:4100
 ```
 
 ---

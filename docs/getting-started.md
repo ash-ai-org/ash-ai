@@ -11,7 +11,11 @@ This guide walks you through installing Ash, deploying your first agent, and cha
 ## 1. Install the CLI
 
 ```bash
+# Option A: npm (requires Node.js >= 20)
 npm install -g @ash-ai/cli
+
+# Option B: one-liner installer (installs Node.js if needed)
+curl -fsSL https://raw.githubusercontent.com/ash-ai-org/ash-ai/main/install.sh | bash
 ```
 
 Verify it works:
@@ -177,10 +181,28 @@ ash stop
 
 ## Production Deployment
 
-By default Ash uses SQLite, which is fine for local development and single-machine
-deployments. For production, use PostgreSQL or CockroachDB.
+### Option A: Docker Compose (Simplest)
 
-### Option A: Managed CockroachDB
+The quickest way to self-host Ash on any server:
+
+```bash
+curl -O https://raw.githubusercontent.com/ash-ai-org/ash-ai/main/docker-compose.yml
+export ANTHROPIC_API_KEY=sk-...
+docker compose up -d
+```
+
+This starts Ash with SQLite (fine for single-machine deployments). Data persists in a Docker volume.
+
+To connect your local CLI to the remote server:
+
+```bash
+ash connect http://your-server:4100
+ash deploy ./my-agent --name my-agent
+```
+
+### Option B: Managed CockroachDB
+
+For production at scale, use PostgreSQL or CockroachDB instead of SQLite.
 
 1. Create a CockroachDB Serverless cluster at [cockroachlabs.cloud](https://cockroachlabs.cloud) (free tier available)
 2. Create the `ash` database:
@@ -192,15 +214,15 @@ deployments. For production, use PostgreSQL or CockroachDB.
    ash start --database-url "postgresql://user:pass@host:26257/ash?sslmode=verify-full"
    ```
 
-### Option B: Docker Compose (CockroachDB + Ash)
+### Option C: Docker Compose with CockroachDB
 
 ```bash
-curl -O https://raw.githubusercontent.com/ash-ai/ash/main/docker-compose.prod.yml
+curl -O https://raw.githubusercontent.com/ash-ai-org/ash-ai/main/docker-compose.prod.yml
 export ANTHROPIC_API_KEY=sk-...
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-### Option C: Bring Your Own Postgres
+### Option D: Bring Your Own Postgres
 
 Any Postgres-compatible database works:
 

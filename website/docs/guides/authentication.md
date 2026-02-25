@@ -70,9 +70,7 @@ agents = client.list_agents()
 ```
 
 </TabItem>
-</Tabs>
-
-### CLI
+<TabItem value="cli" label="CLI">
 
 Set the `ASH_API_KEY` environment variable:
 
@@ -87,7 +85,8 @@ Or pass it inline:
 ASH_API_KEY="your-generated-key-here" ash agent list
 ```
 
-### curl
+</TabItem>
+<TabItem value="curl" label="curl">
 
 Include the `Authorization` header with the `Bearer` scheme:
 
@@ -95,6 +94,9 @@ Include the `Authorization` header with the `Bearer` scheme:
 curl $ASH_SERVER_URL/api/agents \
   -H "Authorization: Bearer your-generated-key-here"
 ```
+
+</TabItem>
+</Tabs>
 
 ## Public Endpoints
 

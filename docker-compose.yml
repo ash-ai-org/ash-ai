@@ -1,0 +1,22 @@
+# Ash — self-hosted AI agent orchestration
+# Usage:
+#   export ANTHROPIC_API_KEY=sk-...
+#   docker compose up -d
+#
+# Server will be available at http://localhost:4100
+# Data is persisted in a Docker volume across restarts.
+
+services:
+  ash:
+    image: ghcr.io/ash-ai-org/ash:latest
+    privileged: true
+    ports:
+      - "${ASH_PORT:-4100}:4100"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ash-data:/data
+    restart: unless-stopped
+
+volumes:
+  ash-data:

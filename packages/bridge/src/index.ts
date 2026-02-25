@@ -38,7 +38,7 @@ async function send(conn: net.Socket, event: BridgeEvent): Promise<void> {
   }
 }
 
-async function runAndStream(conn: net.Socket, prompt: string, sessionId: string, resume: boolean, includePartialMessages?: boolean): Promise<void> {
+async function runAndStream(conn: net.Socket, prompt: string, sessionId: string, resume: boolean, includePartialMessages?: boolean, model?: string): Promise<void> {
   currentAbort = new AbortController();
 
   const timing = timingEnabled();
@@ -57,6 +57,7 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
       resume,
       signal: currentAbort.signal,
       includePartialMessages,
+      model,
     })) {
       eventCount++;
       if (eventCount === 1 && elapsed) {
@@ -97,7 +98,7 @@ async function handleCommand(conn: net.Socket, cmd: BridgeCommand): Promise<void
       const count = sessionQueryCount.get(cmd.sessionId) ?? 0;
       sessionQueryCount.set(cmd.sessionId, count + 1);
       const shouldResume = count > 0;
-      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, cmd.includePartialMessages);
+      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, cmd.includePartialMessages, cmd.model);
     }
 
     case 'resume':

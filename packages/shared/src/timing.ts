@@ -6,7 +6,7 @@
 
 export interface TimingEntry {
   type: 'timing';
-  source: 'server' | 'bridge';
+  source: 'server' | 'bridge' | 'sandbox';
   sessionId: string;
   [key: string]: unknown;
   timestamp: string;

@@ -45,9 +45,7 @@ for f in data["files"]:
 ```
 
 </TabItem>
-</Tabs>
-
-### curl
+<TabItem value="curl" label="curl">
 
 ```bash
 curl $ASH_SERVER_URL/api/sessions/SESSION_ID/files
@@ -77,6 +75,9 @@ Response:
   "source": "sandbox"
 }
 ```
+
+</TabItem>
+</Tabs>
 
 The `source` field indicates where the file listing came from:
 
@@ -110,14 +111,15 @@ print(f"Source: {resp.headers['x-ash-source']}")
 ```
 
 </TabItem>
-</Tabs>
-
-### curl
+<TabItem value="curl" label="curl">
 
 ```bash
 # Download raw file
 curl -o report.pdf $ASH_SERVER_URL/api/sessions/SESSION_ID/files/output/report.pdf
 ```
+
+</TabItem>
+</Tabs>
 
 The response includes these headers:
 
@@ -158,9 +160,7 @@ print(data["content"])
 ```
 
 </TabItem>
-</Tabs>
-
-### curl
+<TabItem value="curl" label="curl">
 
 ```bash
 curl "$ASH_SERVER_URL/api/sessions/SESSION_ID/files/src/index.ts?format=json"
@@ -176,6 +176,9 @@ Response:
   "source": "sandbox"
 }
 ```
+
+</TabItem>
+</Tabs>
 
 ### Limitations (JSON mode)
 

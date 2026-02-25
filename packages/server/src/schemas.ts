@@ -88,8 +88,9 @@ const PoolStatsSchema = {
     maxCapacity: { type: 'integer' },
     resumeWarmHits: { type: 'integer' },
     resumeColdHits: { type: 'integer' },
+    preWarmHits: { type: 'integer' },
   },
-  required: ['total', 'cold', 'warming', 'warm', 'waiting', 'running', 'maxCapacity', 'resumeWarmHits', 'resumeColdHits'],
+  required: ['total', 'cold', 'warming', 'warm', 'waiting', 'running', 'maxCapacity', 'resumeWarmHits', 'resumeColdHits', 'preWarmHits'],
 } as const;
 
 const HealthResponseSchema = {

@@ -1,5 +1,6 @@
 import type { BridgeCommand, BridgeEvent, PoolStats } from '@ash-ai/shared';
 import { SandboxPool, persistSessionState, syncStateToCloud } from '@ash-ai/sandbox';
+import type { LogEntry } from '@ash-ai/sandbox';
 import type { RunnerBackend, CreateSandboxRequest, SandboxHandle } from './types.js';
 
 /**
@@ -87,6 +88,10 @@ export class LocalRunnerBackend implements RunnerBackend {
       );
     }
     return ok;
+  }
+
+  getLogs(sandboxId: string, after?: number): LogEntry[] {
+    return this.pool.getLogs(sandboxId, after);
   }
 
   async getStats(): Promise<PoolStats> {

@@ -3,10 +3,17 @@ import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync } f
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { SANDBOX_ENV_ALLOWLIST, DEFAULT_SANDBOX_LIMITS, INSTALL_SCRIPT_TIMEOUT_MS } from '@ash-ai/shared';
-import type { SandboxLimits } from '@ash-ai/shared';
+import { SANDBOX_ENV_ALLOWLIST, DEFAULT_SANDBOX_LIMITS, INSTALL_SCRIPT_TIMEOUT_MS, startTimer, logTiming } from '@ash-ai/shared';
+import type { SandboxLimits, SandboxTimings } from '@ash-ai/shared';
 import { BridgeClient } from './bridge-client.js';
 import { spawnWithLimits, isOomExit, startDiskMonitor } from './resource-limits.js';
+
+export interface LogEntry {
+  index: number;
+  level: 'stdout' | 'stderr' | 'system';
+  text: string;
+  ts: string;
+}
 
 export interface ManagedSandbox {
   id: string;
@@ -16,6 +23,7 @@ export interface ManagedSandbox {
   workspaceDir: string;
   createdAt: string;
   limits: SandboxLimits;
+  startupTimings?: SandboxTimings;
 }
 
 export interface CreateSandboxOpts {
@@ -33,6 +41,8 @@ export interface CreateSandboxOpts {
   startupScript?: string;
 }
 
+const MAX_LOG_ENTRIES = 10_000;
+
 // Internal tracking — keeps cleanup handles out of the public interface
 interface SandboxInternal {
   sandbox: ManagedSandbox;
@@ -40,8 +50,14 @@ interface SandboxInternal {
   diskMonitor: NodeJS.Timeout;
 }
 
+interface SandboxLogBuffer {
+  entries: LogEntry[];
+  nextIndex: number;
+}
+
 export class SandboxManager {
   private sandboxes = new Map<string, SandboxInternal>();
+  private logBuffers = new Map<string, SandboxLogBuffer>();
   private sandboxesDir: string;
   private bridgeEntry: string;
   private defaultLimits: SandboxLimits;
@@ -53,15 +69,38 @@ export class SandboxManager {
     mkdirSync(this.sandboxesDir, { recursive: true });
   }
 
+  private appendLog(id: string, level: LogEntry['level'], text: string): void {
+    let buf = this.logBuffers.get(id);
+    if (!buf) {
+      buf = { entries: [], nextIndex: 0 };
+      this.logBuffers.set(id, buf);
+    }
+    buf.entries.push({ index: buf.nextIndex++, level, text, ts: new Date().toISOString() });
+    if (buf.entries.length > MAX_LOG_ENTRIES) buf.entries.shift();
+  }
+
+  getLogs(id: string, after?: number): LogEntry[] {
+    const buf = this.logBuffers.get(id);
+    if (!buf) return [];
+    if (after == null) return buf.entries;
+    return buf.entries.filter((e) => e.index > after);
+  }
+
   async create(opts: CreateSandboxOpts): Promise<ManagedSandbox> {
+    const totalTimer = startTimer();
     const id = opts.id ?? randomUUID();
     const shortId = id.slice(0, 8);
     const sandboxDir = join(this.sandboxesDir, id);
     const workspaceDir = join(sandboxDir, 'workspace');
-    // macOS limits Unix socket paths to 104 bytes — use /tmp with short ID
-    const socketPath = join(tmpdir(), `ash-${shortId}.sock`);
+    // Linux: socket in sandboxDir (visible via bwrap bind-mount, not exposed in /tmp).
+    // macOS: socket in /tmp (no bwrap, and macOS limits Unix socket paths to 104 bytes).
+    const socketPath = process.platform === 'linux'
+      ? join(sandboxDir, 'bridge.sock')
+      : join(tmpdir(), `ash-${shortId}.sock`);
     const limits: SandboxLimits = { ...this.defaultLimits, ...opts.limits };
 
+    // --- Phase: agent copy ---
+    const copyTimer = startTimer();
     if (!opts.skipAgentCopy) {
       // Copy entire agent directory into workspace — no special cases.
       // CLAUDE.md, .claude/, .mcp.json, and any other files the SDK needs
@@ -71,6 +110,7 @@ export class SandboxManager {
       // Resume path: workspace already exists, just ensure the dir is there
       mkdirSync(workspaceDir, { recursive: true });
     }
+    const agentCopyMs = copyTimer();
 
     // SECURITY: Allowlist env — nothing else leaks to sandbox
     const env: Record<string, string> = {};
@@ -104,10 +144,12 @@ export class SandboxManager {
     }
 
     // Run install.sh if present (only on fresh creation, not resume)
+    const installTimer = startTimer();
     if (!opts.skipAgentCopy) {
       const installScript = join(workspaceDir, 'install.sh');
       if (existsSync(installScript)) {
         console.log(`[sandbox:${shortId}] Running install.sh...`);
+        this.appendLog(id, 'system', 'Running install.sh...');
         chmodSync(installScript, 0o755);
         try {
           const installOutput = execFileSync(installScript, [], {
@@ -118,22 +160,29 @@ export class SandboxManager {
             ...(sandboxUid !== undefined && { uid: sandboxUid, gid: sandboxGid }),
           });
           if (installOutput.length > 0) {
-            console.log(`[sandbox:${shortId}:install] ${installOutput.toString().trimEnd()}`);
+            const text = installOutput.toString().trimEnd();
+            console.log(`[sandbox:${shortId}:install] ${text}`);
+            this.appendLog(id, 'system', text);
           }
           console.log(`[sandbox:${shortId}] install.sh completed`);
+          this.appendLog(id, 'system', 'install.sh completed');
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
+          this.appendLog(id, 'system', `install.sh failed: ${msg}`);
           throw new Error(`install.sh failed for sandbox ${shortId}: ${msg}`);
         }
       }
     }
+    const installScriptMs = installTimer();
 
     // Run startup script if provided (only on fresh creation, not resume)
+    const startupTimer = startTimer();
     if (!opts.skipAgentCopy && opts.startupScript) {
       const startupPath = join(workspaceDir, 'startup.sh');
       writeFileSync(startupPath, opts.startupScript, 'utf-8');
       chmodSync(startupPath, 0o755);
       console.log(`[sandbox:${shortId}] Running startup.sh...`);
+      this.appendLog(id, 'system', 'Running startup.sh...');
       try {
         const startupOutput = execFileSync(startupPath, [], {
           cwd: workspaceDir,
@@ -143,15 +192,22 @@ export class SandboxManager {
           ...(sandboxUid !== undefined && { uid: sandboxUid, gid: sandboxGid }),
         });
         if (startupOutput.length > 0) {
-          console.log(`[sandbox:${shortId}:startup] ${startupOutput.toString().trimEnd()}`);
+          const text = startupOutput.toString().trimEnd();
+          console.log(`[sandbox:${shortId}:startup] ${text}`);
+          this.appendLog(id, 'system', text);
         }
         console.log(`[sandbox:${shortId}] startup.sh completed`);
+        this.appendLog(id, 'system', 'startup.sh completed');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        this.appendLog(id, 'system', `startup.sh failed: ${msg}`);
         throw new Error(`startup.sh failed for sandbox ${shortId}: ${msg}`);
       }
     }
+    const startupScriptMs = startupTimer();
 
+    // --- Phase: bridge spawn ---
+    const bridgeSpawnTimer = startTimer();
     const spawnOpts: Record<string, unknown> = {
       env, cwd: workspaceDir, stdio: ['ignore', 'pipe', 'pipe'],
       ...(sandboxUid !== undefined && { uid: sandboxUid, gid: sandboxGid }),
@@ -162,14 +218,18 @@ export class SandboxManager {
       [this.bridgeEntry],
       spawnOpts as import('node:child_process').SpawnOptions,
       limits,
-      { sandboxId: id, workspaceDir, agentDir: opts.agentDir },
+      { sandboxId: id, workspaceDir, agentDir: opts.agentDir, sandboxDir, sandboxesDir: this.sandboxesDir },
     );
 
     child.stdout?.on('data', (chunk: Buffer) => {
-      console.log(`[sandbox:${shortId}:out] ${chunk.toString().trimEnd()}`);
+      const text = chunk.toString().trimEnd();
+      console.log(`[sandbox:${shortId}:out] ${text}`);
+      this.appendLog(id, 'stdout', text);
     });
     child.stderr?.on('data', (chunk: Buffer) => {
-      console.error(`[sandbox:${shortId}:err] ${chunk.toString().trimEnd()}`);
+      const text = chunk.toString().trimEnd();
+      console.error(`[sandbox:${shortId}:err] ${text}`);
+      this.appendLog(id, 'stderr', text);
     });
 
     // OOM detection
@@ -180,9 +240,37 @@ export class SandboxManager {
         opts.onOomKill?.(id);
       }
     });
+    const bridgeSpawnMs = bridgeSpawnTimer();
 
+    // --- Phase: bridge connect ---
+    const bridgeConnectTimer = startTimer();
     const client = new BridgeClient(socketPath);
     await client.connect();
+    const bridgeConnectMs = bridgeConnectTimer();
+
+    // --- Timing summary ---
+    const totalMs = totalTimer();
+    const timings: SandboxTimings = {
+      agentCopyMs: Math.round(agentCopyMs * 100) / 100,
+      installScriptMs: Math.round(installScriptMs * 100) / 100,
+      startupScriptMs: Math.round(startupScriptMs * 100) / 100,
+      bridgeSpawnMs: Math.round(bridgeSpawnMs * 100) / 100,
+      bridgeConnectMs: Math.round(bridgeConnectMs * 100) / 100,
+      totalMs: Math.round(totalMs * 100) / 100,
+    };
+
+    this.appendLog(id, 'system',
+      `Sandbox created in ${Math.round(totalMs)}ms (copy: ${Math.round(agentCopyMs)}ms, install: ${Math.round(installScriptMs)}ms, startup: ${Math.round(startupScriptMs)}ms, bridge: ${Math.round(bridgeSpawnMs + bridgeConnectMs)}ms)`
+    );
+
+    logTiming({
+      type: 'timing',
+      source: 'sandbox',
+      sessionId: opts.sessionId,
+      sandboxId: id,
+      ...timings,
+      timestamp: new Date().toISOString(),
+    });
 
     const sandbox: ManagedSandbox = {
       id,
@@ -192,6 +280,7 @@ export class SandboxManager {
       workspaceDir,
       createdAt: new Date().toISOString(),
       limits,
+      startupTimings: timings,
     };
 
     // Disk monitoring — kill sandbox if workspace exceeds disk limit
@@ -236,6 +325,7 @@ export class SandboxManager {
     try { unlinkSync(sandbox.socketPath); } catch { /* already gone */ }
     resourceCleanup();
     this.sandboxes.delete(id);
+    this.logBuffers.delete(id);
   }
 
   async destroyAll(): Promise<void> {

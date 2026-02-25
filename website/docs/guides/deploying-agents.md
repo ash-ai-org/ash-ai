@@ -50,12 +50,6 @@ Existing sessions continue using the version they started with. New sessions pic
 
 ## Listing Agents
 
-### CLI
-
-```bash
-ash agent list
-```
-
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
 
@@ -79,9 +73,14 @@ print(agents)
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash agent list
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl $ASH_SERVER_URL/api/agents
@@ -104,13 +103,10 @@ Response:
 }
 ```
 
+</TabItem>
+</Tabs>
+
 ## Getting Agent Details
-
-### CLI
-
-```bash
-ash agent info research-bot
-```
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -127,23 +123,25 @@ agent = client.get_agent("research-bot")
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash agent info research-bot
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl $ASH_SERVER_URL/api/agents/research-bot
 ```
 
+</TabItem>
+</Tabs>
+
 ## Deleting an Agent
 
 Deleting an agent removes its registration from the server. Existing sessions that were created from the agent continue to run, but no new sessions can be created.
-
-### CLI
-
-```bash
-ash agent delete research-bot
-```
 
 <Tabs groupId="sdk-language">
 <TabItem value="typescript" label="TypeScript">
@@ -160,13 +158,21 @@ client.delete_agent("research-bot")
 ```
 
 </TabItem>
-</Tabs>
+<TabItem value="cli" label="CLI">
 
-### curl
+```bash
+ash agent delete research-bot
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
 
 ```bash
 curl -X DELETE $ASH_SERVER_URL/api/agents/research-bot
 ```
+
+</TabItem>
+</Tabs>
 
 ## API Reference
 

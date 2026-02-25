@@ -57,6 +57,13 @@
       "when": 1771706260827,
       "tag": "0007_keen_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771973631446,
+      "tag": "0008_demonic_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import type { PoolStats, SandboxState, SandboxRecord } from '@ash-ai/shared';
 import { DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS, IDLE_SWEEP_INTERVAL_MS } from '@ash-ai/shared';
-import type { ManagedSandbox, CreateSandboxOpts, SandboxManager } from './manager.js';
+import type { ManagedSandbox, CreateSandboxOpts, SandboxManager, LogEntry } from './manager.js';
 import { deleteSessionState, deleteCloudState } from './state-persistence.js';
 
 export type LiveSandboxState = 'warming' | 'warm' | 'waiting' | 'running';
@@ -52,6 +52,7 @@ export class SandboxPool {
   private sweepTimer: NodeJS.Timeout | null = null;
   private resumeWarmHits = 0;
   private resumeColdHits = 0;
+  private _preWarmHits = 0;
 
   constructor(opts: SandboxPoolOpts) {
     this.manager = opts.manager;
@@ -72,6 +73,16 @@ export class SandboxPool {
   }
 
   async create(opts: CreateSandboxOpts & { agentName: string }): Promise<ManagedSandbox> {
+    // Try to claim a pre-warmed sandbox first
+    if (opts.sessionId) {
+      const warm = this.claimWarm(opts.agentName, opts.sessionId);
+      if (warm) {
+        this._preWarmHits++;
+        console.log(`[pool] Claimed pre-warmed sandbox ${warm.id.slice(0, 8)} for session ${opts.sessionId}`);
+        return warm;
+      }
+    }
+
     // Enforce capacity — evict if needed
     const count = await this.db.countSandboxes();
     if (count >= this.maxCapacity) {
@@ -182,6 +193,85 @@ export class SandboxPool {
     this.db.touchSandbox(sandboxId).catch(() => {});
   }
 
+  // --- Pre-warming ---
+
+  /**
+   * Pre-create sandboxes for an agent so first sessions skip install/startup latency.
+   * Sandboxes are created with no sessionId and sit in 'warm' state until claimed.
+   */
+  async warmUp(agentName: string, agentDir: string, count: number, opts?: { startupScript?: string; extraEnv?: Record<string, string> }): Promise<void> {
+    let created = 0;
+    for (let i = 0; i < count; i++) {
+      // Respect capacity
+      const currentCount = await this.db.countSandboxes();
+      if (currentCount >= this.maxCapacity) {
+        console.log(`[pool] Pre-warm stopped at ${created}/${count} for ${agentName} — capacity reached`);
+        break;
+      }
+
+      try {
+        const sandbox = await this.manager.create({
+          agentDir,
+          sessionId: '', // placeholder — pre-warm sandboxes have no session
+          startupScript: opts?.startupScript,
+          extraEnv: opts?.extraEnv,
+        });
+
+        await this.db.insertSandbox(sandbox.id, agentName, sandbox.workspaceDir);
+        await this.db.updateSandboxState(sandbox.id, 'warm');
+
+        const entry: PoolEntry = {
+          sandbox,
+          state: 'warm',
+          sessionId: null,
+          agentName,
+        };
+        this.live.set(sandbox.id, entry);
+        created++;
+      } catch (err) {
+        console.error(`[pool] Pre-warm failed for ${agentName} (${created}/${count}):`, err);
+        break;
+      }
+    }
+
+    if (created > 0) {
+      console.log(`[pool] Pre-warmed ${created} sandbox(es) for agent ${agentName}`);
+    }
+  }
+
+  /**
+   * Claim a pre-warmed sandbox for a session.
+   * Scans the live map for an idle warm sandbox matching the agent.
+   * Returns undefined if none available.
+   */
+  claimWarm(agentName: string, sessionId: string): ManagedSandbox | undefined {
+    for (const [id, entry] of this.live) {
+      if (entry.state === 'warm' && entry.agentName === agentName && entry.sessionId === null) {
+        // Check process is alive
+        if (entry.sandbox.process.exitCode !== null) {
+          this.live.delete(id);
+          this.db.deleteSandbox(id).catch(() => {});
+          continue;
+        }
+
+        // Claim it
+        entry.sessionId = sessionId;
+        this.sessionIndex.set(sessionId, id);
+        // Update DB with session association
+        this.db.updateSandboxSession(id, sessionId).catch((err) =>
+          console.error(`[pool] Failed to update sandbox ${id} session:`, err)
+        );
+        this.db.touchSandbox(id).catch(() => {});
+        return entry.sandbox;
+      }
+    }
+    return undefined;
+  }
+
+  get preWarmHits(): number {
+    return this._preWarmHits;
+  }
+
   // --- Eviction ---
 
   private async evictOne(): Promise<boolean> {
@@ -274,6 +364,12 @@ export class SandboxPool {
     }
   }
 
+  // --- Logs ---
+
+  getLogs(sandboxId: string, after?: number): LogEntry[] {
+    return this.manager.getLogs(sandboxId, after);
+  }
+
   // --- Resume metrics ---
 
   recordWarmHit(): void { this.resumeWarmHits++; }
@@ -305,6 +401,7 @@ export class SandboxPool {
       maxCapacity: this.maxCapacity,
       resumeWarmHits: this.resumeWarmHits,
       resumeColdHits: this.resumeColdHits,
+      preWarmHits: this._preWarmHits,
     };
   }
 

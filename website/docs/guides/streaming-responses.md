@@ -90,6 +90,27 @@ for event in client.send_message_stream(session.id, "Explain TCP in one paragrap
 ```
 
 </TabItem>
+<TabItem value="curl" label="curl">
+
+Use the `-N` flag to disable output buffering so events print as they arrive:
+
+```bash
+curl -N -X POST $ASH_SERVER_URL/api/sessions/SESSION_ID/messages \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Hello!"}'
+```
+
+Output:
+
+```
+event: message
+data: {"type":"assistant","message":{"content":[{"type":"text","text":"Hello! How can I help you?"}]}}
+
+event: done
+data: {"sessionId":"a1b2c3d4-..."}
+```
+
+</TabItem>
 </Tabs>
 
 ## Display Items
@@ -233,26 +254,6 @@ while (true) {
     }
   }
 }
-```
-
-## curl
-
-Use the `-N` flag to disable output buffering so events print as they arrive:
-
-```bash
-curl -N -X POST $ASH_SERVER_URL/api/sessions/SESSION_ID/messages \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Hello!"}'
-```
-
-Output:
-
-```
-event: message
-data: {"type":"assistant","message":{"content":[{"type":"text","text":"Hello! How can I help you?"}]}}
-
-event: done
-data: {"sessionId":"a1b2c3d4-..."}
 ```
 
 ## Helper Functions Reference

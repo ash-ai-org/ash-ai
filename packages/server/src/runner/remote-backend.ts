@@ -1,5 +1,6 @@
 import type { BridgeCommand, BridgeEvent, PoolStats } from '@ash-ai/shared';
 import { RunnerClient } from './runner-client.js';
+import type { LogEntry } from '@ash-ai/sandbox';
 import type { RunnerBackend, CreateSandboxRequest, SandboxHandle } from './types.js';
 
 /**
@@ -85,6 +86,11 @@ export class RemoteRunnerBackend implements RunnerBackend {
     // Fire-and-forget to runner. Returns true optimistically.
     this.client.persistState(sandboxId, sessionId, agentName).catch(() => {});
     return true;
+  }
+
+  getLogs(sandboxId: string, after?: number): LogEntry[] {
+    // TODO: Add runner-level /runner/sandboxes/:id/logs endpoint for remote log streaming
+    return [];
   }
 
   async getStats(): Promise<PoolStats> {
