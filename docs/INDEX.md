@@ -63,12 +63,12 @@
 | [features/sse-backpressure.md](./features/sse-backpressure.md) | SSE stream backpressure and write timeout |
 | [features/hot-path-timing.md](./features/hot-path-timing.md) | Hot-path timing instrumentation (`ASH_DEBUG_TIMING=1`) |
 | [features/docker-lifecycle.md](./features/docker-lifecycle.md) | Docker container lifecycle management (`ash start/stop/status/logs`) |
-| [features/session-resume.md](./features/session-resume.md) | Session pause/resume with fast-path and cold-path recovery |
+| [features/session-resume.md](./features/session-resume.md) | Session pause/resume with fast-path and cold-path recovery, cold cleanup |
 | [features/database.md](./features/database.md) | Configurable database: SQLite (default) + Postgres/CRDB via `ASH_DATABASE_URL` |
-| [features/sandbox-pool.md](./features/sandbox-pool.md) | DB-backed sandbox pool with capacity limits, LRU eviction, and idle sweep |
+| [features/sandbox-pool.md](./features/sandbox-pool.md) | DB-backed sandbox pool with capacity limits, LRU eviction, idle sweep, and cold cleanup |
 | [features/openapi-spec.md](./features/openapi-spec.md) | OpenAPI spec generation, Swagger UI, and Python SDK |
 | [features/multi-runner.md](./features/multi-runner.md) | Multi-runner architecture: standalone vs coordinator mode, session routing |
-| [features/metrics.md](./features/metrics.md) | Prometheus `/metrics` endpoint, structured resume log lines, pool stats |
+| [features/metrics.md](./features/metrics.md) | Prometheus `/metrics` endpoint, structured resume log lines, pool stats, cold resume source breakdown |
 | [features/multi-coordinator.md](./features/multi-coordinator.md) | Horizontal control plane: DB-backed runner registry, multi-coordinator with CRDB |
 
 ## Runbooks

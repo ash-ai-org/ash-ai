@@ -95,6 +95,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
     });
     await pool.init();
     pool.startIdleSweep();
+    pool.startColdCleanup();
 
     // Pre-warm sandboxes for agents that request it (fire-and-forget, doesn't block startup)
     listAgents().then(async (agents) => {
@@ -221,6 +222,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
     coordinator.stopLivenessSweep();
     if (pool) {
       pool.stopIdleSweep();
+      pool.stopColdCleanup();
       await pool.destroyAll();
     }
     await closeDb();

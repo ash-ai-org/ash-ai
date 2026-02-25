@@ -131,11 +131,13 @@ Optional: `ASH_S3_REGION` overrides the S3 region (default: `us-east-1`).
 ```
 POST /sessions/:id/resume (cold path)
   │
-  ├─ old workspace dir exists? → use it
-  ├─ local persisted state exists? → restore locally
-  ├─ cloud snapshot exists? → download, extract, restore locally
-  └─ none of the above → fresh agent copy
+  ├─ old workspace dir exists? → use it (source: local)
+  ├─ local persisted state exists? → restore locally (source: local)
+  ├─ cloud snapshot exists? → download, extract, restore locally (source: cloud)
+  └─ none of the above → fresh agent copy (source: fresh)
 ```
+
+Each cold resume path is tracked via `resumeSource` (`local`, `cloud`, `fresh`) and recorded in pool stats, Prometheus metrics, lifecycle events, and structured log lines. See [metrics.md](./metrics.md) for the full metrics breakdown.
 
 ### Security
 
@@ -146,9 +148,39 @@ AWS/GCS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `GOOGLE_APPLI
 - `@aws-sdk/client-s3` — installed in server and runner packages
 - `@google-cloud/storage` — optional peer dependency, install if using GCS
 
+## Cold Cleanup
+
+*Added: 2026-02-25*
+
+Cold sandbox entries (no live process) accumulate on disk after idle sweep eviction or server restart. A periodic **cold cleanup sweep** prevents unbounded disk growth:
+
+- **Sweep interval**: Every 5 minutes (`COLD_CLEANUP_INTERVAL_MS`)
+- **TTL**: Cold entries unused for 2 hours (`COLD_CLEANUP_TTL_MS`) are cleaned up
+- **Deleted**: Live workspace dir (`data/sandboxes/<id>/`), local snapshot (`data/sessions/<sessionId>/workspace/`), database record
+- **Preserved**: Cloud snapshots (S3/GCS) — sessions can still be resumed from cloud storage after local cleanup
+
+```
+pool.startColdCleanup();  // Start periodic timer (called on server/runner start)
+pool.stopColdCleanup();   // Stop timer (called on graceful shutdown)
+```
+
+### Lifecycle timeline
+
+```
+Sandbox running → idle 30m → Evicted to cold (idle sweep)
+                               → 2h unused → Local files deleted (cold cleanup)
+                                              → Resume requested → Restored from cloud (if configured)
+```
+
+### Configuration
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `COLD_CLEANUP_TTL_MS` | 2 hours | How long a cold sandbox sits before local files are cleaned up |
+| `COLD_CLEANUP_INTERVAL_MS` | 5 minutes | How often the cold cleanup sweep runs |
+
 ## Limitations
 
 - Full workspace copy can be large if the agent creates many files. A more efficient delta/incremental approach is deferred.
-- No idle sandbox cleanup yet — paused sessions keep their sandbox process alive indefinitely.
 - Cold-path resume requires re-establishing the bridge connection (new process spawn), which takes a few seconds.
 - Cloud upload is fire-and-forget. If the process crashes between local persist and cloud upload completing, the cloud copy may be stale.

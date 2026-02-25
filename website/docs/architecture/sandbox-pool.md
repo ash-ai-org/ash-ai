@@ -67,12 +67,29 @@ pool.startIdleSweep();  // Start the periodic timer
 pool.stopIdleSweep();   // Stop the timer (graceful shutdown)
 ```
 
+## Cold Cleanup
+
+A separate periodic timer (every 5 minutes) removes cold sandbox entries that haven't been used for 2 hours. This prevents unbounded disk growth from accumulated cold entries.
+
+Cold cleanup deletes:
+- The live workspace directory (`data/sandboxes/<id>/`)
+- The local snapshot directory (`data/sessions/<sessionId>/workspace/`)
+- The database record
+
+**Cloud snapshots are preserved**, so sessions can still be resumed from cloud storage after local cleanup. See [State Persistence & Restore](./state-persistence.md) for the full restore fallback chain.
+
+```typescript
+pool.startColdCleanup();  // Start the periodic timer
+pool.stopColdCleanup();   // Stop the timer (graceful shutdown)
+```
+
 ## Configuration
 
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `ASH_MAX_SANDBOXES` | `1000` | Maximum number of sandbox entries (live + cold) in the database |
 | `ASH_IDLE_TIMEOUT_MS` | `1800000` (30 min) | How long a `waiting` sandbox can be idle before eviction |
+| `COLD_CLEANUP_TTL_MS` | `7200000` (2 hr) | How long a `cold` sandbox sits before local files are cleaned up |
 
 ## Race Condition Safety
 
@@ -112,7 +129,13 @@ const stats = await pool.statsAsync();
 //   waiting: 3,      // Idle between messages
 //   running: 2,      // Processing a message
 //   maxCapacity: 1000,
-//   resumeWarmHits: 15,  // Resumes that found sandbox alive
-//   resumeColdHits: 5,   // Resumes that needed new sandbox
+//   resumeWarmHits: 15,   // Resumes that found sandbox alive
+//   resumeColdHits: 5,    // Resumes that needed new sandbox (total)
+//   resumeColdLocalHits: 3,  // Cold resume from local disk
+//   resumeColdCloudHits: 1,  // Cold resume from cloud storage
+//   resumeColdFreshHits: 1,  // Cold resume with no state available
+//   preWarmHits: 2,    // Sessions that claimed a pre-warmed sandbox
 // }
 ```
+
+The cold resume counters break down where the workspace came from during a cold resume. See [State Persistence & Restore](./state-persistence.md) for details.

@@ -40,6 +40,8 @@ export const ASH_HEALTH_POLL_TIMEOUT_MS = 30_000;
 export const DEFAULT_MAX_SANDBOXES = 1000;
 export const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;  // 30 min
 export const IDLE_SWEEP_INTERVAL_MS = 60_000;            // 1 min
+export const COLD_CLEANUP_TTL_MS = 2 * 60 * 60 * 1000;  // 2 hours
+export const COLD_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;   // 5 min
 
 // Runner (multi-machine mode)
 export const DEFAULT_RUNNER_PORT = 4200;

@@ -14,10 +14,11 @@ import { touchCredentialUsed } from '../db/index.js';
 import { recordUsageFromMessage } from '../usage/extractor.js';
 
 /** Structured log line for every resume — always on, not gated by ASH_DEBUG_TIMING. */
-function logResume(path: 'warm' | 'cold', sessionId: string, agentName: string): void {
+function logResume(path: 'warm' | 'cold', sessionId: string, agentName: string, source?: 'local' | 'cloud' | 'fresh'): void {
   process.stderr.write(JSON.stringify({
     type: 'resume_hit',
     path,
+    ...(source ? { source } : {}),
     sessionId,
     agentName,
     ts: new Date().toISOString(),
@@ -749,17 +750,22 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     try {
       const oldWorkspaceDir = join(dataDir, 'sandboxes', session.id, 'workspace');
       const workspaceExists = existsSync(oldWorkspaceDir);
+      let resumeSource: 'local' | 'cloud' | 'fresh' = 'fresh';
 
       if (!workspaceExists) {
         if (hasPersistedState(dataDir, session.id, session.tenantId)) {
           restoreSessionState(dataDir, session.id, oldWorkspaceDir, session.tenantId);
+          resumeSource = 'local';
         } else {
           // Fall back to cloud storage
           const restored = await restoreStateFromCloud(dataDir, session.id, session.tenantId);
           if (restored) {
             restoreSessionState(dataDir, session.id, oldWorkspaceDir, session.tenantId);
+            resumeSource = 'cloud';
           }
         }
+      } else {
+        resumeSource = 'local';
       }
 
       const workspaceAvailable = existsSync(oldWorkspaceDir);
@@ -777,15 +783,21 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           );
         },
       });
-      backend.recordColdHit();
-      logResume('cold', session.id, session.agentName);
+
+      // Track resume source
+      switch (resumeSource) {
+        case 'local': backend.recordColdLocalHit(); break;
+        case 'cloud': backend.recordColdCloudHit(); break;
+        case 'fresh': backend.recordColdFreshHit(); break;
+      }
+      logResume('cold', session.id, session.agentName, resumeSource);
 
       const effectiveRunnerId = runnerId === '__local__' ? null : runnerId;
       await updateSessionSandbox(session.id, handle.sandboxId);
       await updateSessionRunner(session.id, effectiveRunnerId);
       await updateSessionStatus(session.id, 'active');
-      insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'cold' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
-      telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'active', action: 'resumed', path: 'cold' } });
+      insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'cold', source: resumeSource }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
+      telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'active', action: 'resumed', path: 'cold', source: resumeSource } });
 
       return reply.send({ session: { ...session, sandboxId: handle.sandboxId, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {

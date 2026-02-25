@@ -78,6 +78,18 @@ export class LocalRunnerBackend implements RunnerBackend {
     this.pool.recordColdHit();
   }
 
+  recordColdLocalHit(): void {
+    this.pool.recordColdLocalHit();
+  }
+
+  recordColdCloudHit(): void {
+    this.pool.recordColdCloudHit();
+  }
+
+  recordColdFreshHit(): void {
+    this.pool.recordColdFreshHit();
+  }
+
   persistState(sandboxId: string, sessionId: string, agentName: string): boolean {
     const sandbox = this.pool.get(sandboxId);
     if (!sandbox) return false;

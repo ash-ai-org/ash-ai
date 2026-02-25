@@ -53,6 +53,7 @@ export interface Db {
   countSandboxes(): Promise<number>;
   getBestEvictionCandidate(): Promise<SandboxRecord | null>;
   getIdleSandboxes(olderThan: string): Promise<SandboxRecord[]>;
+  getColdSandboxes(olderThan: string): Promise<SandboxRecord[]>;
   deleteSandbox(id: string): Promise<void>;
   markAllSandboxesCold(): Promise<number>;
   // Messages (tenant-scoped)
@@ -245,6 +246,10 @@ export async function getBestEvictionCandidate(): Promise<SandboxRecord | null> 
 
 export async function getIdleSandboxes(olderThan: string): Promise<SandboxRecord[]> {
   return getDb().getIdleSandboxes(olderThan);
+}
+
+export async function getColdSandboxes(olderThan: string): Promise<SandboxRecord[]> {
+  return getDb().getColdSandboxes(olderThan);
 }
 
 export async function deleteSandbox(id: string): Promise<void> {

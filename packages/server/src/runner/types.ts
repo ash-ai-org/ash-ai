@@ -46,6 +46,9 @@ export interface RunnerBackend {
 
   recordWarmHit(): void;
   recordColdHit(): void;
+  recordColdLocalHit(): void;
+  recordColdCloudHit(): void;
+  recordColdFreshHit(): void;
 
   persistState(sandboxId: string, sessionId: string, agentName: string): boolean;
 

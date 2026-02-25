@@ -1,5 +1,7 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import type { PoolStats, SandboxState, SandboxRecord } from '@ash-ai/shared';
-import { DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS, IDLE_SWEEP_INTERVAL_MS } from '@ash-ai/shared';
+import { DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS, IDLE_SWEEP_INTERVAL_MS, COLD_CLEANUP_TTL_MS, COLD_CLEANUP_INTERVAL_MS } from '@ash-ai/shared';
 import type { ManagedSandbox, CreateSandboxOpts, SandboxManager, LogEntry } from './manager.js';
 import { deleteSessionState, deleteCloudState } from './state-persistence.js';
 
@@ -19,6 +21,7 @@ export interface SandboxDb {
   countSandboxes(): Promise<number>;
   getBestEvictionCandidate(): Promise<SandboxRecord | null>;
   getIdleSandboxes(olderThan: string): Promise<SandboxRecord[]>;
+  getColdSandboxes(olderThan: string): Promise<SandboxRecord[]>;
   deleteSandbox(id: string): Promise<void>;
   markAllSandboxesCold(): Promise<number>;
 }
@@ -36,6 +39,7 @@ export interface SandboxPoolOpts {
   dataDir: string;
   maxCapacity?: number;
   idleTimeoutMs?: number;
+  coldCleanupTtlMs?: number;
   onBeforeEvict?: (entry: PoolEntry) => Promise<void>;
 }
 
@@ -48,10 +52,15 @@ export class SandboxPool {
   private dataDir: string;
   private maxCapacity: number;
   private idleTimeoutMs: number;
+  private coldCleanupTtlMs: number;
   private onBeforeEvict?: (entry: PoolEntry) => Promise<void>;
   private sweepTimer: NodeJS.Timeout | null = null;
+  private coldCleanupTimer: NodeJS.Timeout | null = null;
   private resumeWarmHits = 0;
   private resumeColdHits = 0;
+  private _resumeColdLocalHits = 0;
+  private _resumeColdCloudHits = 0;
+  private _resumeColdFreshHits = 0;
   private _preWarmHits = 0;
 
   constructor(opts: SandboxPoolOpts) {
@@ -60,6 +69,7 @@ export class SandboxPool {
     this.dataDir = opts.dataDir;
     this.maxCapacity = opts.maxCapacity ?? DEFAULT_MAX_SANDBOXES;
     this.idleTimeoutMs = opts.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+    this.coldCleanupTtlMs = opts.coldCleanupTtlMs ?? COLD_CLEANUP_TTL_MS;
     this.onBeforeEvict = opts.onBeforeEvict;
   }
 
@@ -364,6 +374,48 @@ export class SandboxPool {
     }
   }
 
+  // --- Cold cleanup ---
+
+  async sweepCold(): Promise<number> {
+    const threshold = new Date(Date.now() - this.coldCleanupTtlMs).toISOString();
+    const staleCold = await this.db.getColdSandboxes(threshold);
+    let cleaned = 0;
+
+    for (const record of staleCold) {
+      // Delete local workspace dir
+      rmSync(join(this.dataDir, 'sandboxes', record.id), { recursive: true, force: true });
+      // Delete local session state backup
+      if (record.sessionId) {
+        deleteSessionState(this.dataDir, record.sessionId);
+      }
+      // Delete DB row (cloud backup preserved for future restore)
+      await this.db.deleteSandbox(record.id);
+      cleaned++;
+    }
+
+    if (cleaned > 0) {
+      console.log(`[pool] Cold cleanup: removed ${cleaned} stale sandbox(es)`);
+    }
+    return cleaned;
+  }
+
+  startColdCleanup(): void {
+    if (this.coldCleanupTimer) return;
+    this.coldCleanupTimer = setInterval(() => {
+      this.sweepCold().catch((err) =>
+        console.error('[pool] Cold cleanup error:', err)
+      );
+    }, COLD_CLEANUP_INTERVAL_MS);
+    this.coldCleanupTimer.unref();
+  }
+
+  stopColdCleanup(): void {
+    if (this.coldCleanupTimer) {
+      clearInterval(this.coldCleanupTimer);
+      this.coldCleanupTimer = null;
+    }
+  }
+
   // --- Logs ---
 
   getLogs(sandboxId: string, after?: number): LogEntry[] {
@@ -374,6 +426,9 @@ export class SandboxPool {
 
   recordWarmHit(): void { this.resumeWarmHits++; }
   recordColdHit(): void { this.resumeColdHits++; }
+  recordColdLocalHit(): void { this._resumeColdLocalHits++; this.resumeColdHits++; }
+  recordColdCloudHit(): void { this._resumeColdCloudHits++; this.resumeColdHits++; }
+  recordColdFreshHit(): void { this._resumeColdFreshHits++; this.resumeColdHits++; }
 
   // --- Stats ---
 
@@ -401,6 +456,9 @@ export class SandboxPool {
       maxCapacity: this.maxCapacity,
       resumeWarmHits: this.resumeWarmHits,
       resumeColdHits: this.resumeColdHits,
+      resumeColdLocalHits: this._resumeColdLocalHits,
+      resumeColdCloudHits: this._resumeColdCloudHits,
+      resumeColdFreshHits: this._resumeColdFreshHits,
       preWarmHits: this._preWarmHits,
     };
   }

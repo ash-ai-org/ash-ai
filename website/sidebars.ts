@@ -101,6 +101,7 @@ const sidebars: SidebarsConfig = {
         'architecture/bridge-protocol',
         'architecture/session-lifecycle',
         'architecture/sandbox-pool',
+        'architecture/state-persistence',
         'architecture/sse-backpressure',
         'architecture/database',
         'architecture/scaling',

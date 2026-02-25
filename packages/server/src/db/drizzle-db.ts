@@ -410,6 +410,19 @@ export class DrizzleDb implements Db {
     }));
   }
 
+  async getColdSandboxes(olderThan: string): Promise<SandboxRecord[]> {
+    const { sandboxes } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(sandboxes)
+      .where(and(eq(sandboxes.state, 'cold'), lt(sandboxes.lastUsedAt, olderThan)))
+      .orderBy(asc(sandboxes.lastUsedAt));
+    return rows.map((r: any) => ({
+      id: r.id, sessionId: r.sessionId, agentName: r.agentName,
+      state: r.state as SandboxState, workspaceDir: r.workspaceDir, createdAt: r.createdAt, lastUsedAt: r.lastUsedAt,
+    }));
+  }
+
   async deleteSandbox(id: string): Promise<void> {
     const { sandboxes } = this.schema;
     await this.drizzle

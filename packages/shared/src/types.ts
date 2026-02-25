@@ -292,6 +292,9 @@ export interface PoolStats {
   maxCapacity: number;
   resumeWarmHits: number;
   resumeColdHits: number;
+  resumeColdLocalHits: number;
+  resumeColdCloudHits: number;
+  resumeColdFreshHits: number;
   preWarmHits: number;
 }
 
