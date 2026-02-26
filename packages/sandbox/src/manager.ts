@@ -135,8 +135,23 @@ export class SandboxManager {
     const sandboxUid = process.env.ASH_SANDBOX_UID ? parseInt(process.env.ASH_SANDBOX_UID, 10) : undefined;
     const sandboxGid = process.env.ASH_SANDBOX_GID ? parseInt(process.env.ASH_SANDBOX_GID, 10) : undefined;
 
+    // Per-sandbox home directory for Claude Code config (.claude.json, .claude/todos, etc.).
+    // Lives inside sandboxDir so it's already covered by the bwrap bind mount,
+    // then mounted OVER /home/ash-sandbox so each sandbox is fully isolated.
+    let sandboxHomeDir: string | undefined;
     if (sandboxUid !== undefined) {
-      env.HOME = `/home/ash-sandbox`;
+      sandboxHomeDir = join(sandboxDir, 'home');
+      mkdirSync(sandboxHomeDir, { recursive: true });
+      // Seed with base Claude config from the image's /home/ash-sandbox
+      const baseHome = '/home/ash-sandbox';
+      const claudeDir = join(sandboxHomeDir, '.claude');
+      mkdirSync(claudeDir, { recursive: true });
+      for (const file of ['.claude/settings.json', '.claude/remote-settings.json']) {
+        const src = join(baseHome, file);
+        const dst = join(sandboxHomeDir, file);
+        if (existsSync(src)) cpSync(src, dst);
+      }
+      env.HOME = baseHome; // bwrap maps sandboxDir/home/ → /home/ash-sandbox
       // Recursively chown so the non-root sandbox user can write to all files
       execSync(`chown -R ${sandboxUid}:${sandboxGid ?? sandboxUid} '${sandboxDir}'`);
     } else {
@@ -218,7 +233,7 @@ export class SandboxManager {
       [this.bridgeEntry],
       spawnOpts as import('node:child_process').SpawnOptions,
       limits,
-      { sandboxId: id, workspaceDir, agentDir: opts.agentDir, sandboxDir, sandboxesDir: this.sandboxesDir },
+      { sandboxId: id, workspaceDir, agentDir: opts.agentDir, sandboxDir, sandboxesDir: this.sandboxesDir, homeDir: sandboxHomeDir },
     );
 
     child.stdout?.on('data', (chunk: Buffer) => {
