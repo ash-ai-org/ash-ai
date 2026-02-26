@@ -43,7 +43,7 @@ The `sendMessageStream` method returns an async generator of typed events:
 import { AshClient } from '@ash-ai/sdk';
 import { extractTextFromEvent, extractDisplayItems } from '@ash-ai/shared';
 
-const client = new AshClient({ serverUrl: 'http://localhost:4100' });
+const client = new AshClient({ serverUrl: 'http://localhost:4100', apiKey: process.env.ASH_API_KEY });
 const session = await client.createSession('my-agent');
 
 for await (const event of client.sendMessageStream(session.id, 'Explain TCP in one paragraph.')) {
@@ -71,7 +71,7 @@ for await (const event of client.sendMessageStream(session.id, 'Explain TCP in o
 ```python
 from ash_sdk import AshClient
 
-client = AshClient("http://localhost:4100")
+client = AshClient("http://localhost:4100", api_key=os.environ["ASH_API_KEY"])
 session = client.create_session("my-agent")
 
 for event in client.send_message_stream(session.id, "Explain TCP in one paragraph."):

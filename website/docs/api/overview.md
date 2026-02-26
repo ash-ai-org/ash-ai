@@ -27,8 +27,8 @@ Authentication behavior depends on server configuration:
 
 | Configuration | Behavior |
 |---|---|
-| `ASH_API_KEY` not set, no DB API keys | Auth disabled (local dev mode). All requests use the `default` tenant. |
 | `ASH_API_KEY` set | Single-tenant mode. The Bearer token must match `ASH_API_KEY`. |
+| `ASH_API_KEY` not set (auto-generated) | The server auto-generates a key on first start. The CLI picks it up automatically. |
 | API keys in database | Multi-tenant mode. Bearer token is hashed and looked up in the `api_keys` table. Each key maps to a tenant. |
 
 Public endpoints (`/health`, `/docs/*`, `/metrics`) do not require authentication.

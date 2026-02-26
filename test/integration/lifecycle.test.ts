@@ -13,6 +13,7 @@ describe('full lifecycle', () => {
   let server: ServerHandle;
   let testRoot: string;
   let agentDir: string;
+  let auth: Record<string, string>;
 
   beforeAll(async () => {
     // All test dirs under one root — single Docker volume mount
@@ -31,6 +32,7 @@ describe('full lifecycle', () => {
 
     server = await launchServer({ port, testRoot });
     await waitForReady(server.url);
+    auth = { Authorization: `Bearer ${server.apiKey}` };
   }, 120_000); // generous timeout for first-time Docker image build
 
   afterAll(async () => {
@@ -48,7 +50,7 @@ describe('full lifecycle', () => {
   it('deploys an agent', async () => {
     const res = await fetch(`${server.url}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ name: 'test-agent', path: server.toServerPath(agentDir) }),
     });
     expect(res.status).toBe(201);
@@ -58,7 +60,7 @@ describe('full lifecycle', () => {
   });
 
   it('lists the deployed agent', async () => {
-    const res = await fetch(`${server.url}/api/agents`);
+    const res = await fetch(`${server.url}/api/agents`, { headers: auth });
     expect(res.ok).toBe(true);
     const body = await res.json() as any;
     expect(body.agents).toHaveLength(1);
@@ -66,7 +68,7 @@ describe('full lifecycle', () => {
   });
 
   it('returns 404 for nonexistent agent', async () => {
-    const res = await fetch(`${server.url}/api/agents/ghost`);
+    const res = await fetch(`${server.url}/api/agents/ghost`, { headers: auth });
     expect(res.status).toBe(404);
   });
 
@@ -75,7 +77,7 @@ describe('full lifecycle', () => {
     mkdirSync(emptyDir, { recursive: true });
     const res = await fetch(`${server.url}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ name: 'bad-agent', path: server.toServerPath(emptyDir) }),
     });
     expect(res.status).toBe(400);
@@ -84,7 +86,7 @@ describe('full lifecycle', () => {
   it('creates a session', async () => {
     const res = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const body = await res.json() as any;
@@ -101,7 +103,7 @@ describe('full lifecycle', () => {
     // Create session
     const createRes = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const { session } = await createRes.json() as any;
@@ -109,7 +111,7 @@ describe('full lifecycle', () => {
     // Send message
     const msgRes = await fetch(`${server.url}/api/sessions/${session.id}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ content: 'Hello, agent!' }),
     });
 
@@ -134,7 +136,7 @@ describe('full lifecycle', () => {
   it('rejects message to nonexistent session', async () => {
     const res = await fetch(`${server.url}/api/sessions/ghost/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ content: 'hello' }),
     });
     expect(res.status).toBe(404);
@@ -143,13 +145,14 @@ describe('full lifecycle', () => {
   it('ends a session', async () => {
     const createRes = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const { session } = await createRes.json() as any;
 
     const deleteRes = await fetch(`${server.url}/api/sessions/${session.id}`, {
       method: 'DELETE',
+      headers: auth,
     });
     expect(deleteRes.status).toBe(200);
     const body = await deleteRes.json() as any;
@@ -158,7 +161,7 @@ describe('full lifecycle', () => {
     // Verify can't send to ended session
     const msgRes = await fetch(`${server.url}/api/sessions/${session.id}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ content: 'hello?' }),
     });
     expect(msgRes.status).toBe(400);
@@ -167,7 +170,7 @@ describe('full lifecycle', () => {
   it('rejects session for nonexistent agent', async () => {
     const res = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'ghost-agent' }),
     });
     expect(res.status).toBe(404);
@@ -176,7 +179,7 @@ describe('full lifecycle', () => {
   it('re-deploys with incremented version', async () => {
     const res = await fetch(`${server.url}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ name: 'test-agent', path: server.toServerPath(agentDir) }),
     });
     expect(res.status).toBe(201);
@@ -187,10 +190,11 @@ describe('full lifecycle', () => {
   it('deletes an agent', async () => {
     const res = await fetch(`${server.url}/api/agents/test-agent`, {
       method: 'DELETE',
+      headers: auth,
     });
     expect(res.status).toBe(200);
 
-    const listRes = await fetch(`${server.url}/api/agents`);
+    const listRes = await fetch(`${server.url}/api/agents`, { headers: auth });
     const body = await listRes.json() as any;
     expect(body.agents).toHaveLength(0);
   });

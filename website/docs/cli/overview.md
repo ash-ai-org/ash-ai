@@ -21,7 +21,7 @@ The CLI connects to an Ash server. Set the server URL via environment variable:
 export ASH_SERVER_URL=http://localhost:4100   # default
 ```
 
-If the server has `ASH_API_KEY` set, the CLI reads credentials from the same environment or passes them via headers.
+The server always requires authentication. When you run `ash start`, the CLI automatically picks up the server's API key (auto-generated or explicit) and saves it to `~/.ash/config.json`. For remote servers, use `ash connect --api-key <key>` to save the key.
 
 ## Help
 

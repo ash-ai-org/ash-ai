@@ -51,7 +51,7 @@ ash start --port 8080
 ash start --database-url "postgresql://user:pass@host:5432/ash"
 
 # Pass extra env vars
-ash start -e ANTHROPIC_API_KEY=sk-ant-... -e ASH_API_KEY=my-secret
+ash start -e ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ### Output
@@ -61,8 +61,11 @@ Starting Ash server...
 Waiting for server to be ready...
 Ash server is running.
   URL:      http://localhost:4100
+  API key:  ash_xxxxxxxx (saved to ~/.ash/config.json)
   Data dir: /Users/you/.ash
 ```
+
+The server auto-generates a secure API key on first start and the CLI saves it to `~/.ash/config.json`. Subsequent CLI commands use this key automatically.
 
 ## `ash stop`
 

@@ -176,7 +176,7 @@ aws ecs describe-services \
 
 ## Authentication
 
-The deploy script sets `ASH_API_KEY` on the Fargate task. When this variable is set, Ash enforces authentication on all API requests (except `/health` and `/docs`).
+The deploy script sets `ASH_API_KEY` on the Fargate task. Ash enforces authentication on all API requests (except `/health` and `/docs`). If you don't provide an `ASH_API_KEY`, the deploy script auto-generates one.
 
 Your client must include the key as a Bearer token:
 

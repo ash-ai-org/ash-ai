@@ -39,13 +39,13 @@ import { AshClient } from '@ash-ai/sdk';
 
 const client = new AshClient({
   serverUrl: 'http://localhost:4100',
-  apiKey: 'your-api-key', // optional in local dev mode
+  apiKey: 'your-api-key',
 });
 ```
 
 The `serverUrl` is the base URL of your Ash server. Trailing slashes are stripped automatically.
 
-When `ASH_API_KEY` is not set on the server, authentication is disabled and the `apiKey` parameter can be omitted.
+The server always requires authentication. If you used `ash start`, the CLI saves the auto-generated key to `~/.ash/config.json`. For SDK usage, pass the key explicitly.
 
 </TabItem>
 <TabItem value="python" label="Python">
@@ -55,13 +55,11 @@ from ash_ai import AshClient
 
 client = AshClient(
     server_url="http://localhost:4100",
-    api_key="your-api-key",  # optional in local dev mode
+    api_key="your-api-key",
 )
 ```
 
-The `server_url` is the base URL of your Ash server.
-
-When `ASH_API_KEY` is not set on the server, authentication is disabled and the `api_key` parameter can be omitted.
+The `server_url` is the base URL of your Ash server. The `api_key` is required — the server always requires authentication.
 
 </TabItem>
 </Tabs>
@@ -385,7 +383,10 @@ health = client.health()
 ```typescript
 import { AshClient, extractTextFromEvent, extractStreamDelta, extractDisplayItems } from '@ash-ai/sdk';
 
-const client = new AshClient({ serverUrl: 'http://localhost:4100' });
+const client = new AshClient({
+  serverUrl: 'http://localhost:4100',
+  apiKey: process.env.ASH_API_KEY,
+});
 
 // Deploy and create session
 const agent = await client.deployAgent('helper', '/path/to/agent');
@@ -435,7 +436,10 @@ await client.endSession(session.id);
 ```python
 from ash_ai import AshClient
 
-client = AshClient(server_url="http://localhost:4100")
+client = AshClient(
+    server_url="http://localhost:4100",
+    api_key=os.environ.get("ASH_API_KEY"),
+)
 
 # Deploy and create session
 agent = client.deploy_agent(name="helper", path="/path/to/agent")

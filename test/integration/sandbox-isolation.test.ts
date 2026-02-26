@@ -20,15 +20,20 @@ import { launchServer, waitForReady, shouldUseDocker, type ServerHandle } from '
 
 const PORT = 14700 + Math.floor(Math.random() * 200);
 const AGENT_NAME = 'isolation-agent';
+let serverApiKey: string;
 
 // ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
+function authHeaders(): Record<string, string> {
+  return serverApiKey ? { Authorization: `Bearer ${serverApiKey}` } : {};
+}
+
 async function post(url: string, body: object): Promise<Response> {
   return fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
 }
@@ -56,7 +61,7 @@ async function execInSession(
 }
 
 async function deleteSession(baseUrl: string, sessionId: string): Promise<void> {
-  await fetch(`${baseUrl}/api/sessions/${sessionId}`, { method: 'DELETE' });
+  await fetch(`${baseUrl}/api/sessions/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +89,7 @@ describe('cross-sandbox isolation', () => {
     }
 
     server = await launchServer({ port: PORT, testRoot });
+    serverApiKey = server.apiKey;
     await waitForReady(server.url);
 
     // Deploy agent

@@ -21,6 +21,12 @@ export interface SandboxSpawnOpts {
   agentDir: string;
   sandboxDir: string;
   sandboxesDir: string;
+  /**
+   * Per-sandbox home directory (e.g. sandboxDir/home/).
+   * When set, bind-mounted OVER /home/ash-sandbox so each sandbox gets its own
+   * private writable home — no shared state between sandboxes.
+   */
+  homeDir?: string;
 }
 
 // =============================================================================
@@ -76,6 +82,9 @@ function buildBwrapArgs(sandboxOpts: SandboxSpawnOpts): string[] {
     '--tmpfs', sandboxOpts.sandboxesDir,
     // Restore only this sandbox's directory, read-write (workspace + socket)
     '--bind', sandboxOpts.sandboxDir, sandboxOpts.sandboxDir,
+    // Per-sandbox home: bind sandboxDir/home/ OVER /home/ash-sandbox so each
+    // sandbox gets its own private writable home directory (no cross-sandbox leaks).
+    ...(sandboxOpts.homeDir ? ['--bind', sandboxOpts.homeDir, '/home/ash-sandbox'] : []),
     // Minimal /dev and /proc
     '--dev', '/dev',
     '--proc', '/proc',

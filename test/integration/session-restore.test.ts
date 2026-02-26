@@ -14,15 +14,20 @@ import { launchServer, waitForReady, shouldUseDocker, type ServerHandle } from '
 const DOCKER_MOUNT_ROOT = '/mnt/test';
 const PORT = 14300 + Math.floor(Math.random() * 700);
 const AGENT_NAME = 'restore-test-agent';
+let serverApiKey: string;
 
 // ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
+function authHeaders(): Record<string, string> {
+  return serverApiKey ? { Authorization: `Bearer ${serverApiKey}` } : {};
+}
+
 async function post(url: string, body: object): Promise<Response> {
   return fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
 }
@@ -35,7 +40,7 @@ async function createSession(url: string, agent: string): Promise<{ id: string; 
 }
 
 async function getSession(url: string, sessionId: string): Promise<{ id: string; status: string }> {
-  const res = await fetch(`${url}/api/sessions/${sessionId}`);
+  const res = await fetch(`${url}/api/sessions/${sessionId}`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`Get session failed (${res.status}): ${await res.text()}`);
   const { session } = (await res.json()) as any;
   return session;
@@ -53,7 +58,7 @@ async function resumeSession(url: string, sessionId: string): Promise<Response> 
 }
 
 async function deleteSession(url: string, sessionId: string): Promise<Response> {
-  return fetch(`${url}/api/sessions/${sessionId}`, { method: 'DELETE' });
+  return fetch(`${url}/api/sessions/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
 }
 
 async function deployAgent(url: string, name: string, path: string): Promise<void> {
@@ -62,7 +67,7 @@ async function deployAgent(url: string, name: string, path: string): Promise<voi
 }
 
 async function deleteAgent(url: string, name: string): Promise<void> {
-  const res = await fetch(`${url}/api/agents/${name}`, { method: 'DELETE' });
+  const res = await fetch(`${url}/api/agents/${name}`, { method: 'DELETE', headers: authHeaders() });
   if (!res.ok && res.status !== 404) throw new Error(`Delete agent failed (${res.status}): ${await res.text()}`);
 }
 
@@ -142,6 +147,7 @@ describe('Session restore', () => {
   async function startAndDeploy(): Promise<void> {
     server = await launchServer({ port: PORT, testRoot, extraEnv: getExtraEnv() });
     serverUrl = server.url;
+    serverApiKey = server.apiKey;
     await waitForReady(serverUrl);
     const agentPath = server.toServerPath(agentDst);
     await deployAgent(serverUrl, AGENT_NAME, agentPath);

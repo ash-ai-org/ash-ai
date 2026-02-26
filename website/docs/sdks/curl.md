@@ -15,7 +15,7 @@ All examples below use the `ASH_SERVER_URL` environment variable. Set it once:
 export ASH_SERVER_URL=$ASH_SERVER_URL   # default
 ```
 
-If authentication is enabled (the `ASH_API_KEY` environment variable is set on the server), include the `-H "Authorization: Bearer YOUR_KEY"` header on every request except `/health`.
+Include the `-H "Authorization: Bearer YOUR_KEY"` header on every request except `/health`. The server always requires authentication — it auto-generates an API key on first start if one is not provided.
 
 ## Health Check
 

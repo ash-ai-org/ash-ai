@@ -25,15 +25,20 @@ import { launchServer, waitForReady, shouldUseDocker, type ServerHandle } from '
 
 const PORT = 14400 + Math.floor(Math.random() * 500);
 const AGENT_NAME = 'multi-turn-agent';
+let serverApiKey: string;
 
 // ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
+function authHeaders(): Record<string, string> {
+  return serverApiKey ? { Authorization: `Bearer ${serverApiKey}` } : {};
+}
+
 async function post(url: string, body: object): Promise<Response> {
   return fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
 }
@@ -51,7 +56,7 @@ async function createSession(url: string, agent: string): Promise<{ id: string }
 }
 
 async function deleteSession(url: string, sessionId: string): Promise<void> {
-  await fetch(`${url}/api/sessions/${sessionId}`, { method: 'DELETE' });
+  await fetch(`${url}/api/sessions/${sessionId}`, { method: 'DELETE', headers: authHeaders() });
 }
 
 /**
@@ -152,6 +157,7 @@ describe('Multi-turn conversation persistence', () => {
 
     server = await launchServer({ port: PORT, testRoot, extraEnv });
     serverUrl = server.url;
+    serverApiKey = server.apiKey;
     await waitForReady(serverUrl);
 
     const agentPath = server.toServerPath(agentDir);

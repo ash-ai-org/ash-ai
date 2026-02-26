@@ -92,11 +92,21 @@ export class AshClient {
   }
 
   async createAgent(name: string, opts?: {
+    slug?: string;
+    description?: string;
+    model?: string;
+    backend?: string;
     systemPrompt?: string;
+    config?: Record<string, unknown>;
     files?: Array<{ path: string; content: string }>;
   }): Promise<Agent> {
     const body: Record<string, unknown> = { name };
+    if (opts?.slug) body.slug = opts.slug;
+    if (opts?.description) body.description = opts.description;
+    if (opts?.model) body.model = opts.model;
+    if (opts?.backend) body.backend = opts.backend;
     if (opts?.systemPrompt) body.systemPrompt = opts.systemPrompt;
+    if (opts?.config) body.config = opts.config;
     if (opts?.files) body.files = opts.files;
     const res = await this.request<{ agent: Agent }>('POST', '/api/agents', body);
     return res.agent;

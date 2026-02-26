@@ -27,6 +27,7 @@ describe('multi-runner lifecycle', () => {
   let testRoot: string;
   let agentDir: string;
   let useDocker: boolean;
+  let auth: Record<string, string>;
 
   const COORD_PORT = 14300 + Math.floor(Math.random() * 200);
   const RUNNER1_PORT = COORD_PORT + 100;
@@ -64,6 +65,7 @@ describe('multi-runner lifecycle', () => {
       },
     });
     await waitForReady(coordinator.url);
+    auth = { Authorization: `Bearer ${coordinator.apiKey}` };
 
     // Start runner 1 — Docker on macOS, direct on Linux
     runner1 = launchRunner({
@@ -78,7 +80,7 @@ describe('multi-runner lifecycle', () => {
     await waitForRunnerReady(runner1.url);
 
     // Wait for runner to register with coordinator
-    await waitForRunnerRegistered(coordinator.url, 'runner-1');
+    await waitForRunnerRegistered(coordinator.url, 'runner-1', 30_000, coordinator.apiKey);
   }, 120_000); // generous timeout for Docker image build on first run
 
   afterAll(async () => {
@@ -96,7 +98,7 @@ describe('multi-runner lifecycle', () => {
   });
 
   it('lists the registered runner', async () => {
-    const res = await fetch(`${coordinator.url}/api/internal/runners`);
+    const res = await fetch(`${coordinator.url}/api/internal/runners`, { headers: auth });
     expect(res.ok).toBe(true);
     const body = await res.json() as any;
     expect(body.count).toBeGreaterThanOrEqual(1);
@@ -122,7 +124,7 @@ describe('multi-runner lifecycle', () => {
   it('deploys an agent via coordinator', async () => {
     const res = await fetch(`${coordinator.url}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ name: 'test-agent', path: agentDir }),
     });
     expect(res.status).toBe(201);
@@ -131,7 +133,7 @@ describe('multi-runner lifecycle', () => {
   it('creates a session routed to runner', async () => {
     const res = await fetch(`${coordinator.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const body = await res.json() as any;
@@ -148,7 +150,7 @@ describe('multi-runner lifecycle', () => {
     // Create session
     const createRes = await fetch(`${coordinator.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const { session } = await createRes.json() as any;
@@ -157,7 +159,7 @@ describe('multi-runner lifecycle', () => {
     // Send message — goes through coordinator proxy to runner
     const msgRes = await fetch(`${coordinator.url}/api/sessions/${session.id}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ content: 'Hello through proxy!' }),
     });
 
@@ -184,14 +186,14 @@ describe('multi-runner lifecycle', () => {
     expect(assistantMsg).toBeTruthy();
 
     // Clean up
-    await fetch(`${coordinator.url}/api/sessions/${session.id}`, { method: 'DELETE' });
+    await fetch(`${coordinator.url}/api/sessions/${session.id}`, { method: 'DELETE', headers: auth });
   }, 30_000);
 
   it('pauses session when runner is stopped', async () => {
     // Create a session on runner-1
     const createRes = await fetch(`${coordinator.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const { session } = await createRes.json() as any;
@@ -205,12 +207,12 @@ describe('multi-runner lifecycle', () => {
     await new Promise((r) => setTimeout(r, 2000));
 
     // Session should now be paused
-    const getRes = await fetch(`${coordinator.url}/api/sessions/${session.id}`);
+    const getRes = await fetch(`${coordinator.url}/api/sessions/${session.id}`, { headers: auth });
     const body = await getRes.json() as any;
     expect(body.session.status).toBe('paused');
 
     // Runner should be removed from registry
-    const runnersRes = await fetch(`${coordinator.url}/api/internal/runners`);
+    const runnersRes = await fetch(`${coordinator.url}/api/internal/runners`, { headers: auth });
     const runnersBody = await runnersRes.json() as any;
     const r1 = runnersBody.runners.find((r: any) => r.runnerId === 'runner-1');
     expect(r1).toBeUndefined();
@@ -233,12 +235,12 @@ describe('multi-runner lifecycle', () => {
 
     try {
       await waitForRunnerReady(runner2.url);
-      await waitForRunnerRegistered(coordinator.url, 'runner-2');
+      await waitForRunnerRegistered(coordinator.url, 'runner-2', 30_000, coordinator.apiKey);
 
       // Create a new session — should route to runner-2
       const createRes = await fetch(`${coordinator.url}/api/sessions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({ agent: 'test-agent' }),
       });
       const { session } = await createRes.json() as any;
@@ -248,14 +250,14 @@ describe('multi-runner lifecycle', () => {
       // Send a message to verify full proxy works
       const msgRes = await fetch(`${coordinator.url}/api/sessions/${session.id}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({ content: 'Hello runner 2!' }),
       });
       expect(msgRes.status).toBe(200);
       const text = await msgRes.text();
       expect(text).toContain('event: done');
 
-      await fetch(`${coordinator.url}/api/sessions/${session.id}`, { method: 'DELETE' });
+      await fetch(`${coordinator.url}/api/sessions/${session.id}`, { method: 'DELETE', headers: auth });
     } finally {
       await runner2.stop();
     }
@@ -265,7 +267,7 @@ describe('multi-runner lifecycle', () => {
     // At this point, both runners are stopped
     const res = await fetch(`${coordinator.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     // Should fail since no runners are available in coordinator-only mode
@@ -280,11 +282,13 @@ async function waitForRunnerRegistered(
   coordinatorUrl: string,
   runnerId: string,
   timeoutMs = 30_000,
+  apiKey?: string,
 ): Promise<void> {
+  const headers: Record<string, string> = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(`${coordinatorUrl}/api/internal/runners`);
+      const res = await fetch(`${coordinatorUrl}/api/internal/runners`, { headers });
       if (res.ok) {
         const body = await res.json() as any;
         if (body.runners?.some((r: any) => r.runnerId === runnerId)) {

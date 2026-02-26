@@ -37,7 +37,7 @@ starting --> active --> paused --> active (resume)
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
 
-const client = new AshClient({ serverUrl: 'http://localhost:4100' });
+const client = new AshClient({ serverUrl: 'http://localhost:4100', apiKey: process.env.ASH_API_KEY });
 const session = await client.createSession('my-agent');
 console.log(session.id);     // "a1b2c3d4-..."
 console.log(session.status); // "active"
@@ -49,7 +49,7 @@ console.log(session.status); // "active"
 ```python
 from ash_sdk import AshClient
 
-client = AshClient("http://localhost:4100")
+client = AshClient("http://localhost:4100", api_key=os.environ["ASH_API_KEY"])
 session = client.create_session("my-agent")
 print(session.id)     # "a1b2c3d4-..."
 print(session.status) # "active"

@@ -135,8 +135,8 @@ export function Terminal({ logs, connected, onClear, className }: TerminalProps)
             {logs.length === 0 ? 'Waiting for sandbox output...' : 'No matching lines'}
           </div>
         ) : (
-          filteredLogs.map((entry) => (
-            <div key={entry.index} className="flex hover:bg-white/5 rounded px-1 -mx-1">
+          filteredLogs.map((entry, i) => (
+            <div key={`${entry.index}-${i}`} className="flex hover:bg-white/5 rounded px-1 -mx-1">
               {showTimestamps && (
                 <span className="mr-3 shrink-0 select-none text-white/20">
                   {formatTimestamp(entry.ts)}

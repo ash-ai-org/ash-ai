@@ -28,6 +28,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   let server: ServerHandle;
   let testRoot: string;
   let agentDir: string;
+  let auth: Record<string, string>;
 
   beforeAll(async () => {
     testRoot = mkdtempSync(join(tmpdir(), 'ash-crdb-'));
@@ -49,6 +50,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
       extraEnv: { ASH_DATABASE_URL: crdb.url },
     });
     await waitForReady(server.url);
+    auth = { Authorization: `Bearer ${server.apiKey}` };
     console.log(`[crdb-test] Server ready at ${server.url}`);
   }, 120_000);
 
@@ -68,7 +70,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   it('deploys an agent', async () => {
     const res = await fetch(`${server.url}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ name: 'test-agent', path: server.toServerPath(agentDir) }),
     });
     expect(res.status).toBe(201);
@@ -78,7 +80,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   });
 
   it('lists the deployed agent', async () => {
-    const res = await fetch(`${server.url}/api/agents`);
+    const res = await fetch(`${server.url}/api/agents`, { headers: auth });
     expect(res.ok).toBe(true);
     const body = await res.json() as any;
     expect(body.agents).toHaveLength(1);
@@ -86,14 +88,14 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   });
 
   it('returns 404 for nonexistent agent', async () => {
-    const res = await fetch(`${server.url}/api/agents/ghost`);
+    const res = await fetch(`${server.url}/api/agents/ghost`, { headers: auth });
     expect(res.status).toBe(404);
   });
 
   it('creates a session', async () => {
     const res = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const body = await res.json() as any;
@@ -109,13 +111,14 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   it('ends a session', async () => {
     const createRes = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'test-agent' }),
     });
     const { session } = await createRes.json() as any;
 
     const deleteRes = await fetch(`${server.url}/api/sessions/${session.id}`, {
       method: 'DELETE',
+      headers: auth,
     });
     expect(deleteRes.status).toBe(200);
     const body = await deleteRes.json() as any;
@@ -124,7 +127,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
     // Verify can't send to ended session
     const msgRes = await fetch(`${server.url}/api/sessions/${session.id}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ content: 'hello?' }),
     });
     expect(msgRes.status).toBe(400);
@@ -133,7 +136,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   it('rejects session for nonexistent agent', async () => {
     const res = await fetch(`${server.url}/api/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ agent: 'ghost-agent' }),
     });
     expect(res.status).toBe(404);
@@ -142,7 +145,7 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   it('re-deploys with incremented version', async () => {
     const res = await fetch(`${server.url}/api/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ name: 'test-agent', path: server.toServerPath(agentDir) }),
     });
     expect(res.status).toBe(201);
@@ -153,10 +156,11 @@ describe.skipIf(!dockerAvailable)('crdb lifecycle', () => {
   it('deletes an agent', async () => {
     const res = await fetch(`${server.url}/api/agents/test-agent`, {
       method: 'DELETE',
+      headers: auth,
     });
     expect(res.status).toBe(200);
 
-    const listRes = await fetch(`${server.url}/api/agents`);
+    const listRes = await fetch(`${server.url}/api/agents`, { headers: auth });
     const body = await listRes.json() as any;
     expect(body.agents).toHaveLength(0);
   });
