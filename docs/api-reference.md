@@ -8,13 +8,13 @@ All request/response bodies are JSON unless noted. Error responses follow the sh
 
 ## Authentication
 
-If `ASH_API_KEY` is set on the server, all `/api/*` requests require a Bearer token:
+All `/api/*` requests require a Bearer token. The server auto-generates an API key on first start (see [features/authentication.md](./features/authentication.md)):
 
 ```
 Authorization: Bearer <your-api-key>
 ```
 
-Public endpoints (`/health`, `/metrics`, `/docs/*`) do not require auth. See [features/authentication.md](./features/authentication.md) for setup and details.
+Public endpoints (`/health`, `/metrics`, `/docs/*`) do not require auth.
 
 | Status | Meaning |
 |--------|---------|

@@ -1,14 +1,14 @@
 # Authentication
 
-*Added: 2026-02-18*
+*Added: 2026-02-18. Updated: 2026-02-25.*
 
 ## What
 
-API key authentication for Ash server endpoints. When enabled, all API requests must include a `Bearer` token. When disabled (default for local dev), all requests pass through.
+API key authentication for Ash server endpoints. On first start, the server auto-generates an API key and saves it for the CLI. All API requests must include a `Bearer` token. Auth is always on — no manual config needed.
 
 ## How It Works
 
-Set `ASH_API_KEY` on the server. Every request to `/api/*` must include:
+Every request to `/api/*` must include:
 
 ```
 Authorization: Bearer <key>
@@ -26,13 +26,42 @@ Requests without the header or with a wrong key get `401`.
 
 Everything under `/api/` is protected.
 
-## Setup
+## Auto-Generated Keys (Default)
 
-### Generate a Key
+On first start, if no API keys exist in the database and no `ASH_API_KEY` env var is set, the server:
 
-```bash
-openssl rand -hex 32
+1. Generates a key with the format `ash_<24 random bytes base64url>` (e.g. `ash_7kX9mQ2pL...`)
+2. Hashes and stores it in the database
+3. Writes the plaintext key to `{dataDir}/initial-api-key` (permissions `0600`)
+4. Logs the key to stdout
+
+The CLI (`ash start`) automatically picks up this bootstrap file, saves the key to `~/.ash/config.json`, and deletes the file. All subsequent CLI commands send the key automatically.
+
 ```
+$ ash start
+Starting Ash server...
+Waiting for server to be ready...
+
+API key auto-generated and saved to ~/.ash/config.json
+  Key: ash_7kX9mQ2pL...
+
+Ash server is running.
+  URL:      http://localhost:4100
+  Data dir: ~/.ash
+```
+
+On subsequent starts, the existing key is reused — no new key is generated.
+
+### Key Format
+
+Keys are prefixed with `ash_` for identifiability:
+- GitHub secret scanning can detect leaked keys
+- Easy to grep in logs
+- 24 random bytes (base64url) = 192 bits of entropy
+
+## Manual Override
+
+You can still set a key explicitly via environment variable. This takes precedence over auto-generation:
 
 ### Server
 
@@ -50,14 +79,10 @@ ASH_API_KEY=your-secret-key ash start
 ASH_API_KEY=your-secret-key node packages/server/dist/index.js
 ```
 
-If `ASH_API_KEY` is not set, auth is disabled and all requests pass through. The server logs which mode it starts in:
+If `ASH_API_KEY` is set, the server uses it directly (no auto-generation). The server logs which mode it starts in:
 
 ```
 [info] API key authentication enabled
-```
-or
-```
-[info] ASH_API_KEY not set — auth disabled (local dev mode)
 ```
 
 ### TypeScript SDK
@@ -71,8 +96,6 @@ const client = new AshClient({
 });
 ```
 
-Without the `apiKey`, all API calls throw with `"Missing Authorization header"`.
-
 ### Python SDK
 
 ```python
@@ -83,11 +106,18 @@ client = AshClient("http://your-server:4100", api_key="your-secret-key")
 
 ### CLI
 
+The CLI reads the API key from `~/.ash/config.json` automatically (saved by `ash start`). You can also set it explicitly:
+
 ```bash
-export ASH_SERVER_URL=http://your-server:4100
+# Environment variable (highest precedence)
 export ASH_API_KEY=your-secret-key
 ash agent list
+
+# Or save it to config when connecting to a remote server
+ash connect http://your-server:4100 --api-key your-secret-key
 ```
+
+Key precedence: `ASH_API_KEY` env var > `~/.ash/config.json` `api_key` field.
 
 ### curl
 
@@ -112,14 +142,19 @@ Wrong key:
 
 ## Implementation
 
-Single file: `packages/server/src/auth.ts`. Registers a Fastify `onRequest` hook that runs before every route handler. ~30 lines.
+Key generation: `packages/server/src/auth.ts` (`generateApiKey()`). Auto-generation logic: `packages/server/src/server.ts` (after DB init). CLI bootstrap: `packages/cli/src/commands/start.ts`. Config: `packages/cli/src/config.ts`.
+
+Auth hook: Fastify `onRequest` hook in `auth.ts`. Checks DB keys first (HMAC-SHA256 hash), falls back to `ASH_API_KEY` env var comparison.
 
 ### Test Coverage
 
 **Unit tests** (`packages/server/src/__tests__/auth.test.ts`):
 - Fastify inject: no header → 401, wrong key → 401, correct key → 200
 - Public routes bypass auth
-- Auth disabled when no key set
+- Auth required when DB has keys (no ASH_API_KEY env)
+- Auth not required when no keys exist anywhere (pre-generation state)
+- `generateApiKey()` format and uniqueness
+- `hashApiKey()` determinism and HMAC vs plain
 - Real HTTP requests against a listening server
 
 **Integration test** (`test/integration/auth.test.ts`):
@@ -131,7 +166,6 @@ Single file: `packages/server/src/auth.ts`. Registers a Fastify `onRequest` hook
 
 ## Known Limitations
 
-- Single shared API key (no per-user keys or RBAC)
-- Key is compared in constant time via string equality (no timing-safe compare yet)
-- No key rotation without server restart
+- No per-user keys or RBAC (multi-tenant API keys are supported via the DB)
 - No rate limiting on failed auth attempts
+- Bootstrap file mechanism requires shared filesystem between server and CLI (works for Docker with mounted `~/.ash`, not for remote-only servers — use `ash connect --api-key` for those)

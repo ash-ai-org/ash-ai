@@ -2,15 +2,16 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { join, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
-import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner, listAgents } from './db/index.js';
+import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner, listAgents, listApiKeysByTenant, insertApiKey } from './db/index.js';
 import { QueueProcessor } from './queue/processor.js';
 import { randomUUID } from 'node:crypto';
 import { SandboxManager, SandboxPool, persistSessionState, syncStateToCloud } from '@ash-ai/sandbox';
 import { LocalRunnerBackend } from './runner/local-backend.js';
 import { RunnerCoordinator } from './runner/coordinator.js';
 import { registerSchemas } from './schemas.js';
-import { registerAuth } from './auth.js';
+import { registerAuth, generateApiKey, hashApiKey } from './auth.js';
 import { agentRoutes } from './routes/agents.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { healthRoutes } from './routes/health.js';
@@ -144,8 +145,36 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   await app.register(swaggerUi, { routePrefix: '/docs' });
   registerSchemas(app);
 
+  // Auto-generate API key on first start if no keys exist
+  let hasDbKeys = false;
+  const existingKeys = await listApiKeysByTenant('default');
+  hasDbKeys = existingKeys.length > 0;
+
+  if (!hasDbKeys && !opts.apiKey) {
+    const plainKey = generateApiKey();
+    const hmacSecret = process.env.ASH_CREDENTIAL_KEY;
+    const keyHash = hashApiKey(plainKey, hmacSecret);
+    await insertApiKey(randomUUID(), 'default', keyHash, 'auto-generated');
+    hasDbKeys = true;
+
+    // Write bootstrap file for CLI to pick up
+    const bootstrapPath = join(dataDir, 'initial-api-key');
+    writeFileSync(bootstrapPath, plainKey, { mode: 0o600 });
+
+    console.log('');
+    console.log('==========================================================');
+    console.log('  Auto-generated API key (save this — it won\'t be shown again):');
+    console.log('');
+    console.log(`  ${plainKey}`);
+    console.log('');
+    console.log('  The key has been saved to:');
+    console.log(`  ${bootstrapPath}`);
+    console.log('==========================================================');
+    console.log('');
+  }
+
   // Auth
-  registerAuth(app, opts.apiKey, db);
+  registerAuth(app, opts.apiKey, db, hasDbKeys);
 
   // Routes
   agentRoutes(app, dataDir, pool);

@@ -15,7 +15,7 @@ Three reasons:
 
 1. **Secrets stay server-side.** Your `ASH_API_KEY` and `ASH_SERVER_URL` never reach the browser. If a user opens DevTools, they see requests to `/api/chat`, not `http://your-ash-server:4100/api/sessions/...`.
 
-2. **You own the auth boundary.** Ash has a single shared API key — it doesn't know about your users. Your BFF maps authenticated users to Ash sessions and enforces who can do what.
+2. **You own the auth boundary.** Ash authenticates API clients with API keys — it doesn't know about your end users. Your BFF maps authenticated users to Ash sessions and enforces who can do what.
 
 3. **You control the surface area.** Ash exposes ~30 endpoints. Your users probably need 4: create session, send message, list sessions, end session. The BFF is where you decide what's exposed.
 

@@ -5,7 +5,8 @@ export function connectCommand(): Command {
   return new Command('connect')
     .description('Connect to a remote Ash server')
     .argument('<url>', 'Server URL (e.g. http://my-server:4100)')
-    .action(async (url: string) => {
+    .option('--api-key <key>', 'API key for the remote server')
+    .action(async (url: string, opts: { apiKey?: string }) => {
       // Normalize: strip trailing slash
       url = url.replace(/\/+$/, '');
 
@@ -37,9 +38,15 @@ export function connectCommand(): Command {
       // Save to config
       const config = loadConfig();
       config.server_url = url;
+      if (opts.apiKey) {
+        config.api_key = opts.apiKey;
+      }
       saveConfig(config);
 
       console.log(`Connected to ${url}`);
+      if (opts.apiKey) {
+        console.log(`API key saved to ~/.ash/config.json`);
+      }
       console.log(`Saved to ~/.ash/config.json`);
       console.log(`\nAll CLI commands will now target this server.`);
       console.log(`Override with ASH_SERVER_URL env var, or run \`ash disconnect\` to reset.`);

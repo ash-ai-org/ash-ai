@@ -6,6 +6,7 @@ const CONFIG_PATH = join(homedir(), '.ash', 'config.json');
 
 export interface AshConfig {
   server_url?: string;
+  api_key?: string;
 }
 
 export function loadConfig(): AshConfig {
@@ -32,4 +33,13 @@ export function getServerUrl(): string {
     return config.server_url;
   }
   return 'http://localhost:4100';
+}
+
+export function getApiKey(): string | undefined {
+  // Priority: env var > config file
+  if (process.env.ASH_API_KEY) {
+    return process.env.ASH_API_KEY;
+  }
+  const config = loadConfig();
+  return config.api_key;
 }
