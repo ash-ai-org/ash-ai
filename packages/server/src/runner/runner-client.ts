@@ -37,6 +37,8 @@ export class RunnerClient {
     limits?: Record<string, number>;
     extraEnv?: Record<string, string>;
     startupScript?: string;
+    systemPrompt?: string;
+    mcpServers?: Record<string, unknown>;
   }): Promise<{ sandboxId: string; workspaceDir: string }> {
     const resp = await fetch(`${this.baseUrl}/runner/sandboxes`, {
       method: 'POST',

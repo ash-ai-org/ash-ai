@@ -144,11 +144,23 @@ export class AshClient {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async createSession(agent: string, opts?: { credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string }): Promise<Session> {
+  async createSession(agent: string, opts?: {
+    credentialId?: string;
+    extraEnv?: Record<string, string>;
+    startupScript?: string;
+    model?: string;
+    /** System prompt override. Overrides agent's CLAUDE.md. */
+    systemPrompt?: string;
+    /** MCP server config. Merged with agent's .mcp.json. Supports stdio (command/args) and HTTP (url). */
+    mcpServers?: Record<string, { command?: string; args?: string[]; url?: string; env?: Record<string, string> }>;
+  }): Promise<Session> {
     const body: Record<string, unknown> = { agent };
     if (opts?.credentialId) body.credentialId = opts.credentialId;
     if (opts?.extraEnv) body.extraEnv = opts.extraEnv;
     if (opts?.startupScript) body.startupScript = opts.startupScript;
+    if (opts?.model) body.model = opts.model;
+    if (opts?.systemPrompt) body.systemPrompt = opts.systemPrompt;
+    if (opts?.mcpServers) body.mcpServers = opts.mcpServers;
     const res = await this.request<{ session: Session }>('POST', '/api/sessions', body);
     return res.session;
   }

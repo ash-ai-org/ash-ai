@@ -25,6 +25,8 @@ export class RemoteRunnerBackend implements RunnerBackend {
       limits: opts.limits as Record<string, number> | undefined,
       extraEnv: opts.extraEnv,
       startupScript: opts.startupScript,
+      systemPrompt: opts.systemPrompt,
+      mcpServers: opts.mcpServers,
     });
 
     const handle: SandboxHandle = {

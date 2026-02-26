@@ -17,12 +17,17 @@ if (!socketPath || !agentDir || !workspaceDir) {
   process.exit(1);
 }
 
-// Load agent instructions
+// Load agent instructions from workspace (may be overridden by per-session systemPrompt)
 let claudeMd = '';
 try {
-  claudeMd = await readFile(join(agentDir, 'CLAUDE.md'), 'utf-8');
+  claudeMd = await readFile(join(workspaceDir, 'CLAUDE.md'), 'utf-8');
 } catch {
-  // No CLAUDE.md — that's fine, validator should have caught this earlier
+  // No CLAUDE.md in workspace — try original agent dir as fallback
+  try {
+    claudeMd = await readFile(join(agentDir, 'CLAUDE.md'), 'utf-8');
+  } catch {
+    // No CLAUDE.md at all — that's fine
+  }
 }
 
 let currentAbort: AbortController | null = null;

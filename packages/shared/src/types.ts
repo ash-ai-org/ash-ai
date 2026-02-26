@@ -551,6 +551,26 @@ export interface CreateSessionRequest {
   startupScript?: string;
   /** Model override for this session. Overrides agent's .claude/settings.json default. */
   model?: string;
+  /** System prompt override for this session. Overrides agent's CLAUDE.md. */
+  systemPrompt?: string;
+  /**
+   * MCP server configuration for this session. Merged with agent's .mcp.json.
+   * Supports stdio (command/args) and HTTP (url) MCP servers.
+   * Example: { "my-server": { "url": "http://localhost:8080/mcp" } }
+   */
+  mcpServers?: Record<string, McpServerConfig>;
+}
+
+/** MCP server config — supports both stdio (command + args) and HTTP/SSE (url) transports. */
+export interface McpServerConfig {
+  /** For stdio-based MCP servers: the command to run. */
+  command?: string;
+  /** For stdio-based MCP servers: arguments for the command. */
+  args?: string[];
+  /** For HTTP/SSE-based MCP servers: the server URL. */
+  url?: string;
+  /** Optional environment variables for stdio servers. */
+  env?: Record<string, string>;
 }
 
 export interface CreateSessionResponse {

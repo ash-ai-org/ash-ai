@@ -44,6 +44,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
       limits?: Record<string, number>;
       extraEnv?: Record<string, string>;
       startupScript?: string;
+      systemPrompt?: string;
+      mcpServers?: Record<string, unknown>;
     };
 
     try {
@@ -56,6 +58,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
         limits: body.limits,
         extraEnv: body.extraEnv,
         startupScript: body.startupScript,
+        systemPrompt: body.systemPrompt,
+        mcpServers: body.mcpServers,
       });
 
       return reply.status(201).send({

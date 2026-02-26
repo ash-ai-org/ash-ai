@@ -1,5 +1,5 @@
 import { type ChildProcess, execSync, execFileSync } from 'node:child_process';
-import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync } from 'node:fs';
+import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -39,6 +39,10 @@ export interface CreateSandboxOpts {
   extraEnv?: Record<string, string>;
   /** Shell script to run in workspace after install.sh but before the bridge starts. */
   startupScript?: string;
+  /** System prompt override. Written as CLAUDE.md in workspace, overriding agent default. */
+  systemPrompt?: string;
+  /** MCP server config override. Merged with agent's .mcp.json in workspace. */
+  mcpServers?: Record<string, unknown>;
 }
 
 const MAX_LOG_ENTRIES = 10_000;
@@ -111,6 +115,28 @@ export class SandboxManager {
       mkdirSync(workspaceDir, { recursive: true });
     }
     const agentCopyMs = copyTimer();
+
+    // Override CLAUDE.md if systemPrompt is provided
+    if (opts.systemPrompt) {
+      writeFileSync(join(workspaceDir, 'CLAUDE.md'), opts.systemPrompt, 'utf-8');
+    }
+
+    // Merge MCP server config if provided
+    if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
+      const mcpJsonPath = join(workspaceDir, '.mcp.json');
+      let existing: Record<string, unknown> = {};
+      try {
+        existing = JSON.parse(readFileSync(mcpJsonPath, 'utf-8'));
+      } catch { /* no existing .mcp.json — start fresh */ }
+      const merged = {
+        ...existing,
+        mcpServers: {
+          ...((existing.mcpServers as Record<string, unknown>) ?? {}),
+          ...opts.mcpServers,
+        },
+      };
+      writeFileSync(mcpJsonPath, JSON.stringify(merged, null, 2), 'utf-8');
+    }
 
     // SECURITY: Allowlist env — nothing else leaks to sandbox
     const env: Record<string, string> = {};

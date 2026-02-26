@@ -22,6 +22,7 @@ export type {
   UsageEventType,
   UsageStats,
   CreateSessionRequest,
+  McpServerConfig,
   SendMessageRequest,
   DeployAgentRequest,
   ListAgentsResponse,

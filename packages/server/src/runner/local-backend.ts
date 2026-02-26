@@ -24,6 +24,8 @@ export class LocalRunnerBackend implements RunnerBackend {
       onOomKill: opts.onOomKill,
       extraEnv: opts.extraEnv,
       startupScript: opts.startupScript,
+      systemPrompt: opts.systemPrompt,
+      mcpServers: opts.mcpServers,
     });
     return { sandboxId: sandbox.id, workspaceDir: sandbox.workspaceDir };
   }

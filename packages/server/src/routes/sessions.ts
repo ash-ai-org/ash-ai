@@ -79,6 +79,20 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           extraEnv: { type: 'object', additionalProperties: { type: 'string' } },
           startupScript: { type: 'string' },
           model: { type: 'string', description: 'Model override for this session. Overrides agent .claude/settings.json default.' },
+          systemPrompt: { type: 'string', description: 'System prompt override. Overrides agent CLAUDE.md.' },
+          mcpServers: {
+            type: 'object',
+            additionalProperties: {
+              type: 'object',
+              properties: {
+                command: { type: 'string' },
+                args: { type: 'array', items: { type: 'string' } },
+                url: { type: 'string' },
+                env: { type: 'object', additionalProperties: { type: 'string' } },
+              },
+            },
+            description: 'MCP server config. Merged with agent .mcp.json. Supports stdio (command/args) and HTTP (url).',
+          },
         },
         required: ['agent'],
       },
@@ -91,7 +105,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, systemPrompt, mcpServers } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; systemPrompt?: string; mcpServers?: Record<string, unknown> };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
@@ -127,6 +141,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         sandboxId: sessionId,
         extraEnv,
         startupScript,
+        systemPrompt,
+        mcpServers,
         onOomKill: () => {
           updateSessionStatus(sessionId, 'paused').catch((err) =>
             console.error(`Failed to update session status on OOM: ${err}`)
@@ -381,10 +397,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
               console.error(`Failed to persist assistant message: ${err}`)
             );
             telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'message', data: { role: 'assistant', messageType: data.type } });
-            // Extract and record usage metrics (non-blocking)
-            recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
           }
-          // Extract and record usage metrics once per turn (result has the usage summary)
+          // Extract and record usage metrics once per turn (result has the usage summary).
+          // Only call once to avoid double-counting — see extractor.ts docstring.
           if (data.type === 'result') {
             recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
           }
@@ -421,8 +436,10 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       reply.raw.write(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`);
-      // Emit session_end when an error terminates the stream
-      reply.raw.write(`event: session_end\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
+      // Signal stream completion — use 'done', not 'session_end', because the
+      // session is still active. 'session_end' should only be emitted when the
+      // session actually transitions to 'ended' status.
+      reply.raw.write(`event: done\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
     } finally {
       // Mark waiting after message processing completes
       backend.markWaiting(session.sandboxId);

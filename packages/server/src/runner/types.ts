@@ -13,6 +13,10 @@ export interface CreateSandboxRequest {
   extraEnv?: Record<string, string>;
   /** Shell script to run in workspace after install.sh but before the bridge starts. */
   startupScript?: string;
+  /** System prompt override. Written as CLAUDE.md in workspace, overriding agent default. */
+  systemPrompt?: string;
+  /** MCP server config override. Merged with agent's .mcp.json in workspace. */
+  mcpServers?: Record<string, unknown>;
 }
 
 export interface SandboxHandle {
