@@ -1,5 +1,19 @@
 # @ash-ai/cli
 
+## 0.0.8 - 2026-02-25
+
+### Added
+
+- Auto-capture API key from bootstrap file after `ash start` — saved to `~/.ash/config.json` (#23)
+- `--api-key` option on `ash connect` for remote server authentication (#23)
+- `getApiKey()` config function with precedence: `ASH_API_KEY` env > `config.json` (#23)
+- `api_key` field in `~/.ash/config.json` (#23)
+
+### Changed
+
+- All CLI HTTP requests now send `Authorization: Bearer` header when a key is available (#23)
+- Updated dependencies: @ash-ai/shared@0.0.9
+
 ## 0.0.7 - 2026-02-24
 
 ### Added

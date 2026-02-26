@@ -1,5 +1,19 @@
 # @ash-ai/server
 
+## 0.0.9 - 2026-02-25
+
+### Added
+
+- Auto-generate `ash_`-prefixed API key on first server start when no keys exist (#23)
+- `generateApiKey()` helper in auth module (#23)
+- Bootstrap file (`{dataDir}/initial-api-key`) for CLI key pickup (#23)
+
+### Changed
+
+- Auth is now required when DB has keys, even without `ASH_API_KEY` env — removes dev-mode fallback (#23)
+- `registerAuth()` accepts `hasDbKeys` param to control auth enforcement (#23)
+- Updated dependencies: @ash-ai/shared@0.0.9
+
 ## 0.0.8 - 2026-02-25
 
 ### Added
