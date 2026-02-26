@@ -1,5 +1,15 @@
 # @ash-ai/ui
 
+## 0.0.5 - 2026-02-26
+
+### Fixed
+
+- Duplicate React key warning in Terminal log list (#25)
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.4 - 2026-02-25
 
 ### Changed

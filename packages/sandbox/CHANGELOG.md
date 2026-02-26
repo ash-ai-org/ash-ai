@@ -1,5 +1,16 @@
 # @ash-ai/sandbox
 
+## 0.0.9 - 2026-02-26
+
+### Added
+
+- Per-sandbox home directory isolation: each sandbox gets a private writable `/home/ash-sandbox` via bind mount (#25)
+- Seed `.claude` config files from base image into per-sandbox home (#25)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.10
+
 ## 0.0.8 - 2026-02-25
 
 ### Changed
