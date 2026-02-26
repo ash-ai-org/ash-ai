@@ -47,9 +47,10 @@ variable "ash_max_sandboxes" {
 }
 
 variable "ash_api_key" {
-  description = "API key for authenticating requests to the Ash server"
+  description = "API key for authenticating requests to the Ash server. If empty, the server auto-generates one on first start (check CloudWatch logs for the key)."
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "ash_internal_secret" {

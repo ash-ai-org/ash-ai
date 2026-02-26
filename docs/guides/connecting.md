@@ -5,10 +5,10 @@ You have an Ash server URL (e.g. `http://your-server:4100`) and want to build ag
 ## What You Need
 
 - **Server URL** — e.g. `http://your-server:4100`
-- **API key** (if the server has auth enabled) — the admin who deployed it will give you this
+- **API key** — the server auto-generates one on first start. If you ran `ash start` locally, the key is already saved in `~/.ash/config.json`. For remote servers, the admin provides the key.
 - **An agent name** — ask what agents are deployed, or deploy your own
 
-Verify the server is reachable:
+Verify the server is reachable (health endpoint is public, no auth needed):
 
 ```bash
 curl http://your-server:4100/health
@@ -20,10 +20,10 @@ You should see:
 {"status":"ok","activeSessions":0,"activeSandboxes":0,"uptime":347}
 ```
 
-If the server has auth enabled (`ASH_API_KEY` is set), include the key:
+API endpoints require the key:
 
 ```bash
-curl -H "Authorization: Bearer YOUR_API_KEY" http://your-server:4100/health
+curl -H "Authorization: Bearer YOUR_API_KEY" http://your-server:4100/api/agents
 ```
 
 ## Check What Agents Are Available
@@ -55,7 +55,7 @@ import { AshClient } from '@ash-ai/sdk';
 
 const client = new AshClient({
   serverUrl: 'http://your-server:4100',
-  apiKey: 'YOUR_API_KEY',  // omit if auth is disabled
+  apiKey: 'YOUR_API_KEY',  // from ~/.ash/config.json or server admin
 });
 
 // Check what agents are available
@@ -228,15 +228,16 @@ npm install -g @ash-ai/cli
 Connect to your server:
 
 ```bash
-ash connect http://your-server:4100
+ash connect http://your-server:4100 --api-key YOUR_API_KEY
 ```
 
-This saves the server URL to `~/.ash/config.json`. All subsequent commands target this server until you run `ash disconnect`.
+This saves the server URL and API key to `~/.ash/config.json`. All subsequent commands target this server and authenticate automatically until you run `ash disconnect`.
 
-You can also use the environment variable instead:
+You can also use environment variables instead:
 
 ```bash
 export ASH_SERVER_URL=http://your-server:4100
+export ASH_API_KEY=YOUR_API_KEY
 ```
 
 ### Check Server and Agents
@@ -326,11 +327,14 @@ curl -s -X DELETE http://your-server:4100/api/sessions/SESSION_ID
 
 ### With Auth
 
-If the server has `ASH_API_KEY` set, add the header to every request:
+All `/api/*` endpoints require authentication. Add the `Authorization` header to every API request:
 
 ```bash
-curl -H "Authorization: Bearer YOUR_API_KEY" http://your-server:4100/health
+curl -H "Authorization: Bearer YOUR_API_KEY" \
+  http://your-server:4100/api/agents
 ```
+
+Public endpoints (`/health`, `/docs/*`) don't require auth.
 
 ## Deploying Your Own Agent
 

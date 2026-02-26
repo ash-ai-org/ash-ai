@@ -62,7 +62,9 @@ ash:
 
 auth:
   # -- Ash API key for protecting endpoints.
-  # Set directly here, or use existingSecret below.
+  # If empty and no existingSecret, the server auto-generates a key on first start
+  # (check pod logs for the key: `kubectl logs <pod> | grep ash_`).
+  # For production, set explicitly or use existingSecret below.
   apiKey: ""
 
   # -- Anthropic API key for Claude agent execution.

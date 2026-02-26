@@ -41,13 +41,12 @@ resource "aws_ecs_task_definition" "ash" {
         }
       ]
 
-      environment = [
+      environment = concat([
         { name = "ASH_MODE", value = "standalone" },
         { name = "ASH_MAX_SANDBOXES", value = var.ash_max_sandboxes },
-        { name = "ASH_API_KEY", value = var.ash_api_key },
         { name = "ASH_INTERNAL_SECRET", value = var.ash_internal_secret },
         { name = "ANTHROPIC_API_KEY", value = var.anthropic_api_key },
-      ]
+      ], var.ash_api_key != "" ? [{ name = "ASH_API_KEY", value = var.ash_api_key }] : [])
 
       logConfiguration = {
         logDriver = "awslogs"

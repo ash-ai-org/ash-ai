@@ -1,11 +1,18 @@
-import { getServerUrl } from './config.js';
+import { getServerUrl, getApiKey } from './config.js';
 
 const serverUrl = getServerUrl();
 
+function authHeaders(): Record<string, string> {
+  const key = getApiKey();
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
 async function request(method: string, path: string, body?: unknown): Promise<Response> {
+  const headers: Record<string, string> = { ...authHeaders() };
+  if (body) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${serverUrl}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   return res;
@@ -46,7 +53,7 @@ export async function createSession(agent: string) {
 export async function sendMessage(sessionId: string, content: string): Promise<ReadableStream<Uint8Array> | null> {
   const res = await fetch(`${serverUrl}/api/sessions/${sessionId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ content }),
   });
   if (!res.ok) {

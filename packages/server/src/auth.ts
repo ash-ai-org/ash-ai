@@ -1,6 +1,14 @@
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Db } from './db/index.js';
+
+/**
+ * Generate a prefixed API key with 24 random bytes (base64url).
+ * The `ash_` prefix aids identifiability (e.g. GitHub secret scanning, log grep).
+ */
+export function generateApiKey(): string {
+  return `ash_${randomBytes(24).toString('base64url')}`;
+}
 
 /**
  * Extend Fastify request with tenantId.
@@ -32,10 +40,10 @@ export function hashApiKey(key: string, secret?: string): string {
  * 2. Internal endpoints (/api/internal/) → skip auth, tenantId = 'default'
  * 3. Bearer token → hash → look up in api_keys table → set tenantId from DB row
  * 4. Bearer token matches ASH_API_KEY env → tenantId = 'default' (backward compat)
- * 5. No auth header + no ASH_API_KEY set → tenantId = 'default' (local dev mode)
+ * 5. No auth header + no ASH_API_KEY set + no DB keys → tenantId = 'default' (first-run, no keys anywhere)
  * 6. No match → 401
  */
-export function registerAuth(app: FastifyInstance, apiKey: string | undefined, db?: Db): void {
+export function registerAuth(app: FastifyInstance, apiKey: string | undefined, db?: Db, hasDbKeys?: boolean): void {
   const hmacSecret = process.env.ASH_CREDENTIAL_KEY;
 
   // Decorate request with tenantId so it's always available
@@ -58,8 +66,8 @@ export function registerAuth(app: FastifyInstance, apiKey: string | undefined, d
 
     // No auth header
     if (!header) {
-      if (!apiKey) {
-        // Dev mode: no ASH_API_KEY set, no auth required
+      if (!apiKey && !hasDbKeys) {
+        // No keys configured anywhere — allow through (first-run before any keys exist)
         request.tenantId = 'default';
         return;
       }
@@ -104,9 +112,9 @@ export function registerAuth(app: FastifyInstance, apiKey: string | undefined, d
     return reply.status(401).send({ error: 'Invalid API key', statusCode: 401 });
   });
 
-  if (!apiKey && !db) {
-    app.log.info('ASH_API_KEY not set — auth disabled (local dev mode), all requests use tenant "default"');
+  if (!apiKey && !hasDbKeys) {
+    app.log.info('No API keys configured — auth disabled, all requests use tenant "default"');
   } else {
-    app.log.info('API key authentication enabled (multi-tenant support active)');
+    app.log.info('API key authentication enabled');
   }
 }

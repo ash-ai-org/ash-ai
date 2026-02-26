@@ -31,16 +31,22 @@ export ANTHROPIC_API_KEY=sk-...
 ash start
 ```
 
-This pulls the Ash Docker image, starts the container, and waits for the server to be healthy:
+This pulls the Ash Docker image, starts the container, and waits for the server to be healthy. On first start, an API key is auto-generated:
 
 ```
 Pulling ghcr.io/ash-ai/ash:latest...
 Starting Ash server...
 Waiting for server to be ready...
+
+API key auto-generated and saved to ~/.ash/config.json
+  Key: ash_7kX9mQ2pL...
+
 Ash server is running.
   URL:      http://localhost:4100
   Data dir: ~/.ash
 ```
+
+The key is saved automatically — all CLI commands will use it. On subsequent starts, the existing key is reused.
 
 Check that it's running:
 
@@ -193,10 +199,10 @@ docker compose up -d
 
 This starts Ash with SQLite (fine for single-machine deployments). Data persists in a Docker volume.
 
-To connect your local CLI to the remote server:
+The server auto-generates an API key on first start. Check the server logs for the key, then connect your local CLI:
 
 ```bash
-ash connect http://your-server:4100
+ash connect http://your-server:4100 --api-key ash_<key-from-server-logs>
 ash deploy ./my-agent --name my-agent
 ```
 
@@ -234,7 +240,7 @@ Ash auto-creates its tables on first startup. No migrations needed.
 
 ### Option E: Kubernetes (Helm Chart)
 
-Deploy Ash to any Kubernetes cluster with the official Helm chart:
+Deploy Ash to any Kubernetes cluster with the official Helm chart. For K8s, you provide the API key explicitly (the auto-generation bootstrap file isn't accessible outside the container):
 
 ```bash
 kubectl create secret generic ash-secrets \
@@ -243,6 +249,12 @@ kubectl create secret generic ash-secrets \
 
 helm install ash ./charts/ash \
   --set auth.existingSecret=ash-secrets
+```
+
+Then connect your CLI:
+
+```bash
+ash connect http://ash.your-cluster:4100 --api-key <the-key-you-generated>
 ```
 
 See the full [Kubernetes Deployment Guide](guides/kubernetes-deployment.md) for production configuration, external database setup, and enterprise integration.

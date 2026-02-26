@@ -1,6 +1,8 @@
 import { execSync } from 'node:child_process';
 import { Command } from 'commander';
 import { DEFAULT_PORT } from '@ash-ai/shared';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   isDockerInstalled,
   isDockerRunning,
@@ -14,6 +16,7 @@ import {
   isImageStale,
   findRepoRoot,
 } from '../docker.js';
+import { loadConfig, saveConfig } from '../config.js';
 import { isDevMode } from '../index.js';
 import { getCredentials } from './login.js';
 
@@ -154,6 +157,23 @@ export function startCommand(): Command {
         console.error('Server failed to become healthy within 30 seconds.');
         console.error('Check logs with: ash logs');
         process.exit(1);
+      }
+
+      // Check for auto-generated API key bootstrap file
+      const bootstrapPath = join(ashDataDir(), 'initial-api-key');
+      if (existsSync(bootstrapPath)) {
+        const generatedKey = readFileSync(bootstrapPath, 'utf-8').trim();
+        if (generatedKey) {
+          const config = loadConfig();
+          config.api_key = generatedKey;
+          saveConfig(config);
+          unlinkSync(bootstrapPath);
+
+          console.log('');
+          console.log('API key auto-generated and saved to ~/.ash/config.json');
+          console.log(`  Key: ${generatedKey}`);
+          console.log('');
+        }
       }
 
       console.log(`Ash server is running.`);
