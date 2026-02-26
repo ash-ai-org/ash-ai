@@ -1,5 +1,11 @@
 # ash-ai-sdk (Python)
 
+## 0.0.9 - 2026-02-26
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.8 - 2026-02-25
 
 ### Changed

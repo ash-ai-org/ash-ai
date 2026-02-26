@@ -1,5 +1,15 @@
 # @ash-ai/sdk
 
+## 0.0.10 - 2026-02-26
+
+### Added
+
+- `createAgent()` method fields for agent creation via SDK (#25)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.10
+
 ## 0.0.9 - 2026-02-25
 
 ### Changed
