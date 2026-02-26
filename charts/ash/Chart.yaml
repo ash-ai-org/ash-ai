@@ -1,0 +1,18 @@
+apiVersion: v2
+name: ash
+description: Deploy and orchestrate hosted AI agents — self-hostable server with sandbox isolation
+type: application
+version: 0.1.0
+appVersion: "0.0.8"
+home: https://github.com/ash-ai-org/ash-ai
+sources:
+  - https://github.com/ash-ai-org/ash-ai
+keywords:
+  - ai
+  - agents
+  - claude
+  - orchestration
+  - sandbox
+maintainers:
+  - name: ash-ai-org
+    url: https://github.com/ash-ai-org

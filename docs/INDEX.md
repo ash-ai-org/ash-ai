@@ -13,6 +13,7 @@
 | [guides/ec2-deployment.md](./guides/ec2-deployment.md) | Deploy Ash to EC2 (example scripts in `examples/deploy/ec2/`) |
 | [guides/gce-deployment.md](./guides/gce-deployment.md) | Deploy Ash to GCP Compute Engine (example scripts in `examples/deploy/gce/`) |
 | [guides/backend-for-frontend.md](./guides/backend-for-frontend.md) | Why and how to put a BFF between your browser app and Ash |
+| [guides/kubernetes-deployment.md](./guides/kubernetes-deployment.md) | Deploy Ash to Kubernetes with the official Helm chart (`charts/ash/`) |
 
 ## Plan
 
