@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readdirSync, statSync, readFileSync, createReadStream } from 'node:fs';
-import { join, isAbsolute, relative, basename, extname } from 'node:path';
+import { existsSync, readdirSync, statSync, readFileSync, createReadStream, mkdirSync, writeFileSync } from 'node:fs';
+import { join, isAbsolute, relative, basename, extname, dirname } from 'node:path';
 import { upsertAgent, getAgent, listAgents, deleteAgent } from '../db/index.js';
 import type { FileEntry } from '@ash-ai/shared';
 import type { SandboxPool } from '@ash-ai/sandbox';
@@ -53,7 +53,7 @@ const nameParam = {
 } as const;
 
 export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: SandboxPool | null): void {
-  // Deploy agent (provide local path to agent directory)
+  // Deploy agent (provide local path to agent directory, or create managed agent from systemPrompt/files)
   app.post('/api/agents', {
     schema: {
       tags: ['agents'],
@@ -62,8 +62,20 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
         properties: {
           name: { type: 'string' },
           path: { type: 'string' },
+          systemPrompt: { type: 'string' },
+          files: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                path: { type: 'string' },
+                content: { type: 'string' },
+              },
+              required: ['path', 'content'],
+            },
+          },
         },
-        required: ['name', 'path'],
+        required: ['name'],
       },
       response: {
         201: {
@@ -75,14 +87,52 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       },
     },
   }, async (req, reply) => {
-    const { name, path } = req.body as { name: string; path: string };
+    const { name, path: inputPath, systemPrompt, files } = req.body as {
+      name: string;
+      path?: string;
+      systemPrompt?: string;
+      files?: Array<{ path: string; content: string }>;
+    };
 
-    // Resolve relative paths against dataDir
-    const resolvedPath = isAbsolute(path) ? path : join(dataDir, path);
+    let resolvedPath: string;
 
-    // Validate: CLAUDE.md must exist
-    if (!existsSync(join(resolvedPath, 'CLAUDE.md'))) {
-      return reply.status(400).send({ error: 'Agent directory must contain CLAUDE.md', statusCode: 400 });
+    if (inputPath) {
+      // CLI deploy flow: resolve provided path
+      resolvedPath = isAbsolute(inputPath) ? inputPath : join(dataDir, inputPath);
+
+      // Validate: CLAUDE.md must exist
+      if (!existsSync(join(resolvedPath, 'CLAUDE.md'))) {
+        return reply.status(400).send({ error: 'Agent directory must contain CLAUDE.md', statusCode: 400 });
+      }
+    } else {
+      // Managed agent: create directory at dataDir/agents/<name>/
+      resolvedPath = join(dataDir, 'agents', name);
+      mkdirSync(resolvedPath, { recursive: true });
+
+      // Write uploaded files (base64-decoded)
+      let hasClaudeMd = false;
+      if (files && files.length > 0) {
+        for (const file of files) {
+          // Path traversal protection
+          if (file.path.includes('..') || file.path.startsWith('/')) continue;
+          const fileDest = join(resolvedPath, file.path);
+          if (!fileDest.startsWith(resolvedPath)) continue;
+          mkdirSync(dirname(fileDest), { recursive: true });
+          writeFileSync(fileDest, Buffer.from(file.content, 'base64'));
+          if (file.path === 'CLAUDE.md') hasClaudeMd = true;
+        }
+      }
+
+      // Write CLAUDE.md from systemPrompt if not already provided via files
+      if (!hasClaudeMd && systemPrompt) {
+        writeFileSync(join(resolvedPath, 'CLAUDE.md'), systemPrompt);
+        hasClaudeMd = true;
+      }
+
+      // Write placeholder CLAUDE.md if nothing else created it
+      if (!hasClaudeMd) {
+        writeFileSync(join(resolvedPath, 'CLAUDE.md'), `# ${name}\n`);
+      }
     }
 
     const agent = await upsertAgent(name, resolvedPath, req.tenantId);

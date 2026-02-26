@@ -91,6 +91,17 @@ export class AshClient {
     return res.agent;
   }
 
+  async createAgent(name: string, opts?: {
+    systemPrompt?: string;
+    files?: Array<{ path: string; content: string }>;
+  }): Promise<Agent> {
+    const body: Record<string, unknown> = { name };
+    if (opts?.systemPrompt) body.systemPrompt = opts.systemPrompt;
+    if (opts?.files) body.files = opts.files;
+    const res = await this.request<{ agent: Agent }>('POST', '/api/agents', body);
+    return res.agent;
+  }
+
   async listAgents(): Promise<Agent[]> {
     const res = await this.request<ListAgentsResponse>('GET', '/api/agents');
     return res.agents;
