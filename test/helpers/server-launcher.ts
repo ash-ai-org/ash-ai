@@ -5,8 +5,13 @@ import { join } from 'node:path';
 const DOCKER_IMAGE = 'ash-dev';
 const DOCKER_MOUNT_ROOT = '/mnt/test';
 
+/** Default API key injected into every test server unless overridden via extraEnv. */
+export const TEST_API_KEY = 'test-integration-key-abc123';
+
 export interface ServerHandle {
   url: string;
+  /** The API key the server was started with. Use for Authorization headers. */
+  apiKey: string;
   /** Translate a host-side path to the path the server process sees. */
   toServerPath(hostPath: string): string;
   stop(): Promise<void>;
@@ -69,6 +74,8 @@ function launchDirect(port: number, testRoot: string, extraEnv?: Record<string, 
   const dataDir = join(testRoot, 'data');
   mkdirSync(dataDir, { recursive: true });
 
+  // Auto-inject ASH_API_KEY so auth works; tests can override via extraEnv
+  const resolvedApiKey = extraEnv?.ASH_API_KEY ?? TEST_API_KEY;
   const child = spawn('node', ['packages/server/dist/index.js'], {
     env: {
       ...process.env,
@@ -76,6 +83,7 @@ function launchDirect(port: number, testRoot: string, extraEnv?: Record<string, 
       ASH_HOST: '127.0.0.1',
       ASH_DATA_DIR: dataDir,
       ASH_BRIDGE_ENTRY: bridgeEntry,
+      ASH_API_KEY: resolvedApiKey,
       ...extraEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -86,6 +94,7 @@ function launchDirect(port: number, testRoot: string, extraEnv?: Record<string, 
 
   return {
     url: `http://localhost:${port}`,
+    apiKey: resolvedApiKey,
     toServerPath: (p) => p,
     stop: () => stopChild(child),
   };
@@ -103,7 +112,12 @@ function launchInDocker(port: number, testRoot: string, extraEnv?: Record<string
   // Safety: stop leftover container from a previous crashed run
   try { execSync(`docker stop ${containerName}`, { stdio: 'ignore', timeout: 5000 }); } catch { /* fine */ }
 
+  // Auto-inject ASH_API_KEY so auth works; tests can override via extraEnv
+  const resolvedApiKey = extraEnv?.ASH_API_KEY ?? TEST_API_KEY;
+
   const extraEnvArgs: string[] = [];
+  // Inject API key first so extraEnv can override
+  extraEnvArgs.push('-e', `ASH_API_KEY=${resolvedApiKey}`);
   if (extraEnv) {
     for (const [key, value] of Object.entries(extraEnv)) {
       extraEnvArgs.push('-e', `${key}=${value}`);
@@ -131,6 +145,7 @@ function launchInDocker(port: number, testRoot: string, extraEnv?: Record<string
 
   return {
     url: `http://localhost:${port}`,
+    apiKey: resolvedApiKey,
     toServerPath: (hostPath) => hostPath.replace(testRoot, DOCKER_MOUNT_ROOT),
     stop: async () => {
       try { execSync(`docker stop ${containerName}`, { stdio: 'ignore', timeout: 10_000 }); } catch { /* fine */ }

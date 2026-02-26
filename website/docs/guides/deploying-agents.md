@@ -56,7 +56,7 @@ Existing sessions continue using the version they started with. New sessions pic
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
 
-const client = new AshClient({ serverUrl: 'http://localhost:4100' });
+const client = new AshClient({ serverUrl: 'http://localhost:4100', apiKey: process.env.ASH_API_KEY });
 const agents = await client.listAgents();
 console.log(agents);
 ```
@@ -67,7 +67,7 @@ console.log(agents);
 ```python
 from ash_sdk import AshClient
 
-client = AshClient("http://localhost:4100")
+client = AshClient("http://localhost:4100", api_key=os.environ["ASH_API_KEY"])
 agents = client.list_agents()
 print(agents)
 ```

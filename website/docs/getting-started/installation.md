@@ -53,8 +53,11 @@ Starting Ash server...
 Waiting for server to be ready...
 Ash server is running.
   URL:      http://localhost:4100
+  API key:  ash_xxxxxxxx (saved to ~/.ash/config.json)
   Data dir: ~/.ash
 ```
+
+The server auto-generates an API key on first start. The CLI captures it and saves it to `~/.ash/config.json`, so subsequent CLI commands authenticate automatically. If you need the key for SDK usage, read it from `~/.ash/config.json` or set `ASH_API_KEY` as an environment variable.
 
 ### `ash start` Options
 

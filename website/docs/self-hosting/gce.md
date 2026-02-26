@@ -107,6 +107,7 @@ import { AshClient } from "@ash-ai/sdk";
 
 const client = new AshClient({
   serverUrl: "http://<EXTERNAL_IP>:4100",
+  apiKey: "<your-api-key>",
 });
 
 // Create a session

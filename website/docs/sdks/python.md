@@ -39,7 +39,7 @@ from ash_ai import AshClient
 
 client = AshClient(
     server_url="http://localhost:4100",
-    api_key="your-api-key",  # optional in local dev mode
+    api_key="your-api-key",
 )
 ```
 
@@ -51,7 +51,7 @@ import { AshClient } from '@ash-ai/sdk';
 
 const client = new AshClient({
   serverUrl: 'http://localhost:4100',
-  apiKey: 'your-api-key', // optional in local dev mode
+  apiKey: 'your-api-key',
 });
 ```
 

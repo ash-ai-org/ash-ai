@@ -8,33 +8,33 @@ import TabItem from '@theme/TabItem';
 
 # Authentication
 
-Ash uses Bearer token authentication to protect API endpoints. All requests to `/api/*` routes require a valid API key when authentication is enabled.
+Ash uses Bearer token authentication to protect API endpoints. All requests to `/api/*` routes require a valid API key. Authentication is always enabled — the server auto-generates an API key on first start if one is not provided.
 
-## Generating an API Key
+## Auto-Generated API Key
 
-Generate a random key with `openssl`:
+When you run `ash start` for the first time, the server automatically generates a secure API key (prefixed `ash_`) and:
+
+1. Stores the hashed key in the database.
+2. Writes the plaintext key to `~/.ash/initial-api-key`.
+3. Logs the key to stdout.
+
+The CLI automatically picks up this key and saves it to `~/.ash/config.json`. No manual configuration is needed for local development.
+
+## Manual Configuration
+
+To use a specific API key instead of the auto-generated one, set the `ASH_API_KEY` environment variable:
 
 ```bash
-openssl rand -hex 32
-```
-
-This produces a 64-character hex string suitable for use as an API key.
-
-## Configuring the Server
-
-Set the `ASH_API_KEY` environment variable on the server:
-
-```bash
-export ASH_API_KEY="your-generated-key-here"
+export ASH_API_KEY="your-key-here"
 ```
 
 Or pass it when starting the server:
 
 ```bash
-ASH_API_KEY="your-generated-key-here" ash start
+ash start -e ASH_API_KEY=your-key-here
 ```
 
-When `ASH_API_KEY` is set, every request to `/api/*` must include a matching Bearer token. When it is **not** set, authentication is disabled and all requests are accepted (local development mode).
+When `ASH_API_KEY` is set, the server uses it directly instead of auto-generating one.
 
 ## Sending Authenticated Requests
 
@@ -112,7 +112,7 @@ The following endpoints do not require authentication, even when `ASH_API_KEY` i
 
 ### 401 -- Missing Authorization Header
 
-Returned when `ASH_API_KEY` is set on the server but the request has no `Authorization` header:
+Returned when the request has no `Authorization` header:
 
 ```json
 {
@@ -143,22 +143,11 @@ Returned when the `Authorization` header does not use the `Bearer <key>` format:
 }
 ```
 
-## Development Mode
-
-When `ASH_API_KEY` is not set, the server starts in development mode:
-
-- No authentication is required for any endpoint
-- All requests are assigned to the `default` tenant
-- The server logs: `ASH_API_KEY not set -- auth disabled (local dev mode)`
-
-This is convenient for local development but should never be used in production. Always set `ASH_API_KEY` when deploying a server that is accessible over a network.
-
 ## Auth Resolution Order
 
 When a request arrives, the server resolves authentication in the following order:
 
 1. **Public endpoints** (`/health`, `/docs/*`) -- skip auth entirely.
-2. **Internal endpoints** (`/api/internal/*`) -- skip auth (used for runner registration).
-3. **Bearer token present** -- validate against the `ASH_API_KEY` value. Accept if they match.
-4. **No header, no `ASH_API_KEY` set** -- accept (dev mode).
-5. **No match** -- reject with 401.
+2. **Internal endpoints** (`/api/internal/*`) -- authenticated via `ASH_INTERNAL_SECRET` (used for runner registration).
+3. **Bearer token present** -- validate against `ASH_API_KEY` or the database API keys table. Accept if matched.
+4. **No match** -- reject with 401.

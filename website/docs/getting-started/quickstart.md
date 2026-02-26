@@ -90,7 +90,10 @@ npm install @ash-ai/sdk
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
 
-const client = new AshClient({ serverUrl: 'http://localhost:4100' });
+const client = new AshClient({
+  serverUrl: 'http://localhost:4100',
+  apiKey: process.env.ASH_API_KEY,
+});
 
 // Create a session
 const session = await client.createSession('my-agent');
@@ -116,7 +119,10 @@ pip install ash-ai-sdk
 ```python
 from ash_ai import AshClient
 
-client = AshClient(server_url="http://localhost:4100")
+client = AshClient(
+    server_url="http://localhost:4100",
+    api_key=os.environ.get("ASH_API_KEY"),
+)
 
 # Create a session
 session = client.create_session("my-agent")
@@ -137,15 +143,18 @@ client.end_session(session.id)
 # Create a session
 curl -s -X POST http://localhost:4100/api/sessions \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ASH_API_KEY" \
   -d '{"agent":"my-agent"}'
 
 # Send a message (returns an SSE stream)
 curl -N -X POST http://localhost:4100/api/sessions/SESSION_ID/messages \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ASH_API_KEY" \
   -d '{"content":"What is a closure?"}'
 
 # End the session
-curl -s -X DELETE http://localhost:4100/api/sessions/SESSION_ID
+curl -s -X DELETE http://localhost:4100/api/sessions/SESSION_ID \
+  -H "Authorization: Bearer $ASH_API_KEY"
 ```
 
 </TabItem>

@@ -76,6 +76,7 @@ beforeAll(async () => {
 
   server = await launchServer({ port, testRoot });
   await waitForReady(server.url);
+  // server.apiKey is available for Python SDK tests to use
 }, 120_000);
 
 afterAll(async () => {

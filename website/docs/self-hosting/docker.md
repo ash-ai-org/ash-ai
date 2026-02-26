@@ -67,7 +67,10 @@ ash stop
 Pass environment variables to the container with `-e`:
 
 ```bash
-ash start -e ASH_API_KEY=my-secret-key -e ASH_MAX_SANDBOXES=50
+ash start -e ASH_MAX_SANDBOXES=50
+
+# Override the auto-generated API key (optional — not required for basic setup)
+ash start -e ASH_API_KEY=my-secret-key
 ```
 
 Use `--database-url` to connect to an external database instead of the default SQLite:
@@ -131,7 +134,7 @@ services:
       - ash-data:/data
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ASH_API_KEY=${ASH_API_KEY}
+      - ASH_API_KEY=${ASH_API_KEY}  # Required for Docker Compose — auto-generation only works with `ash start`
       - ASH_DATABASE_URL=postgresql://ash:ash@cockroach:26257/ash?sslmode=disable
       - ASH_MAX_SANDBOXES=200
       - ASH_IDLE_TIMEOUT_MS=1800000

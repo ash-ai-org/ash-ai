@@ -18,7 +18,7 @@ All Ash configuration is done via environment variables. There are no config fil
 | `ASH_DATABASE_URL` | (none) | PostgreSQL or CockroachDB connection string. When set, the server uses Postgres instead of SQLite. Format: `postgresql://user:password@host:port/dbname`. |
 | `ASH_MAX_SANDBOXES` | `1000` | Maximum number of sandbox entries (live + cold) tracked in the database. When this limit is reached, the pool evicts the least-recently-used sandbox. |
 | `ASH_IDLE_TIMEOUT_MS` | `1800000` (30 min) | How long a sandbox can sit idle (in the `waiting` state) before the idle sweep evicts it. Evicted sandboxes have their workspace persisted and are marked `cold`. |
-| `ASH_API_KEY` | (none) | Single-tenant API key for authentication. When set, all API requests (except `/health` and `/docs`) must include `Authorization: Bearer <key>`. When not set, auth is disabled (local dev mode). |
+| `ASH_API_KEY` | (auto-generated) | Single-tenant API key for authentication. All API requests (except `/health` and `/docs`) must include `Authorization: Bearer <key>`. If not set, the server auto-generates a key on first start and writes it to `{ASH_DATA_DIR}/initial-api-key`. |
 | `ASH_SNAPSHOT_URL` | (none) | Cloud storage URL for session workspace snapshots. Enables cross-machine session resume. Format: `s3://bucket/prefix/` or `gs://bucket/prefix/`. Requires the appropriate SDK installed (`@aws-sdk/client-s3` for S3, `@google-cloud/storage` for GCS). |
 | `ASH_BRIDGE_ENTRY` | (auto-detected) | Absolute path to the bridge process entry point (`packages/bridge/dist/index.js`). Normally auto-detected from the monorepo layout. Override only for custom installations. |
 | `ASH_DEBUG_TIMING` | `0` | Set to `1` to enable timing instrumentation on the hot path. Logs latency for sandbox creation, bridge connect, message round-trip, and SSE delivery. |
@@ -78,13 +78,13 @@ Use Postgres or CockroachDB when:
 
 Ash supports two authentication modes:
 
-### No Auth (Local Dev)
+### Auto-Generated Key (Default)
 
-When `ASH_API_KEY` is not set and no API keys exist in the database, all requests are accepted and assigned to the `default` tenant. This is the default for local development.
+When `ASH_API_KEY` is not set, the server auto-generates a secure API key on first start. The key is stored (hashed) in the database and the plaintext is written to `{ASH_DATA_DIR}/initial-api-key`. The CLI automatically picks up this key via `ash start`.
 
-### API Key Auth
+### Explicit API Key
 
-Set `ASH_API_KEY` for single-tenant authentication:
+Set `ASH_API_KEY` to use a specific key instead of auto-generating:
 
 ```bash
 export ASH_API_KEY=my-secret-key
@@ -119,7 +119,7 @@ Here is every variable in one table for quick reference:
 | `ASH_DATABASE_URL` | (SQLite) | Server |
 | `ASH_MAX_SANDBOXES` | `1000` | Server, Runner |
 | `ASH_IDLE_TIMEOUT_MS` | `1800000` | Server, Runner |
-| `ASH_API_KEY` | (none) | Server |
+| `ASH_API_KEY` | (auto-generated) | Server |
 | `ASH_SNAPSHOT_URL` | (none) | Server, Runner |
 | `ASH_BRIDGE_ENTRY` | (auto) | Server, Runner |
 | `ASH_DEBUG_TIMING` | `0` | Server, Runner |

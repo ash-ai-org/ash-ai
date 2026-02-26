@@ -20,7 +20,7 @@ Retrieve a flat list of all files in a session's workspace.
 ```typescript
 import { AshClient } from '@ash-ai/sdk';
 
-const client = new AshClient({ serverUrl: 'http://localhost:4100' });
+const client = new AshClient({ serverUrl: 'http://localhost:4100', apiKey: process.env.ASH_API_KEY });
 
 const result = await client.getSessionFiles(sessionId);
 console.log(`Source: ${result.source}`); // "sandbox" or "snapshot"
@@ -36,7 +36,7 @@ for (const file of result.files) {
 from ash_sdk import AshClient
 import httpx
 
-client = AshClient("http://localhost:4100")
+client = AshClient("http://localhost:4100", api_key=os.environ["ASH_API_KEY"])
 # The Python SDK uses the raw API response
 resp = httpx.get(f"http://localhost:4100/api/sessions/{session_id}/files")
 data = resp.json()

@@ -43,8 +43,8 @@ beforeAll(async () => {
   server = await launchServer({ port, testRoot });
   await waitForReady(server.url);
 
-  client = new AshClient({ serverUrl: server.url });
-  cliEnv = { ...process.env, ASH_SERVER_URL: server.url };
+  client = new AshClient({ serverUrl: server.url, apiKey: server.apiKey });
+  cliEnv = { ...process.env, ASH_SERVER_URL: server.url, ASH_API_KEY: server.apiKey };
 }, 120_000);
 
 afterAll(async () => {
