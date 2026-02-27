@@ -7,6 +7,7 @@
        ec2-deploy ec2-teardown smoke-ec2 \
        ec2-deploy-distributed ec2-teardown-distributed smoke-distributed \
        gce-deploy gce-teardown smoke-gce \
+       ecs-deploy ecs-teardown deploy-runtime \
        changeset changeset-status version-packages publish publish-dry-run \
        openapi sdk-python
 
@@ -167,6 +168,20 @@ ec2-teardown-distributed:
 # Run smoke test against distributed EC2 deployment
 smoke-distributed:
 	./examples/deploy/ec2-distributed/smoke-test.sh
+
+# Deploy Ash to ECS Fargate (first-time setup, creates all infra)
+ecs-deploy:
+	./scripts/deploy-ecs.sh
+
+# Tear down ECS Fargate deployment
+ecs-teardown:
+	./scripts/teardown-ecs.sh
+
+# Zero-downtime rolling deploy of the Ash runtime on ECS
+# Usage: make deploy-runtime          (re-pull :latest)
+#        make deploy-runtime TAG=0.0.12  (pinned version)
+deploy-runtime:
+	./scripts/deploy-runtime.sh $(TAG)
 
 # Deploy Ash server to GCE (requires gcloud CLI authenticated)
 gce-deploy:

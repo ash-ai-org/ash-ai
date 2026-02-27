@@ -1,4 +1,5 @@
-import { createServer } from 'node:http';
+import { createServer, type Server } from 'node:http';
+import { createInterface } from 'node:readline';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -10,7 +11,7 @@ const CREDENTIALS_PATH = join(homedir(), '.ash', 'credentials.json');
 export interface AshCredentials {
   api_key: string;
   cloud_url: string;
-  email: string;
+  email?: string;
 }
 
 export function getCredentials(): AshCredentials | null {
@@ -23,18 +24,49 @@ export function getCredentials(): AshCredentials | null {
   }
 }
 
+function saveCredentials(credentials: AshCredentials): void {
+  mkdirSync(join(homedir(), '.ash'), { recursive: true });
+  writeFileSync(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2) + '\n');
+}
+
+function startPastePrompt(cloudUrl: string, loginUrl: string, server: Server): void {
+  console.log(`\nIf the browser didn't open, visit:\n  ${loginUrl}\n`);
+  console.log('Or paste your API key below:');
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  rl.question('> ', (apiKey) => {
+    rl.close();
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      console.error('No API key provided.');
+      server.close();
+      process.exit(1);
+    }
+
+    saveCredentials({ api_key: trimmed, cloud_url: cloudUrl });
+    console.log(`\nLogged in.`);
+    console.log(`Credentials saved to ${CREDENTIALS_PATH}`);
+    server.close();
+    process.exit(0);
+  });
+}
+
 export function loginCommand(): Command {
   return new Command('login')
     .description('Authenticate with Ash Cloud')
     .option('--cloud-url <url>', 'Ash Cloud URL', DEFAULT_CLOUD_URL)
     .action(async (opts: { cloudUrl: string }) => {
       const cloudUrl = opts.cloudUrl.replace(/\/$/, '');
+      let completed = false;
 
       // Start a temporary local server to receive the callback
       const server = createServer((req, res) => {
         const url = new URL(req.url!, `http://localhost`);
 
         if (url.pathname === '/callback') {
+          if (completed) return;
+          completed = true;
+
           const apiKey = url.searchParams.get('api_key');
           const email = url.searchParams.get('email');
           const error = url.searchParams.get('error');
@@ -42,7 +74,7 @@ export function loginCommand(): Command {
           if (error) {
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end('<html><body><h2>Login failed</h2><p>You can close this tab.</p></body></html>');
-            console.error(`Login failed: ${error}`);
+            console.error(`\nLogin failed: ${error}`);
             server.close();
             process.exit(1);
             return;
@@ -56,15 +88,7 @@ export function loginCommand(): Command {
             return;
           }
 
-          // Save credentials
-          const credentials: AshCredentials = {
-            api_key: apiKey,
-            cloud_url: cloudUrl,
-            email,
-          };
-
-          mkdirSync(join(homedir(), '.ash'), { recursive: true });
-          writeFileSync(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2) + '\n');
+          saveCredentials({ api_key: apiKey, cloud_url: cloudUrl, email });
 
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(`<html><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h2>Logged in!</h2><p>You can close this tab and return to your terminal.</p></div></body></html>`);
@@ -97,13 +121,25 @@ export function loginCommand(): Command {
           : process.platform === 'win32' ? 'start'
           : 'xdg-open';
 
+        let browserOpened = false;
         try {
           require('node:child_process').execSync(`${open} "${loginUrl}"`, { stdio: 'ignore' });
+          browserOpened = true;
         } catch {
-          console.log(`\nCould not open browser. Visit this URL manually:\n  ${loginUrl}\n`);
+          // Browser failed to open — fall through to paste prompt immediately
         }
 
-        console.log('Waiting for authentication...');
+        if (browserOpened) {
+          console.log('Waiting for authentication...');
+          // Show paste fallback after 5 seconds if callback hasn't fired
+          setTimeout(() => {
+            if (!completed) {
+              startPastePrompt(cloudUrl, loginUrl, server);
+            }
+          }, 5000);
+        } else {
+          startPastePrompt(cloudUrl, loginUrl, server);
+        }
       });
 
       // Timeout after 5 minutes

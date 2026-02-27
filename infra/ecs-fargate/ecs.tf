@@ -89,5 +89,15 @@ resource "aws_ecs_service" "ash" {
     container_port   = 4100
   }
 
+  deployment_configuration {
+    minimum_healthy_percent = 100
+    maximum_percent         = 200
+
+    deployment_circuit_breaker {
+      enable   = true
+      rollback = true
+    }
+  }
+
   depends_on = [aws_lb_listener.ash]
 }
