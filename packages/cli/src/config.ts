@@ -34,7 +34,10 @@ export function getServerUrl(): string {
   }
   try {
     const raw = readFileSync(join(homedir(), '.ash', 'credentials.json'), 'utf-8');
-    const creds = JSON.parse(raw) as { cloud_url?: string };
+    const creds = JSON.parse(raw) as { server_url?: string; cloud_url?: string };
+    if (creds.server_url) {
+      return creds.server_url;
+    }
     if (creds.cloud_url) {
       return creds.cloud_url;
     }

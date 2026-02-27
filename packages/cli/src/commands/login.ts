@@ -12,6 +12,7 @@ export interface AshCredentials {
   api_key: string;
   cloud_url: string;
   email?: string;
+  server_url?: string;
 }
 
 export function getCredentials(): AshCredentials | null {
@@ -69,6 +70,7 @@ export function loginCommand(): Command {
 
           const apiKey = url.searchParams.get('api_key');
           const email = url.searchParams.get('email');
+          const serverUrl = url.searchParams.get('server_url');
           const error = url.searchParams.get('error');
 
           if (error) {
@@ -88,7 +90,7 @@ export function loginCommand(): Command {
             return;
           }
 
-          saveCredentials({ api_key: apiKey, cloud_url: cloudUrl, email });
+          saveCredentials({ api_key: apiKey, cloud_url: cloudUrl, email, server_url: serverUrl || undefined });
 
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(`<html><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><h2>Logged in!</h2><p>You can close this tab and return to your terminal.</p></div></body></html>`);
