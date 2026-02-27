@@ -16,6 +16,7 @@
 | [guides/kubernetes-deployment.md](./guides/kubernetes-deployment.md) | Deploy Ash to Kubernetes with the official Helm chart (`charts/ash/`) |
 | [guides/ecs-rolling-deploy.md](./guides/ecs-rolling-deploy.md) | Zero-downtime rolling deploys on ECS Fargate |
 | [guides/enterprise-integration.md](./guides/enterprise-integration.md) | Integrate Ash with enterprise infrastructure: API gateways, auth, OTEL, network policy, secrets |
+| [guides/enterprise-gap-analysis.md](./guides/enterprise-gap-analysis.md) | All 8 enterprise integration gaps: what's closed, what remains, effort estimates |
 
 ## Plan
 
@@ -80,6 +81,17 @@
 | Doc | Description |
 |-----|-------------|
 | [diagrams/ash-sidecar-mcp-integration.md](./diagrams/ash-sidecar-mcp-integration.md) | Architecture diagram: integrating Ash with a host app that has in-process Python tools via sidecar MCP |
+
+## Future Tasks
+
+| Doc | Description |
+|-----|-------------|
+| [future_tasks/otel-tracing.md](./future_tasks/otel-tracing.md) | OpenTelemetry distributed tracing: coordinator auto-instrumentation + bridge-level spans |
+| [future_tasks/unprivileged-sandboxes.md](./future_tasks/unprivileged-sandboxes.md) | Running Ash without `--privileged`: user namespaces, K8s-native isolation |
+| [future_tasks/memory-as-mcp.md](./future_tasks/memory-as-mcp.md) | Memory system as MCP server in agent definitions (zero Ash changes) |
+| [future_tasks/pluggable-sandbox-providers.md](./future_tasks/pluggable-sandbox-providers.md) | SandboxProvider interface for E2B, Docker, and cloud sandbox backends |
+| [future_tasks/sandbox-overlays.md](./future_tasks/sandbox-overlays.md) | Overlay filesystem for copy-on-write sandbox workspaces |
+| [future_tasks/unify-db-backends.md](./future_tasks/unify-db-backends.md) | Unify SQLite and Postgres backends behind Drizzle ORM |
 
 ## Runbooks
 

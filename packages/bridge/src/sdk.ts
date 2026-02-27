@@ -39,6 +39,12 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
 
   // The SDK reads .mcp.json from cwd automatically for MCP servers.
   // settingSources: ['project'] tells it to load .claude/settings.json and skills.
+  // Permission mode: configurable via ASH_PERMISSION_MODE env var.
+  // Default is 'bypassPermissions' — sandbox isolation is the security boundary.
+  // Set to 'permissionsByAgent' to use SDK permission system with .claude/settings.json.
+  const permMode = process.env.ASH_PERMISSION_MODE || 'bypassPermissions';
+  const isBypass = permMode === 'bypassPermissions';
+
   const q = query({
     prompt: opts.prompt,
     options: {
@@ -46,8 +52,8 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
       systemPrompt: opts.claudeMd || undefined,
       resume: opts.resume ? (opts.resumeSessionId || opts.sessionId) : undefined,
       persistSession: true,
-      permissionMode: 'bypassPermissions',
-      allowDangerouslySkipPermissions: true,
+      permissionMode: permMode as any,
+      ...(isBypass && { allowDangerouslySkipPermissions: true }),
       abortController: abortControllerFromSignal(opts.signal),
       settingSources: ['project'],
       ...(opts.model && { model: opts.model }),
