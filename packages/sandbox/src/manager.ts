@@ -1,10 +1,10 @@
 import { type ChildProcess, execSync, execFileSync } from 'node:child_process';
-import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync } from 'node:fs';
+import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { SANDBOX_ENV_ALLOWLIST, DEFAULT_SANDBOX_LIMITS, INSTALL_SCRIPT_TIMEOUT_MS, startTimer, logTiming } from '@ash-ai/shared';
-import type { SandboxLimits, SandboxTimings } from '@ash-ai/shared';
+import type { SandboxLimits, SandboxTimings, McpServerConfig } from '@ash-ai/shared';
 import { BridgeClient } from './bridge-client.js';
 import { spawnWithLimits, isOomExit, startDiskMonitor } from './resource-limits.js';
 
@@ -39,6 +39,10 @@ export interface CreateSandboxOpts {
   extraEnv?: Record<string, string>;
   /** Shell script to run in workspace after install.sh but before the bridge starts. */
   startupScript?: string;
+  /** Per-session MCP servers. Merged into the agent's .mcp.json (session overrides agent). */
+  mcpServers?: Record<string, McpServerConfig>;
+  /** System prompt override. Replaces the agent's CLAUDE.md for this session. */
+  systemPrompt?: string;
 }
 
 const MAX_LOG_ENTRIES = 10_000;
@@ -111,6 +115,25 @@ export class SandboxManager {
       mkdirSync(workspaceDir, { recursive: true });
     }
     const agentCopyMs = copyTimer();
+
+    // --- Phase: per-session overrides ---
+    // Merge session-level MCP servers into agent's .mcp.json
+    if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
+      const mcpJsonPath = join(workspaceDir, '.mcp.json');
+      let existing: { mcpServers?: Record<string, unknown> } = {};
+      try {
+        existing = JSON.parse(readFileSync(mcpJsonPath, 'utf-8'));
+      } catch {
+        // No .mcp.json from agent — start fresh
+      }
+      existing.mcpServers = { ...existing.mcpServers, ...opts.mcpServers };
+      writeFileSync(mcpJsonPath, JSON.stringify(existing, null, 2) + '\n');
+    }
+
+    // Override agent's CLAUDE.md with session-level system prompt
+    if (opts.systemPrompt != null) {
+      writeFileSync(join(workspaceDir, 'CLAUDE.md'), opts.systemPrompt);
+    }
 
     // SECURITY: Allowlist env — nothing else leaks to sandbox
     const env: Record<string, string> = {};

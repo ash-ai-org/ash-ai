@@ -1,4 +1,4 @@
-import type { BridgeCommand, BridgeEvent, PoolStats, SandboxLimits } from '@ash-ai/shared';
+import type { BridgeCommand, BridgeEvent, PoolStats, SandboxLimits, McpServerConfig } from '@ash-ai/shared';
 import type { LogEntry } from '@ash-ai/sandbox';
 
 export interface CreateSandboxRequest {
@@ -13,6 +13,10 @@ export interface CreateSandboxRequest {
   extraEnv?: Record<string, string>;
   /** Shell script to run in workspace after install.sh but before the bridge starts. */
   startupScript?: string;
+  /** Per-session MCP servers. Merged into agent's .mcp.json (session overrides agent). */
+  mcpServers?: Record<string, McpServerConfig>;
+  /** System prompt override. Replaces agent's CLAUDE.md for this session. */
+  systemPrompt?: string;
 }
 
 export interface SandboxHandle {

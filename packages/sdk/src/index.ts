@@ -49,4 +49,5 @@ export type {
   FileEntry,
   ListFilesResponse,
   GetFileResponse,
+  McpServerConfig,
 } from '@ash-ai/shared';

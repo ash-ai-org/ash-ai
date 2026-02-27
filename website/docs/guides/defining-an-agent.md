@@ -144,6 +144,12 @@ Configures MCP (Model Context Protocol) servers available to the agent. Each ser
 
 MCP servers run as child processes inside the sandbox. The `env` field sets environment variables specific to that server. Paths are relative to the agent's workspace directory.
 
+:::tip Per-Session MCP Servers
+
+You can also inject MCP servers at session creation time using the `mcpServers` field on `POST /api/sessions`. Session-level entries are merged into the agent's `.mcp.json` (session overrides agent on key conflict). This enables the **sidecar pattern** — your host app exposes tenant-specific tools as MCP endpoints. See [Per-Session MCP Servers](../api/sessions.md#per-session-mcp-servers) for details.
+
+:::
+
 ### .claude/skills/
 
 Skills are markdown files that define reusable workflows the agent can invoke. Each file becomes a slash command.

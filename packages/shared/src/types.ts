@@ -541,6 +541,18 @@ export interface ListQueueResponse {
 
 // -- API request/response -----------------------------------------------------
 
+/** MCP server configuration for .mcp.json entries. */
+export interface McpServerConfig {
+  /** Remote MCP server URL (HTTP/SSE transport). Mutually exclusive with command. */
+  url?: string;
+  /** Command to spawn a stdio MCP server. Mutually exclusive with url. */
+  command?: string;
+  /** Arguments for the command. */
+  args?: string[];
+  /** Environment variables for the MCP server process. */
+  env?: Record<string, string>;
+}
+
 export interface CreateSessionRequest {
   agent: string;
   /** Credential ID to inject into sandbox env. */
@@ -551,6 +563,18 @@ export interface CreateSessionRequest {
   startupScript?: string;
   /** Model override for this session. Overrides agent's .claude/settings.json default. */
   model?: string;
+  /**
+   * Per-session MCP servers. Merged into the agent's .mcp.json before the bridge starts.
+   * Session-level entries override agent-level entries with the same key.
+   * Enables the sidecar pattern: host app exposes tools as HTTP MCP endpoints,
+   * each session connects to a tenant-scoped URL.
+   */
+  mcpServers?: Record<string, McpServerConfig>;
+  /**
+   * System prompt override. Replaces the agent's CLAUDE.md for this session.
+   * When set, the bridge reads this instead of the agent's CLAUDE.md file.
+   */
+  systemPrompt?: string;
 }
 
 export interface CreateSessionResponse {

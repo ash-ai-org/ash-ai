@@ -72,6 +72,12 @@
 | [features/metrics.md](./features/metrics.md) | Prometheus `/metrics` endpoint, structured resume log lines, pool stats, cold resume source breakdown |
 | [features/multi-coordinator.md](./features/multi-coordinator.md) | Horizontal control plane: DB-backed runner registry, multi-coordinator with CRDB |
 
+## Diagrams
+
+| Doc | Description |
+|-----|-------------|
+| [diagrams/ash-sidecar-mcp-integration.md](./diagrams/ash-sidecar-mcp-integration.md) | Architecture diagram: integrating Ash with a host app that has in-process Python tools via sidecar MCP |
+
 ## Runbooks
 
 *Created as failure modes are discovered. One doc per scenario in `docs/runbooks/`*
