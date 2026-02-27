@@ -3,7 +3,7 @@ import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync, re
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { SANDBOX_ENV_ALLOWLIST, DEFAULT_SANDBOX_LIMITS, INSTALL_SCRIPT_TIMEOUT_MS, startTimer, logTiming } from '@ash-ai/shared';
+import { SANDBOX_ENV_ALLOWLIST, DEFAULT_SANDBOX_LIMITS, INSTALL_SCRIPT_TIMEOUT_MS, BRIDGE_READY_TIMEOUT_MS, startTimer, logTiming } from '@ash-ai/shared';
 import type { SandboxLimits, SandboxTimings, McpServerConfig } from '@ash-ai/shared';
 import { BridgeClient } from './bridge-client.js';
 import { spawnWithLimits, isOomExit, startDiskMonitor } from './resource-limits.js';
@@ -259,11 +259,6 @@ export class SandboxManager {
       { sandboxId: id, workspaceDir, agentDir: opts.agentDir, sandboxDir, sandboxesDir: this.sandboxesDir, homeDir: sandboxHomeDir },
     );
 
-    child.stdout?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString().trimEnd();
-      console.log(`[sandbox:${shortId}:out] ${text}`);
-      this.appendLog(id, 'stdout', text);
-    });
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString().trimEnd();
       console.error(`[sandbox:${shortId}:err] ${text}`);
@@ -278,9 +273,47 @@ export class SandboxManager {
         opts.onOomKill?.(id);
       }
     });
+
+    // Wait for bridge to signal readiness via stdout ('R' byte) before connecting.
+    // This eliminates the 100ms polling loop that was adding ~100ms latency.
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Bridge did not become ready within ${BRIDGE_READY_TIMEOUT_MS}ms`));
+      }, BRIDGE_READY_TIMEOUT_MS);
+
+      let signaled = false;
+
+      child.stdout?.on('data', (chunk: Buffer) => {
+        if (!signaled) {
+          signaled = true;
+          clearTimeout(timeout);
+          // Strip the leading 'R' signal byte, forward any remaining data to logs
+          const rest = chunk.toString().slice(1).trimEnd();
+          if (rest) {
+            console.log(`[sandbox:${shortId}:out] ${rest}`);
+            this.appendLog(id, 'stdout', rest);
+          }
+          resolve();
+        } else {
+          const text = chunk.toString().trimEnd();
+          if (text) {
+            console.log(`[sandbox:${shortId}:out] ${text}`);
+            this.appendLog(id, 'stdout', text);
+          }
+        }
+      });
+
+      child.on('exit', (code) => {
+        if (!signaled) {
+          clearTimeout(timeout);
+          reject(new Error(`Bridge exited with code ${code} before signaling ready`));
+        }
+      });
+    });
     const bridgeSpawnMs = bridgeSpawnTimer();
 
     // --- Phase: bridge connect ---
+    // Socket is guaranteed listening (bridge signaled readiness). No polling needed.
     const bridgeConnectTimer = startTimer();
     const client = new BridgeClient(socketPath);
     await client.connect();

@@ -165,7 +165,8 @@ const server = net.createServer((conn) => {
 });
 
 server.listen(socketPath, () => {
-  // Bridge is ready — server will detect via 'ready' event on connect
+  // Signal readiness to parent — eliminates polling in BridgeClient.connect()
+  process.stdout.write('R');
 });
 
 // Graceful shutdown

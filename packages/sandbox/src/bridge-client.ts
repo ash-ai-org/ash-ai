@@ -14,6 +14,7 @@ export class BridgeClient {
 
   /**
    * Connect to the bridge socket and wait for the 'ready' event.
+   * Caller must ensure the bridge socket is already listening before calling this.
    */
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -21,25 +22,17 @@ export class BridgeClient {
         reject(new Error(`Bridge did not become ready within ${BRIDGE_READY_TIMEOUT_MS}ms`));
       }, BRIDGE_READY_TIMEOUT_MS);
 
-      const tryConnect = () => {
-        const sock = net.createConnection(this.socketPath);
+      const sock = net.createConnection(this.socketPath);
 
-        sock.on('connect', () => {
-          this.socket = sock;
-          this.setupDataHandler(sock);
-        });
+      sock.on('connect', () => {
+        this.socket = sock;
+        this.setupDataHandler(sock);
+      });
 
-        sock.on('error', (err: NodeJS.ErrnoException) => {
-          if (err.code === 'ENOENT' || err.code === 'ECONNREFUSED' || err.code === 'EINVAL') {
-            // Socket not ready yet — retry
-            sock.destroy();
-            setTimeout(tryConnect, 100);
-          } else {
-            clearTimeout(timeout);
-            reject(err);
-          }
-        });
-      };
+      sock.on('error', (err: NodeJS.ErrnoException) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
 
       // Wait for 'ready' event
       const onReady = (event: BridgeEvent) => {
@@ -50,8 +43,6 @@ export class BridgeClient {
         }
       };
       this.addListener(onReady);
-
-      tryConnect();
     });
   }
 

@@ -245,6 +245,25 @@ export function usePlaygroundChat({
           setMessages((prev) => prev.map((m) =>
             m.id === assistantId ? { ...m, content: fullContent || '(no response)', toolCalls: [...toolCalls], isStreaming: false, timestamp: new Date().toISOString() } : m
           ));
+        } else if (event.type === 'message') {
+          const data = event.data as Record<string, any>;
+          // Complete assistant message — use as authoritative content to prevent
+          // duplication from text_delta events emitted for both streaming deltas
+          // and the final assembled message.
+          if (data.type === 'assistant' && Array.isArray(data.message?.content)) {
+            let text = '';
+            for (const block of data.message.content) {
+              if (block.type === 'text' && block.text) {
+                text += (text ? '\n' : '') + block.text;
+              }
+            }
+            if (text) {
+              fullContent = text;
+              setMessages((prev) => prev.map((m) =>
+                m.id === assistantId ? { ...m, content: fullContent, toolCalls: [...toolCalls], isStreaming: true } : m
+              ));
+            }
+          }
         } else if (event.type === 'error') {
           const data = event.data as { error: string };
           const errText = data.error || 'Unknown error';
@@ -254,15 +273,17 @@ export function usePlaygroundChat({
         }
       }
 
-      // Finalize
-      for (const tc of toolCalls) {
-        if (tc.state === 'running' || tc.state === 'pending') tc.state = 'completed';
+      // Finalize — only needed if stream ended without a turn_complete/done event
+      if (fullContent || toolCalls.length > 0) {
+        for (const tc of toolCalls) {
+          if (tc.state === 'running' || tc.state === 'pending') tc.state = 'completed';
+        }
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId && m.isStreaming
+            ? { ...m, content: fullContent || '(no response)', toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined, isStreaming: false, timestamp: new Date().toISOString() }
+            : m
+        ));
       }
-      setMessages((prev) => prev.map((m) =>
-        m.id === assistantId && m.isStreaming
-          ? { ...m, content: fullContent || '(no response)', toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined, isStreaming: false, timestamp: new Date().toISOString() }
-          : m
-      ));
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Failed to send';
       setMessages((prev) => prev.map((m) =>
