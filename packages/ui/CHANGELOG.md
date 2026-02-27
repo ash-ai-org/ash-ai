@@ -1,5 +1,16 @@
 # @ash-ai/ui
 
+## 0.0.6 - 2026-02-26
+
+### Fixed
+
+- Streaming content duplication: use final assembled message as authoritative content (#28)
+- Only finalize streaming state when there's actual content to display (#28)
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.5 - 2026-02-26
 
 ### Fixed

@@ -1,5 +1,16 @@
 # @ash-ai/bridge
 
+## 0.0.10 - 2026-02-26
+
+### Added
+
+- Sidecar MCP server support: bridge spawns MCP servers defined in `.mcp.json` as child processes (#27)
+- Ready signal: bridge writes `R` byte to stdout when socket is listening, eliminating polling (#28)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.11
+
 ## 0.0.9 - 2026-02-26
 
 ### Changed

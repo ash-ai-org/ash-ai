@@ -1,5 +1,21 @@
 # @ash-ai/sandbox
 
+## 0.0.10 - 2026-02-26
+
+### Added
+
+- Per-session MCP servers: merge session-level `mcpServers` into agent's `.mcp.json` (#27)
+- Per-session system prompt override via `systemPrompt` option (#27)
+- Bridge ready signal wait: `SandboxManager` waits for `R` byte from bridge stdout before connecting (#28)
+
+### Fixed
+
+- Removed 100ms polling loop in `BridgeClient.connect()` — socket is guaranteed listening (#28)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.11
+
 ## 0.0.9 - 2026-02-26
 
 ### Added

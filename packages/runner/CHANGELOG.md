@@ -1,5 +1,15 @@
 # @ash-ai/runner
 
+## 0.0.10 - 2026-02-26
+
+### Added
+
+- Forward `mcpServers` and `systemPrompt` from session creation to sandbox (#27)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.11, @ash-ai/sandbox@0.0.10
+
 ## 0.0.9 - 2026-02-26
 
 ### Changed

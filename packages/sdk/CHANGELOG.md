@@ -1,5 +1,15 @@
 # @ash-ai/sdk
 
+## 0.0.11 - 2026-02-26
+
+### Added
+
+- `mcpServers` and `systemPrompt` options on `createSession()` for per-session MCP and system prompt override (#27)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.11
+
 ## 0.0.10 - 2026-02-26
 
 ### Added
