@@ -1,10 +1,15 @@
 # Ash + Sidecar MCP Integration Architecture
 
-_2026-02-27 — How a host application (e.g. backbone) integrates with Ash when it has Python tools that need access to in-process infrastructure._
+_2026-02-27 — How a host application with its own tools and infrastructure integrates with Ash via the sidecar MCP pattern._
 
 ## Overview
 
 The host app keeps its tools as HTTP MCP endpoints inside its own process. Ash sessions connect to them as remote MCP servers. Two systems, clean boundary.
+
+This pattern applies when you have an existing application (Python, Go, Java, etc.) that:
+- Already has business logic, service clients, and infrastructure connections
+- Wants agent capabilities (Claude, sandboxing, session management) without moving tools out of process
+- Needs per-request context (tenant ID, auth, scoped clients) available to tools
 
 ## Full Architecture Diagram
 
@@ -13,48 +18,48 @@ The host app keeps its tools as HTTP MCP endpoints inside its own process. Ash s
 │                                        HOST MACHINE                                             │
 │                                                                                                 │
 │  ┌───────────────────────────────────────────────┐   ┌────────────────────────────────────────┐  │
-│  │          BACKBONE (FastAPI, Python)            │   │         ASH SERVER (Fastify, TS)       │  │
-│  │                                                │   │              :4100                     │  │
-│  │  ┌──────────────────────────────────────────┐  │   │                                        │  │
-│  │  │         Request Handler                  │  │   │  ┌─────────┐  ┌──────────┐  ┌───────┐ │  │
-│  │  │                                          │  │   │  │ REST API│  │ Sessions │  │SQLite │ │  │
-│  │  │  POST /api/ai/storefront-theme           │──┼──▶│  │  Routes │  │  (CRUD)  │  │  (DB) │ │  │
-│  │  │                                          │  │   │  └────┬────┘  └──────────┘  └───────┘ │  │
-│  │  │  1. Receives request with business_id    │  │   │       │                                │  │
-│  │  │  2. Calls Ash REST API to create session │  │   │       ▼                                │  │
-│  │  │  3. Streams SSE response back to caller  │  │   │  ┌─────────────────────────────────┐   │  │
-│  │  └──────────────────────────────────────────┘  │   │  │     SandboxPool / Manager       │   │  │
-│  │                                                │   │  │     (@ash-ai/sandbox)            │   │  │
-│  │  ┌──────────────────────────────────────────┐  │   │  │                                 │   │  │
-│  │  │      MCP Server Endpoint (HTTP)          │  │   │  │  - Creates isolated sandboxes   │   │  │
-│  │  │      /mcp/storefront                     │  │   │  │  - Manages lifecycle            │   │  │
-│  │  │                                          │  │   │  │  - Resource limits (cgroups)     │   │  │
-│  │  │  Speaks MCP protocol over HTTP/SSE       │  │   │  │  - Env allowlist (security)     │   │  │
-│  │  │  Has full access to:                     │  │   │  └──────────────┬──────────────────┘   │  │
-│  │  │   • gRPC clients (storefront service)    │  │   │                 │                      │  │
-│  │  │   • Redis connections                    │  │   │                 │ spawns                │  │
-│  │  │   • Database models                      │  │   │                 ▼                      │  │
-│  │  │   • Request-scoped state (business_id)   │  │   │  ┌──────────────────────────────────┐  │  │
-│  │  │                                          │  │   │  │         SANDBOX (isolated)       │  │  │
-│  │  │  Tools exposed:                          │  │   │  │  ┌────────────────────────────┐  │  │  │
-│  │  │   • save_preview_theme                   │  │   │  │  │    Bridge Process          │  │  │  │
-│  │  │   • get_existing_theme                   │  │   │  │  │    (@ash-ai/bridge)        │  │  │  │
-│  │  │   • generate_theme_preview               │  │   │  │  │                            │  │  │  │
-│  │  │   • (Playwright tools — keeps browser    │  │   │  │  │  - Reads CLAUDE.md         │  │  │  │
-│  │  │     instance alive across calls)         │  │   │  │  │  - Reads .mcp.json         │  │  │  │
-│  │  └──────────────▲───────────────────────────┘  │   │  │  │  - Calls Claude Agent SDK  │  │  │  │
-│  │                 │                              │   │  │  │  - Yields SDK messages      │  │  │  │
-│  │                 │ MCP protocol                 │   │  │  └─────┬──────────┬───────────┘  │  │  │
-│  │                 │ (JSON-RPC over HTTP)         │   │  │        │          │              │  │  │
-│  │                 │                              │   │  │        │          │ spawns       │  │  │
-│  │                 │                              │   │  │        │          ▼              │  │  │
+│  │          HOST APP (any language/framework)     │   │         ASH SERVER (Fastify, TS)       │  │
+│  │          e.g. FastAPI, Express, Spring         │   │              :4100                     │  │
+│  │                                                │   │                                        │  │
+│  │  ┌──────────────────────────────────────────┐  │   │  ┌─────────┐  ┌──────────┐  ┌───────┐ │  │
+│  │  │         Request Handler                  │  │   │  │ REST API│  │ Sessions │  │SQLite │ │  │
+│  │  │                                          │  │   │  │  Routes │  │  (CRUD)  │  │  (DB) │ │  │
+│  │  │  POST /api/run-agent                     │──┼──▶│  └────┬────┘  └──────────┘  └───────┘ │  │
+│  │  │                                          │  │   │       │                                │  │
+│  │  │  1. Receives request with tenant context  │  │   │       ▼                                │  │
+│  │  │  2. Calls Ash REST API to create session │  │   │  ┌─────────────────────────────────┐   │  │
+│  │  │  3. Streams SSE response back to caller  │  │   │  │     SandboxPool / Manager       │   │  │
+│  │  └──────────────────────────────────────────┘  │   │  │     (@ash-ai/sandbox)            │   │  │
+│  │                                                │   │  │                                 │   │  │
+│  │  ┌──────────────────────────────────────────┐  │   │  │  - Creates isolated sandboxes   │   │  │
+│  │  │      MCP Server Endpoint (HTTP)          │  │   │  │  - Manages lifecycle            │   │  │
+│  │  │      /mcp/my-tools                       │  │   │  │  - Resource limits (cgroups)     │   │  │
+│  │  │                                          │  │   │  │  - Env allowlist (security)     │   │  │
+│  │  │  Speaks MCP protocol over HTTP/SSE       │  │   │  └──────────────┬──────────────────┘   │  │
+│  │  │  Has full access to:                     │  │   │                 │                      │  │
+│  │  │   • Service clients (gRPC, REST, etc.)   │  │   │                 │ spawns                │  │
+│  │  │   • Database / cache connections         │  │   │                 ▼                      │  │
+│  │  │   • Auth context, tenant state           │  │   │  ┌──────────────────────────────────┐  │  │
+│  │  │   • In-memory state (browser instances,  │  │   │  │         SANDBOX (isolated)       │  │  │
+│  │  │     connection pools, caches)            │  │   │  │  ┌────────────────────────────┐  │  │  │
+│  │  │                                          │  │   │  │  │    Bridge Process          │  │  │  │
+│  │  │  Exposes tools like:                     │  │   │  │  │    (@ash-ai/bridge)        │  │  │  │
+│  │  │   • query_database                       │  │   │  │  │                            │  │  │  │
+│  │  │   • call_internal_service                │  │   │  │  │  - Reads CLAUDE.md         │  │  │  │
+│  │  │   • update_resource                      │  │   │  │  │  - Reads .mcp.json         │  │  │  │
+│  │  │   • (stateful tools — keeps handles      │  │   │  │  │  - Calls Claude Agent SDK  │  │  │  │
+│  │  │     alive across calls)                  │  │   │  │  │  - Yields SDK messages      │  │  │  │
+│  │  └──────────────▲───────────────────────────┘  │   │  │  └─────┬──────────┬───────────┘  │  │  │
+│  │                 │                              │   │  │        │          │              │  │  │
+│  │                 │ MCP protocol                 │   │  │        │          │ spawns       │  │  │
+│  │                 │ (JSON-RPC over HTTP)         │   │  │        │          ▼              │  │  │
 │  │                 │                              │   │  │        │  ┌─────────────────┐   │  │  │
 │  │                 │                              │   │  │        │  │  Claude CLI      │   │  │  │
 │  │                 └──────────────────────────────┼───┼──┼────────┼──│  subprocess      │   │  │  │
 │  │                                                │   │  │        │  │                  │   │  │  │
 │  │                                                │   │  │        │  │  Env:            │   │  │  │
 │  │                                                │   │  │        │  │  ANTHROPIC_BASE_ │   │  │  │
-│  │                                                │   │  │        │  │   URL=portkey    │   │  │  │
+│  │                                                │   │  │        │  │   URL=gateway    │   │  │  │
 │  │                                                │   │  │        │  │  ANTHROPIC_CUST_ │   │  │  │
 │  │                                                │   │  │        │  │   HEADERS=...    │   │  │  │
 │  │                                                │   │  │        │  └────────┬─────────┘   │  │  │
@@ -69,17 +74,16 @@ The host app keeps its tools as HTTP MCP endpoints inside its own process. Ash s
                                                                                 │ HTTPS
                                                                                 ▼
                                                               ┌──────────────────────────────┐
-                                                              │   Portkey Gateway             │
-                                                              │   (cybertron-service-gateway) │
+                                                              │   API Gateway / LLM Proxy     │
+                                                              │   (Portkey, LiteLLM, direct)  │
                                                               │                              │
-                                                              │   Routes via virtual key     │
-                                                              │   to AWS Bedrock             │
+                                                              │   Routes to model provider   │
                                                               └──────────────┬───────────────┘
                                                                              │
                                                                              ▼
                                                               ┌──────────────────────────────┐
-                                                              │     AWS Bedrock              │
-                                                              │     Claude model             │
+                                                              │     Model Provider            │
+                                                              │  (Anthropic, Bedrock, etc.)   │
                                                               └──────────────────────────────┘
 ```
 
@@ -88,15 +92,15 @@ The host app keeps its tools as HTTP MCP endpoints inside its own process. Ash s
 ```
 ┌──────────────────┐     HTTP/SSE      ┌──────────────────┐    Unix Socket     ┌──────────────┐
 │   Client / CLI   │ ◀───(streaming)──▶│   Ash Server     │ ◀───(ndjson)──────▶│    Bridge     │
-│   or Backbone    │    REST + SSE     │   :4100          │  BridgeCommand /   │  (in sandbox) │
+│   or Host App    │    REST + SSE     │   :4100          │  BridgeCommand /   │  (in sandbox) │
 └──────────────────┘                   └──────────────────┘  BridgeEvent       └──────┬───────┘
                                                                                       │
                                                                               SDK spawns CLI
                                                                                       │
                                                                                       ▼
 ┌──────────────────┐   MCP (JSON-RPC   ┌──────────────────────────────────────────────────────┐
-│  Backbone MCP    │ ◀──over HTTP)────▶│   Claude CLI subprocess                              │
-│  /mcp/storefront │                   │   (reads .mcp.json, connects to declared servers)    │
+│  Host App MCP    │ ◀──over HTTP)────▶│   Claude CLI subprocess                              │
+│  /mcp/my-tools   │                   │   (reads .mcp.json, connects to declared servers)    │
 └──────────────────┘                   └──────────────────────────────────────────────────────┘
 ```
 
@@ -107,22 +111,22 @@ The host app keeps its tools as HTTP MCP endpoints inside its own process. Ash s
 | 1 | Client → Ash Server | HTTP REST + SSE | JSON (SDK Message types) |
 | 2 | Ash Server → Bridge | Unix socket | Newline-delimited JSON (`BridgeCommand` / `BridgeEvent`) |
 | 3 | Bridge → Claude CLI | In-process (SDK `query()`) | SDK `Message` objects (async generator) |
-| 4 | Claude CLI → Portkey | HTTPS | Anthropic Messages API |
-| 5 | Portkey → Bedrock | HTTPS | AWS Bedrock API |
-| 6 | Claude CLI → MCP Server | HTTP (JSON-RPC) | MCP protocol (tool calls / results) |
+| 4 | Claude CLI → API Gateway | HTTPS | Anthropic Messages API |
+| 5 | API Gateway → Model Provider | HTTPS | Provider API (Anthropic, Bedrock, etc.) |
+| 6 | Claude CLI → Host App MCP | HTTP (JSON-RPC) | MCP protocol (tool calls / results) |
 
 ## Session Creation Flow (with sidecar MCP)
 
 ```
-Backbone                          Ash Server                    Sandbox
+Host App                          Ash Server                    Sandbox
    │                                  │                            │
    │  POST /api/sessions              │                            │
    │  {                               │                            │
-   │    agent: "storefront-theme",    │                            │
+   │    agent: "my-agent",            │                            │
    │    extraEnv: {                   │                            │
    │      ANTHROPIC_BASE_URL: "...",  │                            │
    │      ANTHROPIC_CUSTOM_HEADERS:   │                            │
-   │        "x-portkey-api-key: ..."  │                            │
+   │        "x-api-key: ..."         │                            │
    │    },                            │                            │
    │    model: "claude-sonnet-4-6"    │                            │
    │  }                               │                            │
@@ -151,7 +155,7 @@ Backbone                          Ash Server                    Sandbox
 ## Message Flow (with sidecar MCP tool call)
 
 ```
-Backbone          Ash Server          Bridge           Claude CLI        Backbone MCP
+Host App          Ash Server          Bridge           Claude CLI        Host App MCP
    │                  │                  │                  │                │
    │ POST /sessions/  │                  │                  │                │
    │   :id/messages   │                  │                  │                │
@@ -161,21 +165,21 @@ Backbone          Ash Server          Bridge           Claude CLI        Backbon
    │  SSE stream ◀────│  query cmd ────▶│                  │                │
    │  (text/event-    │  (unix socket)  │  SDK query() ──▶│                │
    │   stream)        │                  │                  │                │
-   │                  │                  │                  │  HTTPS ──────▶ Portkey ──▶ Bedrock
+   │                  │                  │                  │  HTTPS ──────▶ Gateway ──▶ Model
    │                  │                  │                  │ ◀──── response │
    │                  │                  │                  │                │
    │                  │                  │                  │ ── tool_use: ─▶│
-   │                  │                  │                  │  save_preview  │ (MCP JSON-RPC
-   │                  │                  │                  │  _theme        │  over HTTP)
+   │                  │                  │                  │  update_       │ (MCP JSON-RPC
+   │                  │                  │                  │  resource      │  over HTTP)
    │                  │                  │                  │                │
-   │                  │                  │                  │                │──▶ gRPC call to
-   │                  │                  │                  │                │    storefront
-   │                  │                  │                  │                │    service
+   │                  │                  │                  │                │──▶ internal service
+   │                  │                  │                  │                │    call (gRPC, DB,
+   │                  │                  │                  │                │    cache, etc.)
    │                  │                  │                  │                │◀── result
    │                  │                  │                  │                │
    │                  │                  │                  │ ◀── tool_result│
    │                  │                  │                  │                │
-   │                  │                  │                  │  HTTPS ──────▶ Portkey (continue)
+   │                  │                  │                  │  HTTPS ──────▶ Gateway (continue)
    │                  │                  │                  │ ◀──── final   │
    │                  │                  │                  │                │
    │                  │  SDK messages ◀─│ ◀── messages ───│                │
@@ -191,17 +195,17 @@ Backbone          Ash Server          Bridge           Claude CLI        Backbon
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      BACKBONE PROCESS (Python)                      │
+│                       HOST APP PROCESS                              │
+│                    (your existing application)                       │
 │                                                                     │
 │  Owns:                                                              │
-│   • FastAPI routes (business logic, user-facing API)                │
-│   • gRPC client connections (storefront, payments, etc.)            │
-│   • Redis connections, DB models                                    │
-│   • MCP endpoint /mcp/storefront (exposes Python tools as MCP)     │
-│   • Playwright browser instances (long-lived, stateful)             │
-│   • OpenTelemetry tracing (AgentTracer)                             │
-│   • Memory system (filesystem + remote storage)                     │
-│   • Request-scoped state (business_id, auth context)                │
+│   • Application routes (business logic, user-facing API)            │
+│   • Service client connections (gRPC, REST, GraphQL, etc.)          │
+│   • Database / cache connections (Postgres, Redis, etc.)            │
+│   • MCP endpoint (exposes app tools over MCP protocol)              │
+│   • Stateful tool resources (browser instances, connection pools)   │
+│   • Observability (tracing, metrics, logging)                       │
+│   • Request-scoped state (tenant ID, auth context, feature flags)   │
 │                                                                     │
 │  Calls Ash for:                                                     │
 │   • Creating sessions (POST /api/sessions)                          │
@@ -209,8 +213,8 @@ Backbone          Ash Server          Bridge           Claude CLI        Backbon
 │   • Session lifecycle (pause, resume, end)                          │
 │                                                                     │
 │  Does NOT use Ash for:                                              │
-│   • Direct Portkey calls (large single-turn HTML gen, no SDK)       │
-│   • Chat HTML patching (direct API, not agentic)                    │
+│   • Non-agentic LLM calls (single-turn completions, embeddings)    │
+│   • Workflows that don't need sandboxing or tool use               │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -228,10 +232,9 @@ Backbone          Ash Server          Bridge           Claude CLI        Backbon
 │   • Telemetry (usage tracking, token costs)                         │
 │                                                                     │
 │  Does NOT own:                                                      │
-│   • Business logic (that's backbone)                                │
-│   • Tool implementations (that's MCP servers)                       │
-│   • Model routing (that's Portkey, via env vars)                    │
-│   • Memory/tracing (not implemented)                                │
+│   • Business logic (that's the host app)                            │
+│   • Tool implementations (that's the MCP servers)                   │
+│   • Model routing (that's the API gateway, via env vars)            │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -250,24 +253,24 @@ Backbone          Ash Server          Bridge           Claude CLI        Backbon
 │   • Allowlisted env vars only (no process.env spread)               │
 │   • Resource limits (memory, CPU, disk, process count)              │
 │   • Filesystem isolation (bwrap on Linux)                           │
-│   • Network: can reach Portkey gateway + MCP endpoints              │
+│   • Network: can reach API gateway + MCP endpoints                  │
 │                                                                     │
 │  Communicates outward:                                              │
 │   • Unix socket → Ash Server (bridge protocol, ndjson)              │
-│   • HTTPS → Portkey gateway (Claude API calls)                      │
-│   • HTTP → Backbone MCP endpoint (tool calls)                       │
+│   • HTTPS → API gateway (Claude API calls)                          │
+│   • HTTP → Host App MCP endpoint (tool calls)                       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## The .mcp.json for Sidecar Pattern
 
-The agent's `.mcp.json` declares the backbone MCP server as a remote HTTP endpoint:
+The agent's `.mcp.json` declares the host app's MCP server as a remote HTTP endpoint:
 
 ```json
 {
   "mcpServers": {
-    "storefront": {
-      "url": "http://backbone:8000/mcp/storefront"
+    "my-tools": {
+      "url": "http://host-app:8000/mcp/my-tools"
     },
     "fetch": {
       "command": "npx",
@@ -277,29 +280,44 @@ The agent's `.mcp.json` declares the backbone MCP server as a remote HTTP endpoi
 }
 ```
 
-- `storefront` — remote HTTP MCP server running inside backbone (sidecar pattern)
+- `my-tools` — remote HTTP MCP server running inside the host app (sidecar pattern)
 - `fetch` — standard stdio MCP server spawned locally inside the sandbox
 
 Both appear identically to the Claude CLI. It doesn't know or care where the MCP server lives.
 
 ## What Changes for Per-Session Dynamic MCP
 
-Today, `.mcp.json` is copied from the agent dir at sandbox creation. To support per-session MCP endpoints (different `business_id` per session), Ash needs:
+Today, `.mcp.json` is copied from the agent dir at sandbox creation. To support per-session MCP endpoints (different tenant, different tools), Ash needs:
 
 ```
 POST /api/sessions
 {
-  "agent": "storefront-theme",
-  "mcpServers": {                                          ◀── NEW
-    "storefront": {
-      "url": "http://backbone:8000/mcp/storefront?biz=123"
+  "agent": "my-agent",
+  "mcpServers": {                                              ◀── NEW
+    "my-tools": {
+      "url": "http://host-app:8000/mcp/my-tools?tenant=t_123"
     }
   },
   "extraEnv": {
-    "ANTHROPIC_BASE_URL": "http://cybertron:8080/v1",
-    "ANTHROPIC_CUSTOM_HEADERS": "x-portkey-api-key: ..."
+    "ANTHROPIC_BASE_URL": "http://gateway:8080/v1",
+    "ANTHROPIC_CUSTOM_HEADERS": "x-api-key: ..."
   }
 }
 ```
 
 Implementation: merge `mcpServers` from the request into the agent's `.mcp.json` before writing it to the sandbox workspace. Three lines of code in `SandboxManager.createSandbox()`.
+
+## Why Sidecar MCP (Not In-Process)
+
+Some SDKs offer "in-process MCP" — registering functions as tool callbacks within the same process. This works for simple cases but breaks down when you need:
+
+| Concern | In-Process | Sidecar MCP |
+|---------|-----------|-------------|
+| Language coupling | Tools must be same language as SDK | Tools can be any language |
+| Shared infrastructure | Need to import SDK into your app | HTTP boundary, no import needed |
+| Stateful tools | Works (same process memory) | Works (MCP server is long-lived per session) |
+| Per-tenant scoping | Closure variables | Query params or headers on MCP URL |
+| Scaling | Tools scale with SDK process | Tools scale independently |
+| Isolation | Tools run with SDK privileges | Tools run with app privileges, sandbox is separate |
+
+The sidecar pattern uses MCP the way it was designed — as a network protocol between services. The host app's tools stay in the host app's process with full access to its infrastructure. Ash handles the agent lifecycle, sandboxing, and streaming. Clean separation.
