@@ -127,6 +127,102 @@ curl -X POST $ASH_SERVER_URL/api/sessions \
 </TabItem>
 </Tabs>
 
+### Creating a Session with Per-Session MCP Servers
+
+You can inject MCP servers at session creation time. This enables the **sidecar pattern**: your host application exposes tenant-specific tools as MCP endpoints, and each session connects to its own URL.
+
+Session-level MCP servers are merged into the agent's `.mcp.json`. If both define a server with the same key, the session entry wins.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+const session = await client.createSession('my-agent', {
+  mcpServers: {
+    'customer-tools': { url: 'http://host-app:8000/mcp?tenant=t_abc123' },
+  },
+});
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl -X POST $ASH_SERVER_URL/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent": "my-agent",
+    "mcpServers": {
+      "customer-tools": { "url": "http://host-app:8000/mcp?tenant=t_abc123" }
+    }
+  }'
+```
+
+</TabItem>
+</Tabs>
+
+### Creating a Session with a System Prompt Override
+
+You can replace the agent's `CLAUDE.md` for a specific session. The agent definition is not modified — only the sandbox workspace copy is overwritten.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+const session = await client.createSession('my-agent', {
+  systemPrompt: 'You are a support agent for tenant t_abc123. Be concise.',
+});
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl -X POST $ASH_SERVER_URL/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent": "my-agent",
+    "systemPrompt": "You are a support agent for tenant t_abc123. Be concise."
+  }'
+```
+
+</TabItem>
+</Tabs>
+
+### Combining MCP Servers and System Prompt
+
+For full per-tenant customization, pass both `mcpServers` and `systemPrompt` together:
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+const session = await client.createSession('my-agent', {
+  mcpServers: {
+    'tenant-tools': { url: `http://host-app:8000/mcp?tenant=${tenantId}` },
+  },
+  systemPrompt: `You are a support agent for ${tenantName}. Use the tenant-tools MCP server to look up account data.`,
+});
+```
+
+</TabItem>
+<TabItem value="curl" label="curl">
+
+```bash
+curl -X POST $ASH_SERVER_URL/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent": "my-agent",
+    "mcpServers": {
+      "tenant-tools": { "url": "http://host-app:8000/mcp?tenant=t_abc123" }
+    },
+    "systemPrompt": "You are a support agent for Acme Corp. Use the tenant-tools MCP server to look up account data."
+  }'
+```
+
+</TabItem>
+</Tabs>
+
 ## Sending Messages
 
 Messages are sent via POST and return an SSE stream. See the [Streaming Responses](./streaming-responses.md) guide for full details on consuming the stream.

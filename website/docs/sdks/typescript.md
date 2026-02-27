@@ -114,6 +114,18 @@ client.delete_agent("my-agent")
 // Create a new session for an agent
 const session = await client.createSession('my-agent');
 
+// Create with per-session MCP servers (sidecar pattern)
+const session = await client.createSession('my-agent', {
+  mcpServers: {
+    'tenant-tools': { url: 'http://host-app:8000/mcp?tenant=t_abc123' },
+  },
+});
+
+// Create with a system prompt override
+const session = await client.createSession('my-agent', {
+  systemPrompt: 'You are a support agent for Acme Corp.',
+});
+
 // List all sessions (optionally filter by agent name)
 const sessions = await client.listSessions();
 const agentSessions = await client.listSessions('my-agent');
@@ -512,6 +524,9 @@ DisplayItem, DisplayItemType
 
 // Files
 FileEntry, ListFilesResponse, GetFileResponse
+
+// MCP
+McpServerConfig
 ```
 
 ## Error Handling

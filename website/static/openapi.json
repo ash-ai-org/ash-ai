@@ -734,6 +734,41 @@
                   },
                   "startupScript": {
                     "type": "string"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Model override for this session. Overrides agent .claude/settings.json default."
+                  },
+                  "mcpServers": {
+                    "type": "object",
+                    "description": "Per-session MCP servers. Merged into agent .mcp.json (session overrides agent). Enables sidecar pattern.",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "description": "Remote MCP server URL (HTTP/SSE transport). Mutually exclusive with command."
+                        },
+                        "command": {
+                          "type": "string",
+                          "description": "Command to spawn a stdio MCP server. Mutually exclusive with url."
+                        },
+                        "args": {
+                          "type": "array",
+                          "items": { "type": "string" },
+                          "description": "Arguments for the command."
+                        },
+                        "env": {
+                          "type": "object",
+                          "additionalProperties": { "type": "string" },
+                          "description": "Environment variables for the MCP server process."
+                        }
+                      }
+                    }
+                  },
+                  "systemPrompt": {
+                    "type": "string",
+                    "description": "System prompt override. Replaces agent CLAUDE.md for this session."
                   }
                 },
                 "required": [

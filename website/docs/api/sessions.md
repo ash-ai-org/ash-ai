@@ -58,6 +58,11 @@ Creates a new session for the specified agent. The server allocates a sandbox, c
 |---|---|---|---|
 | `agent` | string | Yes | Name of a previously deployed agent |
 | `model` | string | No | Model to use for this session. Overrides the agent's default model. Any valid model identifier accepted (e.g. `claude-sonnet-4-5-20250929`, `claude-opus-4-6`). |
+| `mcpServers` | object | No | Per-session MCP servers. Merged into the agent's `.mcp.json` — session entries override agent entries with the same key. See [Per-Session MCP Servers](#per-session-mcp-servers). |
+| `systemPrompt` | string | No | System prompt override. Replaces the agent's `CLAUDE.md` for this session only. |
+| `credentialId` | string | No | Credential ID to inject into sandbox env. |
+| `extraEnv` | object | No | Extra env vars to inject into the sandbox (merged with credential env). |
+| `startupScript` | string | No | Shell script to run in workspace after install.sh but before the bridge starts. |
 
 ### Response
 
@@ -345,3 +350,54 @@ No request body.
 | Status | Condition |
 |---|---|
 | `404` | Session not found |
+
+---
+
+## Per-Session MCP Servers
+
+The `mcpServers` field on `POST /api/sessions` lets you inject MCP servers at session creation time. This enables the **sidecar pattern**: your host application exposes tools as MCP endpoints, and each session connects to a tenant-scoped URL.
+
+Session-level servers are merged into the agent's `.mcp.json`. If both the agent and the session define a server with the same key, the session entry wins.
+
+### Example: Sidecar Pattern
+
+Your host application runs an MCP server that provides tenant-specific tools:
+
+```json
+{
+  "agent": "support-bot",
+  "mcpServers": {
+    "customer-tools": {
+      "url": "http://host-app:8000/mcp?tenant=t_abc123"
+    }
+  }
+}
+```
+
+The agent's `.mcp.json` might already define shared MCP servers (e.g. `fetch`). The session adds `customer-tools` on top of those.
+
+### McpServerConfig
+
+Each MCP server entry supports:
+
+| Field | Type | Description |
+|---|---|---|
+| `url` | string | Remote MCP server URL (HTTP/SSE transport). Mutually exclusive with `command`. |
+| `command` | string | Command to spawn a stdio MCP server. Mutually exclusive with `url`. |
+| `args` | string[] | Arguments for the command. |
+| `env` | object | Environment variables for the MCP server process. |
+
+---
+
+## Per-Session System Prompt
+
+The `systemPrompt` field on `POST /api/sessions` replaces the agent's `CLAUDE.md` for that session. This is useful when the same agent definition needs different instructions per tenant or per use case.
+
+```json
+{
+  "agent": "support-bot",
+  "systemPrompt": "You are a support agent for Acme Corp tenant t_abc123. Use the customer-tools MCP server to look up their account."
+}
+```
+
+The agent's original `CLAUDE.md` is not modified — only the sandbox workspace copy is overwritten before the bridge starts.
