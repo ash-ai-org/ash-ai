@@ -1,5 +1,17 @@
 # @ash-ai/cli
 
+## 0.0.11 - 2026-02-26
+
+### Added
+
+- Paste-API-key fallback for `ash login` in headless/SSH environments (#30)
+- Read credentials from `~/.ash/credentials.json` as fallback for server URL and API key (#30)
+
+### Changed
+
+- Centralize HTTP error handling in CLI client `request()` function (#30)
+- Updated dependencies: @ash-ai/shared@0.0.12
+
 ## 0.0.10 - 2026-02-26
 
 ### Changed
