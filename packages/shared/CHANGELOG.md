@@ -1,5 +1,11 @@
 # @ash-ai/shared
 
+## 0.0.12 - 2026-02-26
+
+### Changed
+
+- Patch version bump (no direct changes)
+
 ## 0.0.11 - 2026-02-26
 
 ### Added
