@@ -1,5 +1,11 @@
 # @ash-ai/cli
 
+## 0.0.10 - 2026-02-26
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.11
+
 ## 0.0.9 - 2026-02-26
 
 ### Changed

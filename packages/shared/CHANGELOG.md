@@ -1,5 +1,13 @@
 # @ash-ai/shared
 
+## 0.0.11 - 2026-02-26
+
+### Added
+
+- `McpServerConfig` type for per-session MCP server configuration (#27)
+- `mcpServers` and `systemPrompt` fields on `CreateSessionRequest` (#27)
+- `BRIDGE_READY_TIMEOUT_MS` constant (#28)
+
 ## 0.0.10 - 2026-02-26
 
 ### Changed
