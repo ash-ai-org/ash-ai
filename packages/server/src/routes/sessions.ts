@@ -79,6 +79,20 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           extraEnv: { type: 'object', additionalProperties: { type: 'string' } },
           startupScript: { type: 'string' },
           model: { type: 'string', description: 'Model override for this session. Overrides agent .claude/settings.json default.' },
+          mcpServers: {
+            type: 'object',
+            description: 'Per-session MCP servers. Merged into agent .mcp.json (session overrides agent). Enables sidecar pattern.',
+            additionalProperties: {
+              type: 'object',
+              properties: {
+                url: { type: 'string' },
+                command: { type: 'string' },
+                args: { type: 'array', items: { type: 'string' } },
+                env: { type: 'object', additionalProperties: { type: 'string' } },
+              },
+            },
+          },
+          systemPrompt: { type: 'string', description: 'System prompt override. Replaces agent CLAUDE.md for this session.' },
         },
         required: ['agent'],
       },
@@ -91,7 +105,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
@@ -127,6 +141,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         sandboxId: sessionId,
         extraEnv,
         startupScript,
+        mcpServers,
+        systemPrompt,
         onOomKill: () => {
           updateSessionStatus(sessionId, 'paused').catch((err) =>
             console.error(`Failed to update session status on OOM: ${err}`)

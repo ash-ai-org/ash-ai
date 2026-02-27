@@ -44,6 +44,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
       limits?: Record<string, number>;
       extraEnv?: Record<string, string>;
       startupScript?: string;
+      mcpServers?: Record<string, unknown>;
+      systemPrompt?: string;
     };
 
     try {
@@ -56,6 +58,8 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
         limits: body.limits,
         extraEnv: body.extraEnv,
         startupScript: body.startupScript,
+        mcpServers: body.mcpServers as Record<string, import('@ash-ai/shared').McpServerConfig> | undefined,
+        systemPrompt: body.systemPrompt,
       });
 
       return reply.status(201).send({
