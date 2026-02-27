@@ -75,7 +75,8 @@ This pattern applies when you have an existing application (Python, Go, Java, et
                                                                                 ▼
                                                               ┌──────────────────────────────┐
                                                               │   API Gateway / LLM Proxy     │
-                                                              │   (Portkey, LiteLLM, direct)  │
+                                                              │   (LiteLLM, custom proxy,     │
+                                                              │    or direct)                 │
                                                               │                              │
                                                               │   Routes to model provider   │
                                                               └──────────────┬───────────────┘
