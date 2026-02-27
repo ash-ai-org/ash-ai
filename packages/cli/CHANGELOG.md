@@ -1,5 +1,16 @@
 # @ash-ai/cli
 
+## 0.0.12 - 2026-02-27
+
+### Fixed
+
+- Persist `server_url` from cloud auth callback in CLI credentials (#32)
+- Use `server_url` from credentials when resolving server URL, before falling back to `cloud_url` (#32)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.13
+
 ## 0.0.11 - 2026-02-26
 
 ### Added
