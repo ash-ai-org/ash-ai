@@ -146,7 +146,7 @@ MCP servers run as child processes inside the sandbox. The `env` field sets envi
 
 :::tip Per-Session MCP Servers
 
-You can also inject MCP servers at session creation time using the `mcpServers` field on `POST /api/sessions`. Session-level entries are merged into the agent's `.mcp.json` (session overrides agent on key conflict). This enables the **sidecar pattern** — your host app exposes tenant-specific tools as MCP endpoints. See [Per-Session MCP Servers](/docs/api/sessions#per-session-mcp-servers) for details.
+You can also inject MCP servers at session creation time using the `mcpServers` field on `POST /api/sessions`. Session-level entries are merged into the agent's `.mcp.json` (session overrides agent on key conflict). This enables the **sidecar pattern** — your host app exposes tenant-specific tools as MCP endpoints. See [Per-Session MCP Servers](../api/sessions.md#per-session-mcp-servers) for details.
 
 :::
 

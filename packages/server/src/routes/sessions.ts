@@ -397,8 +397,6 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
               console.error(`Failed to persist assistant message: ${err}`)
             );
             telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'message', data: { role: 'assistant', messageType: data.type } });
-            // Extract and record usage metrics (non-blocking)
-            recordUsageFromMessage(data, session.id, session.agentName, req.tenantId);
           }
           // Extract and record usage metrics once per turn (result has the usage summary)
           if (data.type === 'result') {
@@ -437,8 +435,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       reply.raw.write(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`);
-      // Emit session_end when an error terminates the stream
-      reply.raw.write(`event: session_end\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
+      // Signal stream completion — the session remains active (not ended)
+      reply.raw.write(`event: done\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
     } finally {
       // Mark waiting after message processing completes
       backend.markWaiting(session.sandboxId);
