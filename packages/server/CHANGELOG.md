@@ -1,5 +1,19 @@
 # @ash-ai/server
 
+## 0.0.15 - 2026-02-28
+
+### Added
+
+- `version` field in health endpoint response (#39)
+- Server version included in `session_start` SSE event (#39)
+- `version.ts` module that reads version from package.json (#39)
+
+### Changed
+
+- OpenAPI spec version now matches package version (#39)
+- Startup log shows `Ash vX.Y.Z` instead of `Ash server` (#39)
+- Updated dependencies: @ash-ai/shared@0.0.15, @ash-ai/sandbox@0.0.14
+
 ## 0.0.14 - 2026-02-27
 
 ### Added

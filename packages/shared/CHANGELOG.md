@@ -1,5 +1,15 @@
 # @ash-ai/shared
 
+## 0.0.15 - 2026-02-28
+
+### Fixed
+
+- Stop emitting duplicate `text_delta` events for complete assistant messages in `classifyToStreamEvents` (#39)
+
+### Changed
+
+- Added `version` field to `AshSessionStartEvent` type (#39)
+
 ## 0.0.14 - 2026-02-27
 
 ### Added
