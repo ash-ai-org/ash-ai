@@ -26,6 +26,7 @@ const sidebars: SidebarsConfig = {
       href: 'https://github.com/ash-ai-org/ash-ai/releases',
       className: 'sidebar-link-changelog',
     },
+    'introduction',
     {
       type: 'category',
       label: 'Getting Started',
@@ -48,6 +49,7 @@ const sidebars: SidebarsConfig = {
         'guides/monitoring',
       ],
     },
+    'use-cases',
     {
       type: 'category',
       label: 'Self-Hosting',
@@ -113,6 +115,7 @@ const sidebars: SidebarsConfig = {
       label: 'Comparisons',
       items: [
         'comparisons/computesdk',
+        'comparisons/blaxel',
       ],
     },
     {

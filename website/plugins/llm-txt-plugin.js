@@ -10,6 +10,7 @@ const DOC_SECTIONS = [
       { id: 'getting-started/installation', title: 'Installation', desc: 'Install the Ash CLI and SDK' },
       { id: 'getting-started/quickstart', title: 'Quickstart', desc: 'Deploy your first agent in minutes' },
       { id: 'getting-started/concepts', title: 'Key Concepts', desc: 'Agents, sessions, sandboxes, and streaming' },
+      { id: 'use-cases', title: 'Use Cases', desc: 'Common patterns and examples for building with Ash' },
     ],
   },
   {
@@ -84,6 +85,7 @@ const OPTIONAL_SECTIONS = [
     section: 'Comparisons',
     docs: [
       { id: 'comparisons/computesdk', title: 'Ash vs ComputeSDK', desc: 'Feature comparison with Anthropic ComputeSDK' },
+      { id: 'comparisons/blaxel', title: 'Ash vs Blaxel', desc: 'Feature comparison with Blaxel managed agent platform' },
     ],
   },
   {

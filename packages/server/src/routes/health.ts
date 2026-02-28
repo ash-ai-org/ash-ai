@@ -4,6 +4,7 @@ import type { SandboxPool } from '@ash-ai/sandbox';
 import type { PoolStats } from '@ash-ai/shared';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import { listSessions } from '../db/index.js';
+import { VERSION } from '../version.js';
 
 const startTime = Date.now();
 /** Unique coordinator ID: hostname + PID. Useful for identifying which coordinator
@@ -34,6 +35,7 @@ export function healthRoutes(app: FastifyInstance, coordinator: RunnerCoordinato
 
     return reply.send({
       status: 'ok',
+      version: VERSION,
       coordinatorId,
       activeSessions: sessions.length,
       activeSandboxes: localPool?.activeCount ?? 0,

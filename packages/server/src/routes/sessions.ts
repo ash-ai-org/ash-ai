@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming } from '@ash-ai/shared';
 import { getAgent, insertSession, insertForkedSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
 import { classifyBridgeMessage, classifyToStreamEvents } from '@ash-ai/shared';
+import { VERSION } from '../version.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import type { TelemetryExporter } from '../telemetry/exporter.js';
 import { restoreSessionState, hasPersistedState, restoreStateFromCloud } from '@ash-ai/sandbox';
@@ -365,7 +366,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     });
 
     // Emit session_start as first SSE event — clients know which session they're streaming
-    await writeSSE(reply.raw, `event: session_start\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
+    await writeSSE(reply.raw, `event: session_start\ndata: ${JSON.stringify({ sessionId: session.id, version: VERSION })}\n\n`);
 
     let eventCount = 0;
     let firstEventMs = 0;
