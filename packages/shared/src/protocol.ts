@@ -16,6 +16,18 @@ export interface QueryCommand {
   includePartialMessages?: boolean;
   /** Override the model for this query. Overrides agent's .claude/settings.json. */
   model?: string;
+  // -- Per-message SDK options --
+  maxTurns?: number;
+  maxBudgetUsd?: number;
+  effort?: 'low' | 'medium' | 'high' | 'max';
+  thinking?: { type: string; budgetTokens?: number };
+  outputFormat?: { type: string; schema: Record<string, unknown> };
+  // -- Session-level SDK options (injected by server) --
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  betas?: string[];
+  subagents?: Record<string, unknown>;
+  initialAgent?: string;
 }
 
 export interface ResumeCommand {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { eq, and, sql, gt, lt, ne, asc, desc, inArray } from 'drizzle-orm';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SessionConfig, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 import type * as sqliteSchema from './schema.sqlite.js';
@@ -8,6 +8,12 @@ import type * as pgSchema from './schema.pg.js';
 
 // The schema types are structurally identical — use a union.
 type Schema = typeof sqliteSchema | typeof pgSchema;
+
+/** Parse JSON config column. Returns null on null/invalid. */
+function parseConfig(raw: string | null | undefined): SessionConfig | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
 
 /**
  * Unified Db implementation backed by Drizzle ORM.
@@ -189,14 +195,15 @@ export class DrizzleDb implements Db {
 
   // -- Sessions ---------------------------------------------------------------
 
-  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default', parentSessionId?: string, model?: string): Promise<Session> {
+  async insertSession(id: string, agentName: string, sandboxId: string, tenantId: string = 'default', parentSessionId?: string, model?: string, config?: SessionConfig | null): Promise<Session> {
     const { sessions } = this.schema;
     const now = new Date().toISOString();
+    const configJson = config ? JSON.stringify(config) : null;
     await this.drizzle
       .insert(sessions)
-      .values({ id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, model: model ?? null, createdAt: now, lastActiveAt: now });
+      .values({ id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, model: model ?? null, config: configJson, createdAt: now, lastActiveAt: now });
 
-    return { id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, model: model ?? null, createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName, sandboxId, status: 'starting', parentSessionId: parentSessionId ?? null, model: model ?? null, config: config ?? null, createdAt: now, lastActiveAt: now };
   }
 
   async insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session> {
@@ -205,9 +212,10 @@ export class DrizzleDb implements Db {
     const tenantId = parentSession.tenantId ?? 'default';
 
     // 1. Create new session linked to parent
+    const configJson = parentSession.config ? JSON.stringify(parentSession.config) : null;
     await this.drizzle
       .insert(sessions)
-      .values({ id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused', parentSessionId: parentSession.id, model: parentSession.model ?? null, createdAt: now, lastActiveAt: now });
+      .values({ id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused', parentSessionId: parentSession.id, model: parentSession.model ?? null, config: configJson, createdAt: now, lastActiveAt: now });
 
     // 2. Copy all messages from parent session with new IDs and session reference
     const parentMessages = await this.drizzle
@@ -229,7 +237,7 @@ export class DrizzleDb implements Db {
       await this.drizzle.insert(messages).values(copied);
     }
 
-    return { id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused' as SessionStatus, parentSessionId: parentSession.id, model: parentSession.model ?? null, createdAt: now, lastActiveAt: now };
+    return { id, tenantId, agentName: parentSession.agentName, sandboxId, status: 'paused' as SessionStatus, parentSessionId: parentSession.id, model: parentSession.model ?? null, config: parentSession.config ?? null, createdAt: now, lastActiveAt: now };
   }
 
   async updateSessionStatus(id: string, status: SessionStatus): Promise<void> {
@@ -268,7 +276,7 @@ export class DrizzleDb implements Db {
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0];
-    return { id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId, status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt };
+    return { id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId, status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, config: parseConfig(r.config), createdAt: r.createdAt, lastActiveAt: r.lastActiveAt };
   }
 
   async listSessions(tenantId: string = 'default', agent?: string): Promise<Session[]> {
@@ -285,7 +293,7 @@ export class DrizzleDb implements Db {
 
     return rows.map((r: any) => ({
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
-      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
+      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, config: parseConfig(r.config), createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
   }
 
@@ -299,7 +307,7 @@ export class DrizzleDb implements Db {
 
     return rows.map((r: any) => ({
       id: r.id, tenantId: r.tenantId, agentName: r.agentName, sandboxId: r.sandboxId,
-      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
+      status: r.status as SessionStatus, runnerId: r.runnerId ?? null, parentSessionId: r.parentSessionId ?? null, model: r.model ?? null, config: parseConfig(r.config), createdAt: r.createdAt, lastActiveAt: r.lastActiveAt,
     }));
   }
 
@@ -314,6 +322,18 @@ export class DrizzleDb implements Db {
         inArray(sessions.status, ['active', 'starting']),
       ));
     return result.changes ?? result.rowCount ?? 0;
+  }
+
+  async updateSessionConfig(id: string, model: string | null | undefined, config: SessionConfig | null): Promise<void> {
+    const { sessions } = this.schema;
+    const now = new Date().toISOString();
+    const set: Record<string, unknown> = { lastActiveAt: now };
+    if (model !== undefined) set.model = model;
+    set.config = config ? JSON.stringify(config) : null;
+    await this.drizzle
+      .update(sessions)
+      .set(set)
+      .where(eq(sessions.id, id));
   }
 
   async touchSession(id: string): Promise<void> {

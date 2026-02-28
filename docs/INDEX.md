@@ -92,6 +92,7 @@
 | [future_tasks/pluggable-sandbox-providers.md](./future_tasks/pluggable-sandbox-providers.md) | SandboxProvider interface for E2B, Docker, and cloud sandbox backends |
 | [future_tasks/sandbox-overlays.md](./future_tasks/sandbox-overlays.md) | Overlay filesystem for copy-on-write sandbox workspaces |
 | [future_tasks/unify-db-backends.md](./future_tasks/unify-db-backends.md) | Unify SQLite and Postgres backends behind Drizzle ORM |
+| [future_tasks/sdk-parity/00-overview.md](./future_tasks/sdk-parity/00-overview.md) | Claude Agent SDK parity: 13 gaps with approach and effort for each |
 
 ## Runbooks
 

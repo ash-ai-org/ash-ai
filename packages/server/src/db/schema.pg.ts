@@ -35,6 +35,7 @@ export const sessions = pgTable('sessions', {
   runnerId: text('runner_id'),
   parentSessionId: text('parent_session_id'),
   model: text('model'),
+  config: text('config'),  // JSON blob of session-level SDK options (SessionConfig)
   createdAt: text('created_at').notNull(),
   lastActiveAt: text('last_active_at').notNull(),
 }, (table) => [

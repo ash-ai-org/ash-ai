@@ -3,8 +3,8 @@ import type { ServerResponse } from 'node:http';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming } from '@ash-ai/shared';
-import { getAgent, insertSession, insertForkedSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
+import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming, type SessionConfig } from '@ash-ai/shared';
+import { getAgent, insertSession, insertForkedSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, updateSessionConfig, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
 import { classifyBridgeMessage, classifyToStreamEvents } from '@ash-ai/shared';
 import { VERSION } from '../version.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
@@ -95,6 +95,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           },
           systemPrompt: { type: 'string', description: 'System prompt override. Replaces agent CLAUDE.md for this session.' },
           permissionMode: { type: 'string', enum: ['bypassPermissions', 'permissionsByAgent', 'default'], description: 'Permission mode for the SDK inside the sandbox. Defaults to bypassPermissions (sandbox isolation is the security boundary).' },
+          allowedTools: { type: 'array', items: { type: 'string' }, description: 'Whitelist of allowed tool names for this session.' },
+          disallowedTools: { type: 'array', items: { type: 'string' }, description: 'Blacklist of disallowed tool names for this session.' },
+          betas: { type: 'array', items: { type: 'string' }, description: 'Beta feature flags for this session.' },
+          subagents: { type: 'object', additionalProperties: true, description: 'Programmatic subagent definitions. Passed through to the SDK as `agents`.' },
+          initialAgent: { type: 'string', description: 'Which subagent to use for the main thread. Maps to SDK `agent` option.' },
         },
         required: ['agent'],
       },
@@ -107,7 +112,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt, permissionMode } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string; permissionMode?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt, permissionMode, allowedTools, disallowedTools, betas, subagents, initialAgent } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string; permissionMode?: string; allowedTools?: string[]; disallowedTools?: string[]; betas?: string[]; subagents?: Record<string, unknown>; initialAgent?: string };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
@@ -160,7 +165,12 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       // Resolve effective model: explicit request > agent record > null (SDK default)
       const effectiveModel = model || agentRecord.model || undefined;
 
-      const session = await insertSession(sessionId, agentRecord.name, handle.sandboxId, req.tenantId, undefined, effectiveModel);
+      // Build session-level SDK config (persisted on session, injected into every query)
+      const sessionConfig: SessionConfig | null = (allowedTools || disallowedTools || betas || subagents || initialAgent)
+        ? { allowedTools, disallowedTools, betas, subagents, initialAgent }
+        : null;
+
+      const session = await insertSession(sessionId, agentRecord.name, handle.sandboxId, req.tenantId, undefined, effectiveModel, sessionConfig);
       const effectiveRunnerId = runnerId === '__local__' ? null : runnerId;
       await updateSessionRunner(sessionId, effectiveRunnerId);
       await updateSessionStatus(sessionId, 'active');
@@ -220,6 +230,53 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
     return reply.send({ session });
+  });
+
+  // Update session config (mid-session control)
+  app.patch<{ Params: { id: string } }>('/api/sessions/:id/config', {
+    schema: {
+      tags: ['sessions'],
+      params: idParam,
+      body: {
+        type: 'object',
+        properties: {
+          model: { type: 'string', description: 'Model override for subsequent queries.' },
+          allowedTools: { type: 'array', items: { type: 'string' }, description: 'Whitelist of allowed tool names.' },
+          disallowedTools: { type: 'array', items: { type: 'string' }, description: 'Blacklist of disallowed tool names.' },
+          betas: { type: 'array', items: { type: 'string' }, description: 'Beta feature flags.' },
+          subagents: { type: 'object', additionalProperties: true, description: 'Programmatic subagent definitions.' },
+          initialAgent: { type: 'string', description: 'Which subagent to use for the main thread.' },
+        },
+      },
+      response: {
+        200: sessionResponse,
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const session = await getSession(req.params.id);
+    if (!session || session.tenantId !== req.tenantId) {
+      return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
+    }
+
+    const { model, allowedTools, disallowedTools, betas, subagents, initialAgent } = req.body as { model?: string; allowedTools?: string[]; disallowedTools?: string[]; betas?: string[]; subagents?: Record<string, unknown>; initialAgent?: string };
+
+    // Merge with existing config (patch semantics — only provided fields are updated)
+    const existingConfig = session.config ?? {};
+    const newConfig: SessionConfig = {
+      ...existingConfig,
+      ...(allowedTools !== undefined && { allowedTools }),
+      ...(disallowedTools !== undefined && { disallowedTools }),
+      ...(betas !== undefined && { betas }),
+      ...(subagents !== undefined && { subagents }),
+      ...(initialAgent !== undefined && { initialAgent }),
+    };
+
+    const hasConfig = Object.keys(newConfig).some(k => (newConfig as any)[k] != null);
+    await updateSessionConfig(session.id, model, hasConfig ? newConfig : null);
+
+    const updated = await getSession(session.id);
+    return reply.send({ session: updated });
   });
 
   // List messages for a session
@@ -304,6 +361,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           content: { type: 'string' },
           includePartialMessages: { type: 'boolean' },
           model: { type: 'string', description: 'Model override for this query. Overrides session and agent defaults.' },
+          maxTurns: { type: 'integer', minimum: 1, description: 'Maximum agentic turns for this query.' },
+          maxBudgetUsd: { type: 'number', minimum: 0, description: 'Maximum budget in USD for this query.' },
+          effort: { type: 'string', enum: ['low', 'medium', 'high', 'max'], description: 'Effort level for this query.' },
+          thinking: { type: 'object', properties: { type: { type: 'string' }, budgetTokens: { type: 'integer' } }, required: ['type'], description: 'Thinking configuration for this query.' },
+          outputFormat: { type: 'object', properties: { type: { type: 'string' }, schema: { type: 'object', additionalProperties: true } }, required: ['type', 'schema'], description: 'Output format constraint for this query.' },
         },
         required: ['content'],
       },
@@ -329,7 +391,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(400).send({ error: `Session is ${session.status}`, statusCode: 400 });
     }
 
-    const { content, includePartialMessages, model: messageModel } = req.body as { content: string; includePartialMessages?: boolean; model?: string };
+    const { content, includePartialMessages, model: messageModel, maxTurns, maxBudgetUsd, effort, thinking, outputFormat } = req.body as { content: string; includePartialMessages?: boolean; model?: string; maxTurns?: number; maxBudgetUsd?: number; effort?: 'low' | 'medium' | 'high' | 'max'; thinking?: { type: string; budgetTokens?: number }; outputFormat?: { type: string; schema: Record<string, unknown> } };
 
     let backend;
     try {
@@ -375,12 +437,27 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       // Model precedence: per-message > session-level > agent default (.claude/settings.json)
       const queryModel = messageModel || session.model || undefined;
 
+      // Session-level config (persisted on session record, injected into every query)
+      const cfg = session.config;
+
       const events = backend.sendCommand(session.sandboxId, {
         cmd: 'query',
         prompt: content,
         sessionId: session.id,
         ...(includePartialMessages && { includePartialMessages: true }),
         ...(queryModel && { model: queryModel }),
+        // Per-message SDK options
+        ...(maxTurns != null && { maxTurns }),
+        ...(maxBudgetUsd != null && { maxBudgetUsd }),
+        ...(effort && { effort }),
+        ...(thinking && { thinking }),
+        ...(outputFormat && { outputFormat }),
+        // Session-level SDK options (from session config)
+        ...(cfg?.allowedTools && { allowedTools: cfg.allowedTools }),
+        ...(cfg?.disallowedTools && { disallowedTools: cfg.disallowedTools }),
+        ...(cfg?.betas && { betas: cfg.betas }),
+        ...(cfg?.subagents && { subagents: cfg.subagents }),
+        ...(cfg?.initialAgent && { initialAgent: cfg.initialAgent }),
       });
 
       for await (const event of events) {

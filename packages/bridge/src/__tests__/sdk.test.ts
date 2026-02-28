@@ -142,6 +142,38 @@ describe('mock SDK wrapper', () => {
     expect((events[1] as any).type).toBe('result');
   });
 
+  it('accepts all SDK parity options without error', async () => {
+    const events: unknown[] = [];
+    const abort = new AbortController();
+
+    for await (const msg of runQuery({
+      prompt: 'test with all options',
+      sessionId: 'opts-session',
+      workspaceDir: '/tmp',
+      claudeMd: '',
+      resume: false,
+      signal: abort.signal,
+      model: 'claude-opus-4-6-20250805',
+      maxTurns: 5,
+      maxBudgetUsd: 1.50,
+      effort: 'high',
+      thinking: { type: 'enabled', budgetTokens: 5000 },
+      outputFormat: { type: 'json_schema', schema: { type: 'object', properties: { answer: { type: 'string' } } } },
+      allowedTools: ['Read', 'Grep'],
+      disallowedTools: ['Bash'],
+      betas: ['context-1m-2025-08-07'],
+      subagents: { researcher: { model: 'claude-sonnet' } },
+      initialAgent: 'researcher',
+    })) {
+      events.push(msg);
+    }
+
+    // Should still produce assistant + result — options don't change mock behavior
+    expect(events.length).toBeGreaterThanOrEqual(2);
+    expect((events[0] as any).type).toBe('assistant');
+    expect((events[events.length - 1] as any).type).toBe('result');
+  });
+
   it('produces messages shaped like real SDK output', async () => {
     const events: unknown[] = [];
     const abort = new AbortController();

@@ -1,7 +1,7 @@
 import { join, resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Agent, Session, SessionStatus, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SessionConfig, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
 
 /** Resolve the package root from the current file — works from both src/ (tsx) and dist/ (compiled). */
 function pkgRoot(): string {
@@ -33,7 +33,7 @@ export interface Db {
   listAgents(tenantId?: string): Promise<Agent[]>;
   deleteAgent(name: string, tenantId?: string): Promise<boolean>;
   // Sessions (tenant-scoped)
-  insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string): Promise<Session>;
+  insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string, config?: SessionConfig | null): Promise<Session>;
   insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session>;
   updateSessionStatus(id: string, status: SessionStatus): Promise<void>;
   updateSessionSandbox(id: string, sandboxId: string): Promise<void>;
@@ -43,6 +43,7 @@ export interface Db {
   listSessionsByRunner(runnerId: string): Promise<Session[]>;
   /** Bulk-pause all active/starting sessions on a runner. Returns count of paused sessions. */
   bulkPauseSessionsByRunner(runnerId: string): Promise<number>;
+  updateSessionConfig(id: string, model: string | null | undefined, config: SessionConfig | null): Promise<void>;
   touchSession(id: string): Promise<void>;
   // Sandboxes (insertSandbox is tenant-scoped)
   insertSandbox(id: string, agentName: string, workspaceDir: string, sessionId?: string, tenantId?: string): Promise<void>;
@@ -174,8 +175,8 @@ export async function deleteAgent(name: string, tenantId?: string): Promise<bool
   return getDb().deleteAgent(name, tenantId);
 }
 
-export async function insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string): Promise<Session> {
-  return getDb().insertSession(id, agentName, sandboxId, tenantId, parentSessionId, model);
+export async function insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string, config?: SessionConfig | null): Promise<Session> {
+  return getDb().insertSession(id, agentName, sandboxId, tenantId, parentSessionId, model, config);
 }
 
 export async function insertForkedSession(id: string, parentSession: Session, sandboxId: string): Promise<Session> {
@@ -208,6 +209,10 @@ export async function listSessionsByRunner(runnerId: string): Promise<Session[]>
 
 export async function bulkPauseSessionsByRunner(runnerId: string): Promise<number> {
   return getDb().bulkPauseSessionsByRunner(runnerId);
+}
+
+export async function updateSessionConfig(id: string, model: string | null | undefined, config: SessionConfig | null): Promise<void> {
+  return getDb().updateSessionConfig(id, model, config);
 }
 
 export async function touchSession(id: string): Promise<void> {
