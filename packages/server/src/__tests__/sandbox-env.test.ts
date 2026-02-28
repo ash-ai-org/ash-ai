@@ -34,7 +34,12 @@ describe('sandbox environment isolation', () => {
 
   it('allowlist contains only expected keys', () => {
     // If someone adds a key, this test forces them to think about it
-    const expected = new Set(['PATH', 'NODE_PATH', 'HOME', 'LANG', 'TERM', 'ANTHROPIC_API_KEY', 'ASH_DEBUG_TIMING', 'ASH_REAL_SDK', 'CLAUDE_CODE_EXECUTABLE']);
+    const expected = new Set([
+      'PATH', 'NODE_PATH', 'HOME', 'LANG', 'TERM',
+      'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_CUSTOM_HEADERS',
+      'ASH_DEBUG_TIMING', 'ASH_REAL_SDK', 'ASH_PERMISSION_MODE',
+      'CLAUDE_CODE_EXECUTABLE',
+    ]);
     const actual = new Set(SANDBOX_ENV_ALLOWLIST);
     expect(actual).toEqual(expected);
   });

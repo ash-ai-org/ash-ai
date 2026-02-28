@@ -93,6 +93,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
             },
           },
           systemPrompt: { type: 'string', description: 'System prompt override. Replaces agent CLAUDE.md for this session.' },
+          permissionMode: { type: 'string', enum: ['bypassPermissions', 'permissionsByAgent', 'default'], description: 'Permission mode for the SDK inside the sandbox. Defaults to bypassPermissions (sandbox isolation is the security boundary).' },
         },
         required: ['agent'],
       },
@@ -105,7 +106,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt, permissionMode } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string; permissionMode?: string };
 
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
@@ -127,6 +128,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     // Merge body-level extraEnv (overrides credential env on conflict)
     if (bodyExtraEnv) {
       extraEnv = { ...extraEnv, ...bodyExtraEnv };
+    }
+
+    // Inject permission mode into sandbox env (bridge reads ASH_PERMISSION_MODE)
+    if (permissionMode) {
+      extraEnv = { ...extraEnv, ASH_PERMISSION_MODE: permissionMode };
     }
 
     const sessionId = randomUUID();

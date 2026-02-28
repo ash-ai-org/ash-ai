@@ -553,6 +553,18 @@ export interface McpServerConfig {
   env?: Record<string, string>;
 }
 
+/**
+ * Permission mode for the Claude Code SDK inside the sandbox.
+ *
+ * - 'bypassPermissions' (default): Sandbox isolation (cgroups + bwrap) is the
+ *   security boundary. The agent can do anything inside its sandbox.
+ * - 'permissionsByAgent': The SDK enforces its own permission system. Configure
+ *   allow/deny lists in the agent's .claude/settings.json file.
+ * - 'default': Full SDK permission mode — prompts for every tool use.
+ *   Only useful for interactive/debugging sessions.
+ */
+export type SandboxPermissionMode = 'bypassPermissions' | 'permissionsByAgent' | 'default';
+
 export interface CreateSessionRequest {
   agent: string;
   /** Credential ID to inject into sandbox env. */
@@ -575,6 +587,13 @@ export interface CreateSessionRequest {
    * When set, the bridge reads this instead of the agent's CLAUDE.md file.
    */
   systemPrompt?: string;
+  /**
+   * Permission mode for the SDK inside the sandbox.
+   * Defaults to 'bypassPermissions' — sandbox isolation is the security boundary.
+   * Set to 'permissionsByAgent' to use the SDK's built-in permission system with
+   * allow/deny lists from the agent's .claude/settings.json.
+   */
+  permissionMode?: SandboxPermissionMode;
 }
 
 export interface CreateSessionResponse {
