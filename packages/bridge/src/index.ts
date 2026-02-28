@@ -43,7 +43,20 @@ async function send(conn: net.Socket, event: BridgeEvent): Promise<void> {
   }
 }
 
-async function runAndStream(conn: net.Socket, prompt: string, sessionId: string, resume: boolean, includePartialMessages?: boolean, model?: string): Promise<void> {
+async function runAndStream(conn: net.Socket, prompt: string, sessionId: string, resume: boolean, sdkOpts?: {
+  includePartialMessages?: boolean;
+  model?: string;
+  maxTurns?: number;
+  maxBudgetUsd?: number;
+  effort?: 'low' | 'medium' | 'high' | 'max';
+  thinking?: { type: string; budgetTokens?: number };
+  outputFormat?: { type: string; schema: Record<string, unknown> };
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  betas?: string[];
+  subagents?: Record<string, unknown>;
+  initialAgent?: string;
+}): Promise<void> {
   currentAbort = new AbortController();
 
   const timing = timingEnabled();
@@ -61,8 +74,7 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
       claudeMd,
       resume,
       signal: currentAbort.signal,
-      includePartialMessages,
-      model,
+      ...sdkOpts,
     })) {
       eventCount++;
       if (eventCount === 1 && elapsed) {
@@ -103,7 +115,9 @@ async function handleCommand(conn: net.Socket, cmd: BridgeCommand): Promise<void
       const count = sessionQueryCount.get(cmd.sessionId) ?? 0;
       sessionQueryCount.set(cmd.sessionId, count + 1);
       const shouldResume = count > 0;
-      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, cmd.includePartialMessages, cmd.model);
+      // Extract SDK-passthrough fields (everything except cmd, prompt, sessionId)
+      const { cmd: _, prompt: __, sessionId: ___, ...sdkOpts } = cmd;
+      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, sdkOpts);
     }
 
     case 'resume':

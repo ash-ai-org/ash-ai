@@ -48,6 +48,18 @@ export interface AshClientOptions {
 export interface SendMessageOptions {
   /** Enable partial message streaming. Yields incremental StreamEvent messages with raw API deltas. */
   includePartialMessages?: boolean;
+  /** Model override for this query. */
+  model?: string;
+  /** Maximum number of agentic turns for this query. */
+  maxTurns?: number;
+  /** Maximum budget in USD for this query. */
+  maxBudgetUsd?: number;
+  /** Effort level: how deeply Claude should think. */
+  effort?: 'low' | 'medium' | 'high' | 'max';
+  /** Thinking configuration for this query. */
+  thinking?: { type: string; budgetTokens?: number };
+  /** Output format constraint — agent's final output must match this JSON schema. */
+  outputFormat?: { type: string; schema: Record<string, unknown> };
 }
 
 export interface ExecResult {
@@ -154,6 +166,16 @@ export class AshClient {
     mcpServers?: Record<string, McpServerConfig>;
     /** System prompt override. Replaces agent's CLAUDE.md for this session. */
     systemPrompt?: string;
+    /** Whitelist of allowed tool names for this session. */
+    allowedTools?: string[];
+    /** Blacklist of disallowed tool names for this session. */
+    disallowedTools?: string[];
+    /** Beta feature flags for this session. */
+    betas?: string[];
+    /** Programmatic subagent definitions. Passed through to the SDK as `agents`. */
+    subagents?: Record<string, unknown>;
+    /** Which subagent to use for the main thread. Maps to SDK `agent` option. */
+    initialAgent?: string;
   }): Promise<Session> {
     const body: Record<string, unknown> = { agent };
     if (opts?.credentialId) body.credentialId = opts.credentialId;
@@ -162,6 +184,11 @@ export class AshClient {
     if (opts?.model) body.model = opts.model;
     if (opts?.mcpServers) body.mcpServers = opts.mcpServers;
     if (opts?.systemPrompt != null) body.systemPrompt = opts.systemPrompt;
+    if (opts?.allowedTools) body.allowedTools = opts.allowedTools;
+    if (opts?.disallowedTools) body.disallowedTools = opts.disallowedTools;
+    if (opts?.betas) body.betas = opts.betas;
+    if (opts?.subagents) body.subagents = opts.subagents;
+    if (opts?.initialAgent) body.initialAgent = opts.initialAgent;
     const res = await this.request<{ session: Session }>('POST', '/api/sessions', body);
     return res.session;
   }
@@ -204,6 +231,12 @@ export class AshClient {
   async sendMessage(sessionId: string, content: string, opts?: SendMessageOptions): Promise<Response> {
     const body: Record<string, unknown> = { content };
     if (opts?.includePartialMessages) body.includePartialMessages = true;
+    if (opts?.model) body.model = opts.model;
+    if (opts?.maxTurns != null) body.maxTurns = opts.maxTurns;
+    if (opts?.maxBudgetUsd != null) body.maxBudgetUsd = opts.maxBudgetUsd;
+    if (opts?.effort) body.effort = opts.effort;
+    if (opts?.thinking) body.thinking = opts.thinking;
+    if (opts?.outputFormat) body.outputFormat = opts.outputFormat;
     const res = await fetch(`${this.serverUrl}/api/sessions/${sessionId}/messages`, {
       method: 'POST',
       headers: this.headers(true),
@@ -225,6 +258,19 @@ export class AshClient {
     const res = await this.sendMessage(sessionId, content, opts);
     if (!res.body) return;
     yield* parseSSEStream(res.body);
+  }
+
+  /** Update session configuration mid-session. Affects subsequent queries. */
+  async updateSessionConfig(id: string, config: {
+    model?: string;
+    allowedTools?: string[];
+    disallowedTools?: string[];
+    betas?: string[];
+    subagents?: Record<string, unknown>;
+    initialAgent?: string;
+  }): Promise<Session> {
+    const res = await this.request<{ session: Session }>('PATCH', `/api/sessions/${id}/config`, config);
+    return res.session;
   }
 
   async stopSession(id: string): Promise<Session> {

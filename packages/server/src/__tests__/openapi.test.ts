@@ -64,6 +64,14 @@ describe('OpenAPI spec generation', () => {
     expect(pathKeys).toContain('/api/sessions/{id}/files');
     // Wildcard route: Fastify may render it as /api/sessions/{id}/files/{*} or similar
     expect(pathKeys.some((p: string) => p.startsWith('/api/sessions/{id}/files/') && p !== '/api/sessions/{id}/files')).toBe(true);
+    expect(pathKeys).toContain('/api/sessions/{id}/config');
+  });
+
+  it('has PATCH method on config endpoint', () => {
+    const paths = spec.paths as Record<string, Record<string, unknown>>;
+    const configPath = paths['/api/sessions/{id}/config'];
+    expect(configPath).toBeDefined();
+    expect(configPath.patch).toBeDefined();
   });
 
   it('has expected number of operations', () => {
@@ -74,7 +82,7 @@ describe('OpenAPI spec generation', () => {
         if (path[method]) count++;
       }
     }
-    expect(count).toBe(24);
+    expect(count).toBe(25);
   });
 
   it('has component schemas for Agent, Session, ApiError, HealthResponse', () => {

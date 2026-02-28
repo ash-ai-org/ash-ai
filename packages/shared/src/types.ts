@@ -59,6 +59,8 @@ export interface Session {
   parentSessionId?: string | null;
   /** Model override for this session. Null = use agent default (.claude/settings.json). */
   model?: string | null;
+  /** Session-level SDK options (allowedTools, betas, subagents, etc.). */
+  config?: SessionConfig | null;
 }
 
 // -- Sandboxes ----------------------------------------------------------------
@@ -594,6 +596,35 @@ export interface CreateSessionRequest {
    * allow/deny lists from the agent's .claude/settings.json.
    */
   permissionMode?: SandboxPermissionMode;
+  /** Whitelist of allowed tool names for this session. */
+  allowedTools?: string[];
+  /** Blacklist of disallowed tool names for this session. */
+  disallowedTools?: string[];
+  /** Beta feature flags for this session. Passed through to the SDK. */
+  betas?: string[];
+  /** Programmatic subagent definitions for this session. Passed through to the SDK. */
+  subagents?: Record<string, unknown>;
+  /** Which subagent to use for the main thread. Maps to SDK's `agent` option. */
+  initialAgent?: string;
+}
+
+/** Session-level SDK options stored on the session record and injected into every query. */
+export interface SessionConfig {
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  betas?: string[];
+  subagents?: Record<string, unknown>;
+  initialAgent?: string;
+}
+
+/** Request body for PATCH /api/sessions/:id/config — update session config mid-session. */
+export interface UpdateSessionConfigRequest {
+  model?: string;
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  betas?: string[];
+  subagents?: Record<string, unknown>;
+  initialAgent?: string;
 }
 
 export interface CreateSessionResponse {
@@ -606,6 +637,16 @@ export interface SendMessageRequest {
   includePartialMessages?: boolean;
   /** Model override for this query. Overrides session and agent defaults. */
   model?: string;
+  /** Maximum number of agentic turns (API round-trips) for this query. */
+  maxTurns?: number;
+  /** Maximum budget in USD for this query. */
+  maxBudgetUsd?: number;
+  /** Effort level for this query: how deeply Claude should think. */
+  effort?: 'low' | 'medium' | 'high' | 'max';
+  /** Thinking configuration for this query. Passed through to the SDK. */
+  thinking?: { type: string; budgetTokens?: number };
+  /** Output format constraint. When set, the agent's final output must match this JSON schema. */
+  outputFormat?: { type: string; schema: Record<string, unknown> };
 }
 
 export interface DeployAgentRequest {

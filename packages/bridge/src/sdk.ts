@@ -17,6 +17,18 @@ export interface QueryOptions {
   includePartialMessages?: boolean;
   /** Override the model for this query. Passed to SDK Options.model. */
   model?: string;
+  // -- Per-message SDK options --
+  maxTurns?: number;
+  maxBudgetUsd?: number;
+  effort?: 'low' | 'medium' | 'high' | 'max';
+  thinking?: { type: string; budgetTokens?: number };
+  outputFormat?: { type: string; schema: Record<string, unknown> };
+  // -- Session-level SDK options --
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  betas?: string[];
+  subagents?: Record<string, unknown>;
+  initialAgent?: string;
 }
 
 /**
@@ -58,6 +70,16 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
       settingSources: ['project'],
       ...(opts.model && { model: opts.model }),
       ...(opts.includePartialMessages && { includePartialMessages: true }),
+      ...(opts.maxTurns != null && { maxTurns: opts.maxTurns }),
+      ...(opts.maxBudgetUsd != null && { maxBudgetUsd: opts.maxBudgetUsd }),
+      ...(opts.effort && { effort: opts.effort }),
+      ...(opts.thinking && { thinking: opts.thinking as any }),
+      ...(opts.outputFormat && { outputFormat: opts.outputFormat as any }),
+      ...(opts.allowedTools && { allowedTools: opts.allowedTools }),
+      ...(opts.disallowedTools && { disallowedTools: opts.disallowedTools }),
+      ...(opts.betas && { betas: opts.betas as any }),
+      ...(opts.subagents && { agents: opts.subagents as any }),
+      ...(opts.initialAgent && { agent: opts.initialAgent }),
       ...(process.env.CLAUDE_CODE_EXECUTABLE && { pathToClaudeCodeExecutable: process.env.CLAUDE_CODE_EXECUTABLE }),
       stderr: (data: string) => process.stderr.write(`[claude-code] ${data}`),
     },
