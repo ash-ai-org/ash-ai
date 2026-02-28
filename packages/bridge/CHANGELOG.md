@@ -1,5 +1,16 @@
 # @ash-ai/bridge
 
+## 0.0.13 - 2026-02-27
+
+### Added
+
+- Configurable permission mode via `ASH_PERMISSION_MODE` env var (#34)
+- Support for `permissionsByAgent` mode to use SDK permission system with `.claude/settings.json` (#34)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.14
+
 ## 0.0.12 - 2026-02-27
 
 ### Changed

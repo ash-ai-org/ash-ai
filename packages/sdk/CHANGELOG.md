@@ -1,5 +1,11 @@
 # @ash-ai/sdk
 
+## 0.0.14 - 2026-02-27
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.14
+
 ## 0.0.13 - 2026-02-27
 
 ### Changed
