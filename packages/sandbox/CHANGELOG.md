@@ -1,5 +1,11 @@
 # @ash-ai/sandbox
 
+## 0.0.15 - 2026-02-28
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.16
+
 ## 0.0.14 - 2026-02-28
 
 ### Changed

@@ -1,5 +1,11 @@
 # @ash-ai/mcp-server
 
+## 0.0.12 - 2026-02-28
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.16, @ash-ai/sdk@0.0.16
+
 ## 0.0.11 - 2026-02-28
 
 ### Changed

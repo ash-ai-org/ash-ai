@@ -1,5 +1,19 @@
 # @ash-ai/server
 
+## 0.0.16 - 2026-02-28
+
+### Added
+
+- Per-message SDK options on `POST /api/sessions/:id/messages`: `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `outputFormat` (#41)
+- Session-level SDK options on `POST /api/sessions`: `allowedTools`, `disallowedTools`, `betas`, `subagents`, `initialAgent` (#41)
+- `PATCH /api/sessions/:id/config` endpoint for mid-session config updates (#41)
+- Session config persisted as JSON column in DB, copied on fork (#41)
+- DB migration for `config` column on sessions table (#41)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.16, @ash-ai/sandbox@0.0.15
+
 ## 0.0.15 - 2026-02-28
 
 ### Added
