@@ -1,5 +1,12 @@
 # @ash-ai/sandbox
 
+## 0.0.14 - 2026-02-28
+
+### Changed
+
+- Allow cgroups-only fallback on Linux when bwrap is unavailable (e.g. Fargate) (#39)
+- Updated dependencies: @ash-ai/shared@0.0.15
+
 ## 0.0.13 - 2026-02-27
 
 ### Changed
