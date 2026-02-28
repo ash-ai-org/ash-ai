@@ -1,5 +1,15 @@
 # @ash-ai/shared
 
+## 0.0.16 - 2026-02-28
+
+### Added
+
+- Per-message SDK options on `SendMessageRequest`: `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `outputFormat` (#41)
+- Session-level SDK options on `CreateSessionRequest`: `allowedTools`, `disallowedTools`, `betas`, `subagents`, `initialAgent` (#41)
+- `SessionConfig` type for persisted session-level SDK options (#41)
+- `UpdateSessionConfigRequest` type for mid-session config updates (#41)
+- All new fields added to `QueryCommand` protocol type (#41)
+
 ## 0.0.15 - 2026-02-28
 
 ### Fixed

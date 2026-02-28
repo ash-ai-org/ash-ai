@@ -1,5 +1,16 @@
 # @ash-ai/bridge
 
+## 0.0.15 - 2026-02-28
+
+### Added
+
+- Pass through SDK options: `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `outputFormat`, `allowedTools`, `disallowedTools`, `betas`, `subagents`, `initialAgent` (#41)
+
+### Changed
+
+- Refactored `handleCommand` to destructure+spread so new fields flow through automatically (#41)
+- Updated dependencies: @ash-ai/shared@0.0.16
+
 ## 0.0.14 - 2026-02-28
 
 ### Changed

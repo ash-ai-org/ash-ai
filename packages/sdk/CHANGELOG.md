@@ -1,5 +1,17 @@
 # @ash-ai/sdk
 
+## 0.0.16 - 2026-02-28
+
+### Added
+
+- `SendMessageOptions`: `maxTurns`, `maxBudgetUsd`, `effort`, `thinking`, `outputFormat` (#41)
+- `createSession` opts: `allowedTools`, `disallowedTools`, `betas`, `subagents`, `initialAgent` (#41)
+- `updateSessionConfig()` method for mid-session config updates (#41)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.16
+
 ## 0.0.15 - 2026-02-28
 
 ### Changed
