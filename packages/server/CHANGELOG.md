@@ -1,5 +1,15 @@
 # @ash-ai/server
 
+## 0.1.0 - 2026-02-27
+
+### Added
+
+- `permissionMode` parameter on session creation API for configurable SDK permission mode (#34)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.1.0, @ash-ai/sandbox@0.1.0
+
 ## 0.0.13 - 2026-02-27
 
 ### Changed

@@ -1,5 +1,11 @@
 # ash-ai-sdk (Python)
 
+## 0.1.0 - 2026-02-27
+
+### Changed
+
+- Minor version bump (no direct changes)
+
 ## 0.0.11 - 2026-02-27
 
 ### Changed

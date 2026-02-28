@@ -1,5 +1,13 @@
 # @ash-ai/shared
 
+## 0.1.0 - 2026-02-27
+
+### Added
+
+- `SandboxPermissionMode` type for configurable SDK permission modes (#34)
+- `permissionMode` field on `CreateSessionRequest` (#34)
+- `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, and `ASH_PERMISSION_MODE` added to sandbox env allowlist (#34)
+
 ## 0.0.13 - 2026-02-27
 
 ### Changed
