@@ -1,5 +1,21 @@
 # @ash-ai/server
 
+## 0.1.0
+
+### Minor Changes
+
+- 65796b9: Add configurable permission mode and API gateway routing support for enterprise deployments.
+
+  - `@ash-ai/shared` — Add `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, and `ASH_PERMISSION_MODE` to sandbox env allowlist. New `SandboxPermissionMode` type and `permissionMode` field on `CreateSessionRequest`.
+  - `@ash-ai/bridge` — Read `ASH_PERMISSION_MODE` env var instead of hardcoding `bypassPermissions`. Supports `bypassPermissions` (default), `permissionsByAgent` (SDK enforces .claude/settings.json rules), and `default`.
+  - `@ash-ai/server` — New `permissionMode` field on `POST /api/sessions`. Injected into sandbox env so the bridge picks it up.
+
+### Patch Changes
+
+- Updated dependencies [65796b9]
+  - @ash-ai/shared@0.1.0
+  - @ash-ai/sandbox@0.0.14
+
 ## 0.0.14 - 2026-02-27
 
 ### Added

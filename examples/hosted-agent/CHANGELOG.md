@@ -1,5 +1,11 @@
 # hosted-agent-example
 
+## 0.1.2
+
+### Patch Changes
+
+- @ash-ai/sdk@0.0.15
+
 ## 0.1.1
 
 ### Patch Changes

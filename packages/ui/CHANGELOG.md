@@ -1,5 +1,11 @@
 # @ash-ai/ui
 
+## 0.0.10
+
+### Patch Changes
+
+- @ash-ai/sdk@0.0.15
+
 ## 0.0.9 - 2026-02-27
 
 ### Changed
