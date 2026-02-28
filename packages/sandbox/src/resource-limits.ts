@@ -189,8 +189,6 @@ export function spawnWithLimits(
   sandboxOpts: SandboxSpawnOpts,
 ): SpawnResult {
   if (process.platform === 'linux') {
-    // Linux: cgroups + bwrap are REQUIRED for sandbox isolation.
-    // Refuse to start without them — silent fallback is a security hole.
     if (!hasCgroups()) {
       throw new Error(
         'SECURITY: cgroups not available on Linux. ' +
@@ -199,11 +197,11 @@ export function spawnWithLimits(
       );
     }
     if (!hasBwrap()) {
-      throw new Error(
-        'SECURITY: bwrap (bubblewrap) not available on Linux. ' +
-        'Sandbox filesystem isolation requires bwrap. ' +
-        'Install with: apt-get install bubblewrap',
-      );
+      // Fargate/environments where bwrap can't create namespaces (no CAP_SYS_ADMIN).
+      // Fall back to cgroups-only: resource limits enforced, filesystem isolation skipped.
+      // The outer container/VM provides the isolation boundary in these environments.
+      console.warn('[resource-limits] bwrap not available — falling back to cgroups-only (no filesystem isolation)');
+      return spawnWithCgroupsOnly(command, args, opts, limits, sandboxOpts);
     }
     return spawnWithCgroups(command, args, opts, limits, sandboxOpts);
   }
@@ -211,6 +209,35 @@ export function spawnWithLimits(
   // macOS: ulimit fallback for local development only.
   // No bwrap on macOS — filesystem isolation is not enforced.
   return spawnWithUlimit(command, args, opts, limits);
+}
+
+/**
+ * Linux sandbox spawn: cgroups only (no bwrap filesystem isolation).
+ * Used in environments like Fargate where bwrap can't create namespaces
+ * but the outer container/VM already provides isolation.
+ */
+function spawnWithCgroupsOnly(
+  command: string,
+  args: string[],
+  opts: SpawnOptions,
+  limits: SandboxLimits,
+  sandboxOpts: SandboxSpawnOpts,
+): SpawnResult {
+  const cgroupPath = createCgroup(sandboxOpts.sandboxId, limits);
+
+  const child = spawn(command, args, opts);
+  console.log(`[resource-limits] Spawned sandbox ${sandboxOpts.sandboxId.slice(0, 8)} with cgroups only (no bwrap)`);
+
+  if (child.pid) {
+    try {
+      addToCgroup(cgroupPath, child.pid);
+    } catch (err) {
+      console.error(`[resource-limits] Failed to add PID ${child.pid} to cgroup: ${err}`);
+    }
+  }
+
+  const cleanup = () => removeCgroup(cgroupPath);
+  return { child, cleanup };
 }
 
 /**

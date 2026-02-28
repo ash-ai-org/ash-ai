@@ -98,6 +98,7 @@ const HealthResponseSchema = {
   type: 'object',
   properties: {
     status: { type: 'string', enum: ['ok'] },
+    version: { type: 'string', description: 'Ash server version' },
     coordinatorId: { type: 'string', description: 'Unique coordinator ID (hostname-PID)' },
     activeSessions: { type: 'integer' },
     activeSandboxes: { type: 'integer' },

@@ -2,6 +2,7 @@ import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
 import { createAshServer } from './server.js';
+import { VERSION } from './version.js';
 
 export { createAshServer } from './server.js';
 export type { AshServerOptions, AshServer } from './server.js';
@@ -37,7 +38,7 @@ process.on('SIGINT', async () => { await shutdown(); process.exit(0); });
 // Start
 try {
   await app.listen({ port, host });
-  app.log.info(`Ash server listening on ${host}:${port} (mode: ${mode})`);
+  app.log.info(`Ash v${VERSION} listening on ${host}:${port} (mode: ${mode})`);
   app.log.info(`Data directory: ${dataDir}`);
   if (mode === 'standalone') {
     app.log.info(`Bridge entry: ${bridgeEntry}`);

@@ -700,7 +700,7 @@ export interface AshTurnCompleteEvent {
 
 export interface AshSessionStartEvent {
   type: 'session_start';
-  data: { sessionId: string };
+  data: { sessionId: string; version?: string };
 }
 
 export interface AshSessionEndEvent {
@@ -757,15 +757,16 @@ export function classifyToStreamEvents(data: Record<string, any>): AshStreamEven
   }
 
   // Assistant message with content blocks
+  // NOTE: text_delta is NOT emitted here — complete assistant messages are not deltas.
+  // Text was already streamed incrementally via stream_event deltas above.
+  // Consumers needing full text should use the 'message' event or extractDisplayItems().
   if (data.type === 'assistant' && Array.isArray(data.message?.content)) {
     for (const block of data.message.content) {
-      if (block.type === 'text') {
-        events.push({ type: 'text_delta', data: { delta: block.text } });
-      } else if (block.type === 'tool_use') {
+      if (block.type === 'tool_use') {
         events.push({ type: 'tool_use', data: { id: block.id, name: block.name, input: block.input } });
       } else if (block.type === 'thinking') {
         events.push({ type: 'thinking_delta', data: { delta: block.thinking } });
-      } else {
+      } else if (block.type !== 'text') {
         // Unknown block type — forward as-is
         events.push({ type: block.type, data: block });
       }

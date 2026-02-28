@@ -23,6 +23,7 @@ import { attachmentRoutes } from './routes/attachments.js';
 import { usageRoutes } from './routes/usage.js';
 import { workspaceRoutes } from './routes/workspace.js';
 import { createTelemetryExporter } from './telemetry/exporter.js';
+import { VERSION } from './version.js';
 
 export interface AshServerOptions {
   /** Data directory for sandboxes and state. Defaults to ASH_DATA_DIR or ~/.ash */
@@ -128,7 +129,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
       info: {
         title: 'Ash API',
         description: 'REST API for deploying and orchestrating hosted AI agents',
-        version: '0.1.0',
+        version: VERSION,
       },
       servers: [{ url: `http://localhost:${port}` }],
       tags: [

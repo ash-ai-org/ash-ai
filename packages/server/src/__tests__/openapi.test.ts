@@ -44,7 +44,7 @@ describe('OpenAPI spec generation', () => {
   it('has info section', () => {
     const info = spec.info as Record<string, string>;
     expect(info.title).toBe('Ash API');
-    expect(info.version).toBe('0.1.0');
+    expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('has all expected paths', () => {

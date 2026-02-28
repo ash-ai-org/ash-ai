@@ -204,7 +204,7 @@ describe('classifyToStreamEvents', () => {
     expect(events[0]).toEqual({ type: 'thinking_delta', data: { delta: 'Hmm...' } });
   });
 
-  it('classifies assistant messages with mixed content', () => {
+  it('classifies assistant messages with mixed content (no text_delta for complete messages)', () => {
     const data = {
       type: 'assistant',
       message: {
@@ -216,7 +216,9 @@ describe('classifyToStreamEvents', () => {
     };
     const events = classifyToStreamEvents(data);
     const types = events.map((e) => e.type);
-    expect(types).toContain('text_delta');
+    // Complete assistant messages should NOT emit text_delta — text was already
+    // streamed incrementally via stream_event deltas. Only tool_use + raw message.
+    expect(types).not.toContain('text_delta');
     expect(types).toContain('tool_use');
     expect(types).toContain('message'); // always includes raw
   });
