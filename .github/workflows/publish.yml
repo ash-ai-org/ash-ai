@@ -32,7 +32,7 @@ jobs:
 
       - uses: changesets/action@v1
         with:
-          version: pnpm version-packages
+          version: bash scripts/release/version-packages.sh
           publish: pnpm release
           title: "chore: version packages"
           commit: "chore: version packages"
