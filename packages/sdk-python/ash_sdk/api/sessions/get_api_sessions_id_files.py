@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -19,11 +20,11 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     id: UUID,
     *,
-    include_hidden: Union[Unset, GetApiSessionsIdFilesIncludeHidden] = UNSET,
+    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
-    json_include_hidden: Union[Unset, str] = UNSET
+    json_include_hidden: str | Unset = UNSET
     if not isinstance(include_hidden, Unset):
         json_include_hidden = include_hidden
 
@@ -34,7 +35,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/sessions/{id}/files".format(
-            id=id,
+            id=quote(str(id), safe=""),
         ),
         "params": params,
     }
@@ -43,8 +44,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[ApiError, GetApiSessionsIdFilesResponse200]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ApiError | GetApiSessionsIdFilesResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiSessionsIdFilesResponse200.from_dict(response.json())
 
@@ -62,8 +63,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[ApiError, GetApiSessionsIdFilesResponse200]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ApiError | GetApiSessionsIdFilesResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -75,20 +76,20 @@ def _build_response(
 def sync_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    include_hidden: Union[Unset, GetApiSessionsIdFilesIncludeHidden] = UNSET,
-) -> Response[Union[ApiError, GetApiSessionsIdFilesResponse200]]:
+    client: AuthenticatedClient | Client,
+    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
+) -> Response[ApiError | GetApiSessionsIdFilesResponse200]:
     """
     Args:
         id (UUID):
-        include_hidden (Union[Unset, GetApiSessionsIdFilesIncludeHidden]):
+        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, GetApiSessionsIdFilesResponse200]]
+        Response[ApiError | GetApiSessionsIdFilesResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -106,20 +107,20 @@ def sync_detailed(
 def sync(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    include_hidden: Union[Unset, GetApiSessionsIdFilesIncludeHidden] = UNSET,
-) -> Optional[Union[ApiError, GetApiSessionsIdFilesResponse200]]:
+    client: AuthenticatedClient | Client,
+    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
+) -> ApiError | GetApiSessionsIdFilesResponse200 | None:
     """
     Args:
         id (UUID):
-        include_hidden (Union[Unset, GetApiSessionsIdFilesIncludeHidden]):
+        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, GetApiSessionsIdFilesResponse200]
+        ApiError | GetApiSessionsIdFilesResponse200
     """
 
     return sync_detailed(
@@ -132,20 +133,20 @@ def sync(
 async def asyncio_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    include_hidden: Union[Unset, GetApiSessionsIdFilesIncludeHidden] = UNSET,
-) -> Response[Union[ApiError, GetApiSessionsIdFilesResponse200]]:
+    client: AuthenticatedClient | Client,
+    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
+) -> Response[ApiError | GetApiSessionsIdFilesResponse200]:
     """
     Args:
         id (UUID):
-        include_hidden (Union[Unset, GetApiSessionsIdFilesIncludeHidden]):
+        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, GetApiSessionsIdFilesResponse200]]
+        Response[ApiError | GetApiSessionsIdFilesResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -161,20 +162,20 @@ async def asyncio_detailed(
 async def asyncio(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    include_hidden: Union[Unset, GetApiSessionsIdFilesIncludeHidden] = UNSET,
-) -> Optional[Union[ApiError, GetApiSessionsIdFilesResponse200]]:
+    client: AuthenticatedClient | Client,
+    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
+) -> ApiError | GetApiSessionsIdFilesResponse200 | None:
     """
     Args:
         id (UUID):
-        include_hidden (Union[Unset, GetApiSessionsIdFilesIncludeHidden]):
+        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, GetApiSessionsIdFilesResponse200]
+        ApiError | GetApiSessionsIdFilesResponse200
     """
 
     return (

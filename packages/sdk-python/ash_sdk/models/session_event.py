@@ -1,11 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import (
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -27,8 +24,8 @@ class SessionEvent:
         type_ (SessionEventType):
         sequence (int):
         created_at (datetime.datetime):
-        tenant_id (Union[Unset, str]):
-        data (Union[None, Unset, str]): JSON-encoded event payload
+        tenant_id (str | Unset):
+        data (None | str | Unset): JSON-encoded event payload
     """
 
     id: UUID
@@ -36,8 +33,8 @@ class SessionEvent:
     type_: SessionEventType
     sequence: int
     created_at: datetime.datetime
-    tenant_id: Union[Unset, str] = UNSET
-    data: Union[None, Unset, str] = UNSET
+    tenant_id: str | Unset = UNSET
+    data: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,7 +50,7 @@ class SessionEvent:
 
         tenant_id = self.tenant_id
 
-        data: Union[None, Unset, str]
+        data: None | str | Unset
         if isinstance(self.data, Unset):
             data = UNSET
         else:
@@ -92,12 +89,12 @@ class SessionEvent:
 
         tenant_id = d.pop("tenantId", UNSET)
 
-        def _parse_data(data: object) -> Union[None, Unset, str]:
+        def _parse_data(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(Union[None, Unset, str], data)
+            return cast(None | str | Unset, data)
 
         data = _parse_data(d.pop("data", UNSET))
 

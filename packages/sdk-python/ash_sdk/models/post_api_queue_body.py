@@ -1,9 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import Any, TypeVar
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -20,16 +18,16 @@ class PostApiQueueBody:
     Attributes:
         agent_name (str):
         prompt (str):
-        session_id (Union[Unset, UUID]):
-        priority (Union[Unset, int]):  Default: 0.
-        max_retries (Union[Unset, int]):  Default: 3.
+        session_id (UUID | Unset):
+        priority (int | Unset):  Default: 0.
+        max_retries (int | Unset):  Default: 3.
     """
 
     agent_name: str
     prompt: str
-    session_id: Union[Unset, UUID] = UNSET
-    priority: Union[Unset, int] = 0
-    max_retries: Union[Unset, int] = 3
+    session_id: UUID | Unset = UNSET
+    priority: int | Unset = 0
+    max_retries: int | Unset = 3
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,7 +35,7 @@ class PostApiQueueBody:
 
         prompt = self.prompt
 
-        session_id: Union[Unset, str] = UNSET
+        session_id: str | Unset = UNSET
         if not isinstance(self.session_id, Unset):
             session_id = str(self.session_id)
 
@@ -70,7 +68,7 @@ class PostApiQueueBody:
         prompt = d.pop("prompt")
 
         _session_id = d.pop("sessionId", UNSET)
-        session_id: Union[Unset, UUID]
+        session_id: UUID | Unset
         if isinstance(_session_id, Unset):
             session_id = UNSET
         else:

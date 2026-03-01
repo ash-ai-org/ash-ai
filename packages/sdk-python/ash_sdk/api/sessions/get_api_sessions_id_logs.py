@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -16,7 +17,7 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     id: UUID,
     *,
-    after: Union[Unset, int] = -1,
+    after: int | Unset = -1,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -27,7 +28,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/sessions/{id}/logs".format(
-            id=id,
+            id=quote(str(id), safe=""),
         ),
         "params": params,
     }
@@ -36,8 +37,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[ApiError, GetApiSessionsIdLogsResponse200]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ApiError | GetApiSessionsIdLogsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiSessionsIdLogsResponse200.from_dict(response.json())
 
@@ -55,8 +56,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[ApiError, GetApiSessionsIdLogsResponse200]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ApiError | GetApiSessionsIdLogsResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -68,20 +69,20 @@ def _build_response(
 def sync_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    after: Union[Unset, int] = -1,
-) -> Response[Union[ApiError, GetApiSessionsIdLogsResponse200]]:
+    client: AuthenticatedClient | Client,
+    after: int | Unset = -1,
+) -> Response[ApiError | GetApiSessionsIdLogsResponse200]:
     """
     Args:
         id (UUID):
-        after (Union[Unset, int]):  Default: -1.
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, GetApiSessionsIdLogsResponse200]]
+        Response[ApiError | GetApiSessionsIdLogsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -99,20 +100,20 @@ def sync_detailed(
 def sync(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    after: Union[Unset, int] = -1,
-) -> Optional[Union[ApiError, GetApiSessionsIdLogsResponse200]]:
+    client: AuthenticatedClient | Client,
+    after: int | Unset = -1,
+) -> ApiError | GetApiSessionsIdLogsResponse200 | None:
     """
     Args:
         id (UUID):
-        after (Union[Unset, int]):  Default: -1.
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, GetApiSessionsIdLogsResponse200]
+        ApiError | GetApiSessionsIdLogsResponse200
     """
 
     return sync_detailed(
@@ -125,20 +126,20 @@ def sync(
 async def asyncio_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    after: Union[Unset, int] = -1,
-) -> Response[Union[ApiError, GetApiSessionsIdLogsResponse200]]:
+    client: AuthenticatedClient | Client,
+    after: int | Unset = -1,
+) -> Response[ApiError | GetApiSessionsIdLogsResponse200]:
     """
     Args:
         id (UUID):
-        after (Union[Unset, int]):  Default: -1.
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, GetApiSessionsIdLogsResponse200]]
+        Response[ApiError | GetApiSessionsIdLogsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -154,20 +155,20 @@ async def asyncio_detailed(
 async def asyncio(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    after: Union[Unset, int] = -1,
-) -> Optional[Union[ApiError, GetApiSessionsIdLogsResponse200]]:
+    client: AuthenticatedClient | Client,
+    after: int | Unset = -1,
+) -> ApiError | GetApiSessionsIdLogsResponse200 | None:
     """
     Args:
         id (UUID):
-        after (Union[Unset, int]):  Default: -1.
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, GetApiSessionsIdLogsResponse200]
+        ApiError | GetApiSessionsIdLogsResponse200
     """
 
     return (

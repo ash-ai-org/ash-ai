@@ -1,10 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,14 +21,14 @@ T = TypeVar("T", bound="GetApiCredentialsResponse200")
 class GetApiCredentialsResponse200:
     """
     Attributes:
-        credentials (Union[Unset, list['GetApiCredentialsResponse200CredentialsItem']]):
+        credentials (list[GetApiCredentialsResponse200CredentialsItem] | Unset):
     """
 
-    credentials: Union[Unset, list["GetApiCredentialsResponse200CredentialsItem"]] = UNSET
+    credentials: list[GetApiCredentialsResponse200CredentialsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        credentials: Union[Unset, list[dict[str, Any]]] = UNSET
+        credentials: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.credentials, Unset):
             credentials = []
             for credentials_item_data in self.credentials:
@@ -53,12 +50,14 @@ class GetApiCredentialsResponse200:
         )
 
         d = dict(src_dict)
-        credentials = []
         _credentials = d.pop("credentials", UNSET)
-        for credentials_item_data in _credentials or []:
-            credentials_item = GetApiCredentialsResponse200CredentialsItem.from_dict(credentials_item_data)
+        credentials: list[GetApiCredentialsResponse200CredentialsItem] | Unset = UNSET
+        if _credentials is not UNSET:
+            credentials = []
+            for credentials_item_data in _credentials:
+                credentials_item = GetApiCredentialsResponse200CredentialsItem.from_dict(credentials_item_data)
 
-            credentials.append(credentials_item)
+                credentials.append(credentials_item)
 
         get_api_credentials_response_200 = cls(
             credentials=credentials,

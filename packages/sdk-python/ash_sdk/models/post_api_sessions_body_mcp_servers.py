@@ -1,9 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,7 +19,7 @@ T = TypeVar("T", bound="PostApiSessionsBodyMcpServers")
 class PostApiSessionsBodyMcpServers:
     """Per-session MCP servers. Merged into agent .mcp.json (session overrides agent). Enables sidecar pattern."""
 
-    additional_properties: dict[str, "PostApiSessionsBodyMcpServersAdditionalProperty"] = _attrs_field(
+    additional_properties: dict[str, PostApiSessionsBodyMcpServersAdditionalProperty] = _attrs_field(
         init=False, factory=dict
     )
 
@@ -54,10 +52,10 @@ class PostApiSessionsBodyMcpServers:
     def additional_keys(self) -> list[str]:
         return list(self.additional_properties.keys())
 
-    def __getitem__(self, key: str) -> "PostApiSessionsBodyMcpServersAdditionalProperty":
+    def __getitem__(self, key: str) -> PostApiSessionsBodyMcpServersAdditionalProperty:
         return self.additional_properties[key]
 
-    def __setitem__(self, key: str, value: "PostApiSessionsBodyMcpServersAdditionalProperty") -> None:
+    def __setitem__(self, key: str, value: PostApiSessionsBodyMcpServersAdditionalProperty) -> None:
         self.additional_properties[key] = value
 
     def __delitem__(self, key: str) -> None:

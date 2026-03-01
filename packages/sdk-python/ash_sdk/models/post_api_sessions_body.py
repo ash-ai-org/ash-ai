@@ -1,11 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -32,36 +28,36 @@ class PostApiSessionsBody:
     """
     Attributes:
         agent (str):
-        credential_id (Union[Unset, str]):
-        extra_env (Union[Unset, PostApiSessionsBodyExtraEnv]):
-        startup_script (Union[Unset, str]):
-        model (Union[Unset, str]): Model override for this session. Overrides agent .claude/settings.json default.
-        mcp_servers (Union[Unset, PostApiSessionsBodyMcpServers]): Per-session MCP servers. Merged into agent .mcp.json
+        credential_id (str | Unset):
+        extra_env (PostApiSessionsBodyExtraEnv | Unset):
+        startup_script (str | Unset):
+        model (str | Unset): Model override for this session. Overrides agent .claude/settings.json default.
+        mcp_servers (PostApiSessionsBodyMcpServers | Unset): Per-session MCP servers. Merged into agent .mcp.json
             (session overrides agent). Enables sidecar pattern.
-        system_prompt (Union[Unset, str]): System prompt override. Replaces agent CLAUDE.md for this session.
-        permission_mode (Union[Unset, PostApiSessionsBodyPermissionMode]): Permission mode for the SDK inside the
-            sandbox. Defaults to bypassPermissions (sandbox isolation is the security boundary).
-        allowed_tools (Union[Unset, list[str]]): Whitelist of allowed tool names for this session.
-        disallowed_tools (Union[Unset, list[str]]): Blacklist of disallowed tool names for this session.
-        betas (Union[Unset, list[str]]): Beta feature flags for this session.
-        subagents (Union[Unset, PostApiSessionsBodySubagents]): Programmatic subagent definitions. Passed through to the
-            SDK as `agents`.
-        initial_agent (Union[Unset, str]): Which subagent to use for the main thread. Maps to SDK `agent` option.
+        system_prompt (str | Unset): System prompt override. Replaces agent CLAUDE.md for this session.
+        permission_mode (PostApiSessionsBodyPermissionMode | Unset): Permission mode for the SDK inside the sandbox.
+            Defaults to bypassPermissions (sandbox isolation is the security boundary).
+        allowed_tools (list[str] | Unset): Whitelist of allowed tool names for this session.
+        disallowed_tools (list[str] | Unset): Blacklist of disallowed tool names for this session.
+        betas (list[str] | Unset): Beta feature flags for this session.
+        subagents (PostApiSessionsBodySubagents | Unset): Programmatic subagent definitions. Passed through to the SDK
+            as `agents`.
+        initial_agent (str | Unset): Which subagent to use for the main thread. Maps to SDK `agent` option.
     """
 
     agent: str
-    credential_id: Union[Unset, str] = UNSET
-    extra_env: Union[Unset, "PostApiSessionsBodyExtraEnv"] = UNSET
-    startup_script: Union[Unset, str] = UNSET
-    model: Union[Unset, str] = UNSET
-    mcp_servers: Union[Unset, "PostApiSessionsBodyMcpServers"] = UNSET
-    system_prompt: Union[Unset, str] = UNSET
-    permission_mode: Union[Unset, PostApiSessionsBodyPermissionMode] = UNSET
-    allowed_tools: Union[Unset, list[str]] = UNSET
-    disallowed_tools: Union[Unset, list[str]] = UNSET
-    betas: Union[Unset, list[str]] = UNSET
-    subagents: Union[Unset, "PostApiSessionsBodySubagents"] = UNSET
-    initial_agent: Union[Unset, str] = UNSET
+    credential_id: str | Unset = UNSET
+    extra_env: PostApiSessionsBodyExtraEnv | Unset = UNSET
+    startup_script: str | Unset = UNSET
+    model: str | Unset = UNSET
+    mcp_servers: PostApiSessionsBodyMcpServers | Unset = UNSET
+    system_prompt: str | Unset = UNSET
+    permission_mode: PostApiSessionsBodyPermissionMode | Unset = UNSET
+    allowed_tools: list[str] | Unset = UNSET
+    disallowed_tools: list[str] | Unset = UNSET
+    betas: list[str] | Unset = UNSET
+    subagents: PostApiSessionsBodySubagents | Unset = UNSET
+    initial_agent: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,7 +65,7 @@ class PostApiSessionsBody:
 
         credential_id = self.credential_id
 
-        extra_env: Union[Unset, dict[str, Any]] = UNSET
+        extra_env: dict[str, Any] | Unset = UNSET
         if not isinstance(self.extra_env, Unset):
             extra_env = self.extra_env.to_dict()
 
@@ -77,29 +73,29 @@ class PostApiSessionsBody:
 
         model = self.model
 
-        mcp_servers: Union[Unset, dict[str, Any]] = UNSET
+        mcp_servers: dict[str, Any] | Unset = UNSET
         if not isinstance(self.mcp_servers, Unset):
             mcp_servers = self.mcp_servers.to_dict()
 
         system_prompt = self.system_prompt
 
-        permission_mode: Union[Unset, str] = UNSET
+        permission_mode: str | Unset = UNSET
         if not isinstance(self.permission_mode, Unset):
             permission_mode = self.permission_mode
 
-        allowed_tools: Union[Unset, list[str]] = UNSET
+        allowed_tools: list[str] | Unset = UNSET
         if not isinstance(self.allowed_tools, Unset):
             allowed_tools = self.allowed_tools
 
-        disallowed_tools: Union[Unset, list[str]] = UNSET
+        disallowed_tools: list[str] | Unset = UNSET
         if not isinstance(self.disallowed_tools, Unset):
             disallowed_tools = self.disallowed_tools
 
-        betas: Union[Unset, list[str]] = UNSET
+        betas: list[str] | Unset = UNSET
         if not isinstance(self.betas, Unset):
             betas = self.betas
 
-        subagents: Union[Unset, dict[str, Any]] = UNSET
+        subagents: dict[str, Any] | Unset = UNSET
         if not isinstance(self.subagents, Unset):
             subagents = self.subagents.to_dict()
 
@@ -157,7 +153,7 @@ class PostApiSessionsBody:
         credential_id = d.pop("credentialId", UNSET)
 
         _extra_env = d.pop("extraEnv", UNSET)
-        extra_env: Union[Unset, PostApiSessionsBodyExtraEnv]
+        extra_env: PostApiSessionsBodyExtraEnv | Unset
         if isinstance(_extra_env, Unset):
             extra_env = UNSET
         else:
@@ -168,7 +164,7 @@ class PostApiSessionsBody:
         model = d.pop("model", UNSET)
 
         _mcp_servers = d.pop("mcpServers", UNSET)
-        mcp_servers: Union[Unset, PostApiSessionsBodyMcpServers]
+        mcp_servers: PostApiSessionsBodyMcpServers | Unset
         if isinstance(_mcp_servers, Unset):
             mcp_servers = UNSET
         else:
@@ -177,7 +173,7 @@ class PostApiSessionsBody:
         system_prompt = d.pop("systemPrompt", UNSET)
 
         _permission_mode = d.pop("permissionMode", UNSET)
-        permission_mode: Union[Unset, PostApiSessionsBodyPermissionMode]
+        permission_mode: PostApiSessionsBodyPermissionMode | Unset
         if isinstance(_permission_mode, Unset):
             permission_mode = UNSET
         else:
@@ -190,7 +186,7 @@ class PostApiSessionsBody:
         betas = cast(list[str], d.pop("betas", UNSET))
 
         _subagents = d.pop("subagents", UNSET)
-        subagents: Union[Unset, PostApiSessionsBodySubagents]
+        subagents: PostApiSessionsBodySubagents | Unset
         if isinstance(_subagents, Unset):
             subagents = UNSET
         else:

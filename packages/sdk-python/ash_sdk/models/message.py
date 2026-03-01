@@ -1,10 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from collections.abc import Mapping
-from typing import (
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import Any, TypeVar
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -27,7 +25,7 @@ class Message:
         content (str): JSON-encoded message content (SDK passthrough)
         sequence (int):
         created_at (datetime.datetime):
-        tenant_id (Union[Unset, str]):
+        tenant_id (str | Unset):
     """
 
     id: UUID
@@ -36,7 +34,7 @@ class Message:
     content: str
     sequence: int
     created_at: datetime.datetime
-    tenant_id: Union[Unset, str] = UNSET
+    tenant_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

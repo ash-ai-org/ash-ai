@@ -1,11 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -25,38 +21,38 @@ T = TypeVar("T", bound="PatchApiSessionsIdConfigBody")
 class PatchApiSessionsIdConfigBody:
     """
     Attributes:
-        model (Union[Unset, str]): Model override for subsequent queries.
-        allowed_tools (Union[Unset, list[str]]): Whitelist of allowed tool names.
-        disallowed_tools (Union[Unset, list[str]]): Blacklist of disallowed tool names.
-        betas (Union[Unset, list[str]]): Beta feature flags.
-        subagents (Union[Unset, PatchApiSessionsIdConfigBodySubagents]): Programmatic subagent definitions.
-        initial_agent (Union[Unset, str]): Which subagent to use for the main thread.
+        model (str | Unset): Model override for subsequent queries.
+        allowed_tools (list[str] | Unset): Whitelist of allowed tool names.
+        disallowed_tools (list[str] | Unset): Blacklist of disallowed tool names.
+        betas (list[str] | Unset): Beta feature flags.
+        subagents (PatchApiSessionsIdConfigBodySubagents | Unset): Programmatic subagent definitions.
+        initial_agent (str | Unset): Which subagent to use for the main thread.
     """
 
-    model: Union[Unset, str] = UNSET
-    allowed_tools: Union[Unset, list[str]] = UNSET
-    disallowed_tools: Union[Unset, list[str]] = UNSET
-    betas: Union[Unset, list[str]] = UNSET
-    subagents: Union[Unset, "PatchApiSessionsIdConfigBodySubagents"] = UNSET
-    initial_agent: Union[Unset, str] = UNSET
+    model: str | Unset = UNSET
+    allowed_tools: list[str] | Unset = UNSET
+    disallowed_tools: list[str] | Unset = UNSET
+    betas: list[str] | Unset = UNSET
+    subagents: PatchApiSessionsIdConfigBodySubagents | Unset = UNSET
+    initial_agent: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         model = self.model
 
-        allowed_tools: Union[Unset, list[str]] = UNSET
+        allowed_tools: list[str] | Unset = UNSET
         if not isinstance(self.allowed_tools, Unset):
             allowed_tools = self.allowed_tools
 
-        disallowed_tools: Union[Unset, list[str]] = UNSET
+        disallowed_tools: list[str] | Unset = UNSET
         if not isinstance(self.disallowed_tools, Unset):
             disallowed_tools = self.disallowed_tools
 
-        betas: Union[Unset, list[str]] = UNSET
+        betas: list[str] | Unset = UNSET
         if not isinstance(self.betas, Unset):
             betas = self.betas
 
-        subagents: Union[Unset, dict[str, Any]] = UNSET
+        subagents: dict[str, Any] | Unset = UNSET
         if not isinstance(self.subagents, Unset):
             subagents = self.subagents.to_dict()
 
@@ -96,7 +92,7 @@ class PatchApiSessionsIdConfigBody:
         betas = cast(list[str], d.pop("betas", UNSET))
 
         _subagents = d.pop("subagents", UNSET)
-        subagents: Union[Unset, PatchApiSessionsIdConfigBodySubagents]
+        subagents: PatchApiSessionsIdConfigBodySubagents | Unset
         if isinstance(_subagents, Unset):
             subagents = UNSET
         else:

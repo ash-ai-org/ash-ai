@@ -1,11 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -25,16 +21,16 @@ T = TypeVar("T", bound="PostApiSessionsBodyMcpServersAdditionalProperty")
 class PostApiSessionsBodyMcpServersAdditionalProperty:
     """
     Attributes:
-        url (Union[Unset, str]):
-        command (Union[Unset, str]):
-        args (Union[Unset, list[str]]):
-        env (Union[Unset, PostApiSessionsBodyMcpServersAdditionalPropertyEnv]):
+        url (str | Unset):
+        command (str | Unset):
+        args (list[str] | Unset):
+        env (PostApiSessionsBodyMcpServersAdditionalPropertyEnv | Unset):
     """
 
-    url: Union[Unset, str] = UNSET
-    command: Union[Unset, str] = UNSET
-    args: Union[Unset, list[str]] = UNSET
-    env: Union[Unset, "PostApiSessionsBodyMcpServersAdditionalPropertyEnv"] = UNSET
+    url: str | Unset = UNSET
+    command: str | Unset = UNSET
+    args: list[str] | Unset = UNSET
+    env: PostApiSessionsBodyMcpServersAdditionalPropertyEnv | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -42,11 +38,11 @@ class PostApiSessionsBodyMcpServersAdditionalProperty:
 
         command = self.command
 
-        args: Union[Unset, list[str]] = UNSET
+        args: list[str] | Unset = UNSET
         if not isinstance(self.args, Unset):
             args = self.args
 
-        env: Union[Unset, dict[str, Any]] = UNSET
+        env: dict[str, Any] | Unset = UNSET
         if not isinstance(self.env, Unset):
             env = self.env.to_dict()
 
@@ -78,7 +74,7 @@ class PostApiSessionsBodyMcpServersAdditionalProperty:
         args = cast(list[str], d.pop("args", UNSET))
 
         _env = d.pop("env", UNSET)
-        env: Union[Unset, PostApiSessionsBodyMcpServersAdditionalPropertyEnv]
+        env: PostApiSessionsBodyMcpServersAdditionalPropertyEnv | Unset
         if isinstance(_env, Unset):
             env = UNSET
         else:

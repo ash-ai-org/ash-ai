@@ -11,14 +11,14 @@ low-level API functions that adds:
 
 from __future__ import annotations
 
-from typing import Any, Generator, AsyncGenerator
+from typing import Any, AsyncGenerator, Generator
 from uuid import UUID
 
 import httpx
 
 from .models.agent import Agent
-from .models.session import Session
 from .models.health_response import HealthResponse
+from .models.post_api_agents_body import PostApiAgentsBody
 from .models.post_api_sessions_body import PostApiSessionsBody
 from .models.post_api_sessions_body_extra_env import PostApiSessionsBodyExtraEnv
 from .models.post_api_sessions_body_mcp_servers import PostApiSessionsBodyMcpServers
@@ -29,7 +29,7 @@ from .models.post_api_sessions_body_mcp_servers_additional_property_env import (
     PostApiSessionsBodyMcpServersAdditionalPropertyEnv,
 )
 from .models.post_api_sessions_body_subagents import PostApiSessionsBodySubagents
-from .models.post_api_agents_body import PostApiAgentsBody
+from .models.session import Session
 from .streaming import AshEvent, parse_sse_stream, parse_sse_stream_async
 from .types import UNSET
 

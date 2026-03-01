@@ -1,10 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -23,15 +20,15 @@ class PostApiAgentsBody:
     """
     Attributes:
         name (str):
-        path (Union[Unset, str]):
-        system_prompt (Union[Unset, str]):
-        files (Union[Unset, list['PostApiAgentsBodyFilesItem']]):
+        path (str | Unset):
+        system_prompt (str | Unset):
+        files (list[PostApiAgentsBodyFilesItem] | Unset):
     """
 
     name: str
-    path: Union[Unset, str] = UNSET
-    system_prompt: Union[Unset, str] = UNSET
-    files: Union[Unset, list["PostApiAgentsBodyFilesItem"]] = UNSET
+    path: str | Unset = UNSET
+    system_prompt: str | Unset = UNSET
+    files: list[PostApiAgentsBodyFilesItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -41,7 +38,7 @@ class PostApiAgentsBody:
 
         system_prompt = self.system_prompt
 
-        files: Union[Unset, list[dict[str, Any]]] = UNSET
+        files: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.files, Unset):
             files = []
             for files_item_data in self.files:
@@ -75,12 +72,14 @@ class PostApiAgentsBody:
 
         system_prompt = d.pop("systemPrompt", UNSET)
 
-        files = []
         _files = d.pop("files", UNSET)
-        for files_item_data in _files or []:
-            files_item = PostApiAgentsBodyFilesItem.from_dict(files_item_data)
+        files: list[PostApiAgentsBodyFilesItem] | Unset = UNSET
+        if _files is not UNSET:
+            files = []
+            for files_item_data in _files:
+                files_item = PostApiAgentsBodyFilesItem.from_dict(files_item_data)
 
-            files.append(files_item)
+                files.append(files_item)
 
         post_api_agents_body = cls(
             name=name,

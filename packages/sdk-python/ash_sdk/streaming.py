@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Generator, AsyncGenerator, Iterator
+from typing import Any, AsyncGenerator, Generator, Iterator
 
 import httpx
 
@@ -24,6 +24,7 @@ class StreamEvent:
         event: The SSE event type (e.g. 'message', 'text_delta', 'error', 'done').
         data: The parsed JSON payload.
     """
+
     event: str
     data: dict[str, Any]
 
@@ -35,24 +36,28 @@ class MessageEvent:
     Contains the raw SDK message as a dict. The message format follows the
     Claude Code SDK Message type (AssistantMessage, UserMessage, ResultMessage, etc.).
     """
+
     data: dict[str, Any]
 
 
 @dataclass
 class TextDeltaEvent:
     """Incremental text chunk (event: text_delta)."""
+
     delta: str
 
 
 @dataclass
 class ThinkingDeltaEvent:
     """Incremental thinking content (event: thinking_delta)."""
+
     delta: str
 
 
 @dataclass
 class ToolUseEvent:
     """Tool invocation (event: tool_use)."""
+
     id: str
     name: str
     input: Any
@@ -61,6 +66,7 @@ class ToolUseEvent:
 @dataclass
 class ToolResultEvent:
     """Tool execution result (event: tool_result)."""
+
     tool_use_id: str
     content: Any
     is_error: bool = False
@@ -69,6 +75,7 @@ class ToolResultEvent:
 @dataclass
 class TurnCompleteEvent:
     """Agent turn completed (event: turn_complete)."""
+
     num_turns: int | None = None
     result: str | None = None
 
@@ -76,6 +83,7 @@ class TurnCompleteEvent:
 @dataclass
 class SessionStartEvent:
     """Session start marker (event: session_start)."""
+
     session_id: str
     version: str | None = None
 
@@ -83,12 +91,14 @@ class SessionStartEvent:
 @dataclass
 class ErrorEvent:
     """Error from the server (event: error)."""
+
     error: str
 
 
 @dataclass
 class DoneEvent:
     """Stream termination (event: done)."""
+
     session_id: str
 
 

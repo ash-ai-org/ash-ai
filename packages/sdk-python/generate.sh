@@ -4,7 +4,7 @@ set -euo pipefail
 # Generate the Python SDK from the OpenAPI spec.
 #
 # Prerequisites:
-#   pip install openapi-python-client>=0.26.0
+#   pip install openapi-python-client==0.28.2
 #
 # The generated output replaces ash_sdk/ — except for hand-written modules
 # listed in PRESERVE below, which are backed up and restored after generation.

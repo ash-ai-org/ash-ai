@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -16,9 +17,9 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     id: UUID,
     *,
-    limit: Union[Unset, int] = 200,
-    after: Union[Unset, int] = 0,
-    type_: Union[Unset, str] = UNSET,
+    limit: int | Unset = 200,
+    after: int | Unset = 0,
+    type_: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -33,7 +34,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "get",
         "url": "/api/sessions/{id}/events".format(
-            id=id,
+            id=quote(str(id), safe=""),
         ),
         "params": params,
     }
@@ -42,8 +43,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[ApiError, GetApiSessionsIdEventsResponse200]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ApiError | GetApiSessionsIdEventsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiSessionsIdEventsResponse200.from_dict(response.json())
 
@@ -61,8 +62,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[ApiError, GetApiSessionsIdEventsResponse200]]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ApiError | GetApiSessionsIdEventsResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -74,24 +75,24 @@ def _build_response(
 def sync_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    limit: Union[Unset, int] = 200,
-    after: Union[Unset, int] = 0,
-    type_: Union[Unset, str] = UNSET,
-) -> Response[Union[ApiError, GetApiSessionsIdEventsResponse200]]:
+    client: AuthenticatedClient | Client,
+    limit: int | Unset = 200,
+    after: int | Unset = 0,
+    type_: str | Unset = UNSET,
+) -> Response[ApiError | GetApiSessionsIdEventsResponse200]:
     """
     Args:
         id (UUID):
-        limit (Union[Unset, int]):  Default: 200.
-        after (Union[Unset, int]):  Default: 0.
-        type_ (Union[Unset, str]):
+        limit (int | Unset):  Default: 200.
+        after (int | Unset):  Default: 0.
+        type_ (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, GetApiSessionsIdEventsResponse200]]
+        Response[ApiError | GetApiSessionsIdEventsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -111,24 +112,24 @@ def sync_detailed(
 def sync(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    limit: Union[Unset, int] = 200,
-    after: Union[Unset, int] = 0,
-    type_: Union[Unset, str] = UNSET,
-) -> Optional[Union[ApiError, GetApiSessionsIdEventsResponse200]]:
+    client: AuthenticatedClient | Client,
+    limit: int | Unset = 200,
+    after: int | Unset = 0,
+    type_: str | Unset = UNSET,
+) -> ApiError | GetApiSessionsIdEventsResponse200 | None:
     """
     Args:
         id (UUID):
-        limit (Union[Unset, int]):  Default: 200.
-        after (Union[Unset, int]):  Default: 0.
-        type_ (Union[Unset, str]):
+        limit (int | Unset):  Default: 200.
+        after (int | Unset):  Default: 0.
+        type_ (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, GetApiSessionsIdEventsResponse200]
+        ApiError | GetApiSessionsIdEventsResponse200
     """
 
     return sync_detailed(
@@ -143,24 +144,24 @@ def sync(
 async def asyncio_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    limit: Union[Unset, int] = 200,
-    after: Union[Unset, int] = 0,
-    type_: Union[Unset, str] = UNSET,
-) -> Response[Union[ApiError, GetApiSessionsIdEventsResponse200]]:
+    client: AuthenticatedClient | Client,
+    limit: int | Unset = 200,
+    after: int | Unset = 0,
+    type_: str | Unset = UNSET,
+) -> Response[ApiError | GetApiSessionsIdEventsResponse200]:
     """
     Args:
         id (UUID):
-        limit (Union[Unset, int]):  Default: 200.
-        after (Union[Unset, int]):  Default: 0.
-        type_ (Union[Unset, str]):
+        limit (int | Unset):  Default: 200.
+        after (int | Unset):  Default: 0.
+        type_ (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, GetApiSessionsIdEventsResponse200]]
+        Response[ApiError | GetApiSessionsIdEventsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -178,24 +179,24 @@ async def asyncio_detailed(
 async def asyncio(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
-    limit: Union[Unset, int] = 200,
-    after: Union[Unset, int] = 0,
-    type_: Union[Unset, str] = UNSET,
-) -> Optional[Union[ApiError, GetApiSessionsIdEventsResponse200]]:
+    client: AuthenticatedClient | Client,
+    limit: int | Unset = 200,
+    after: int | Unset = 0,
+    type_: str | Unset = UNSET,
+) -> ApiError | GetApiSessionsIdEventsResponse200 | None:
     """
     Args:
         id (UUID):
-        limit (Union[Unset, int]):  Default: 200.
-        after (Union[Unset, int]):  Default: 0.
-        type_ (Union[Unset, str]):
+        limit (int | Unset):  Default: 200.
+        after (int | Unset):  Default: 0.
+        type_ (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, GetApiSessionsIdEventsResponse200]
+        ApiError | GetApiSessionsIdEventsResponse200
     """
 
     return (

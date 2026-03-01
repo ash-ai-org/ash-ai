@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
@@ -11,7 +11,7 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
-    agent: Union[Unset, str] = UNSET,
+    agent: str | Unset = UNSET,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
@@ -29,8 +29,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[GetApiSessionsResponse200]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> GetApiSessionsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiSessionsResponse200.from_dict(response.json())
 
@@ -43,7 +43,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[GetApiSessionsResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -55,12 +55,12 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
-    agent: Union[Unset, str] = UNSET,
+    client: AuthenticatedClient | Client,
+    agent: str | Unset = UNSET,
 ) -> Response[GetApiSessionsResponse200]:
     """
     Args:
-        agent (Union[Unset, str]):
+        agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -83,12 +83,12 @@ def sync_detailed(
 
 def sync(
     *,
-    client: Union[AuthenticatedClient, Client],
-    agent: Union[Unset, str] = UNSET,
-) -> Optional[GetApiSessionsResponse200]:
+    client: AuthenticatedClient | Client,
+    agent: str | Unset = UNSET,
+) -> GetApiSessionsResponse200 | None:
     """
     Args:
-        agent (Union[Unset, str]):
+        agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -106,12 +106,12 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
-    agent: Union[Unset, str] = UNSET,
+    client: AuthenticatedClient | Client,
+    agent: str | Unset = UNSET,
 ) -> Response[GetApiSessionsResponse200]:
     """
     Args:
-        agent (Union[Unset, str]):
+        agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -132,12 +132,12 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: Union[AuthenticatedClient, Client],
-    agent: Union[Unset, str] = UNSET,
-) -> Optional[GetApiSessionsResponse200]:
+    client: AuthenticatedClient | Client,
+    agent: str | Unset = UNSET,
+) -> GetApiSessionsResponse200 | None:
     """
     Args:
-        agent (Union[Unset, str]):
+        agent (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

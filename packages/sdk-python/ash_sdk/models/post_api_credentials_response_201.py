@@ -1,10 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -24,14 +21,14 @@ T = TypeVar("T", bound="PostApiCredentialsResponse201")
 class PostApiCredentialsResponse201:
     """
     Attributes:
-        credential (Union[Unset, PostApiCredentialsResponse201Credential]):
+        credential (PostApiCredentialsResponse201Credential | Unset):
     """
 
-    credential: Union[Unset, "PostApiCredentialsResponse201Credential"] = UNSET
+    credential: PostApiCredentialsResponse201Credential | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        credential: Union[Unset, dict[str, Any]] = UNSET
+        credential: dict[str, Any] | Unset = UNSET
         if not isinstance(self.credential, Unset):
             credential = self.credential.to_dict()
 
@@ -51,7 +48,7 @@ class PostApiCredentialsResponse201:
 
         d = dict(src_dict)
         _credential = d.pop("credential", UNSET)
-        credential: Union[Unset, PostApiCredentialsResponse201Credential]
+        credential: PostApiCredentialsResponse201Credential | Unset
         if isinstance(_credential, Unset):
             credential = UNSET
         else:

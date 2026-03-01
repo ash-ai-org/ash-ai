@@ -1,10 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -32,24 +29,23 @@ class PostApiSessionsIdMessagesBody:
     """
     Attributes:
         content (str):
-        include_partial_messages (Union[Unset, bool]):
-        model (Union[Unset, str]): Model override for this query. Overrides session and agent defaults.
-        max_turns (Union[Unset, int]): Maximum agentic turns for this query.
-        max_budget_usd (Union[Unset, float]): Maximum budget in USD for this query.
-        effort (Union[Unset, PostApiSessionsIdMessagesBodyEffort]): Effort level for this query.
-        thinking (Union[Unset, PostApiSessionsIdMessagesBodyThinking]): Thinking configuration for this query.
-        output_format (Union[Unset, PostApiSessionsIdMessagesBodyOutputFormat]): Output format constraint for this
-            query.
+        include_partial_messages (bool | Unset):
+        model (str | Unset): Model override for this query. Overrides session and agent defaults.
+        max_turns (int | Unset): Maximum agentic turns for this query.
+        max_budget_usd (float | Unset): Maximum budget in USD for this query.
+        effort (PostApiSessionsIdMessagesBodyEffort | Unset): Effort level for this query.
+        thinking (PostApiSessionsIdMessagesBodyThinking | Unset): Thinking configuration for this query.
+        output_format (PostApiSessionsIdMessagesBodyOutputFormat | Unset): Output format constraint for this query.
     """
 
     content: str
-    include_partial_messages: Union[Unset, bool] = UNSET
-    model: Union[Unset, str] = UNSET
-    max_turns: Union[Unset, int] = UNSET
-    max_budget_usd: Union[Unset, float] = UNSET
-    effort: Union[Unset, PostApiSessionsIdMessagesBodyEffort] = UNSET
-    thinking: Union[Unset, "PostApiSessionsIdMessagesBodyThinking"] = UNSET
-    output_format: Union[Unset, "PostApiSessionsIdMessagesBodyOutputFormat"] = UNSET
+    include_partial_messages: bool | Unset = UNSET
+    model: str | Unset = UNSET
+    max_turns: int | Unset = UNSET
+    max_budget_usd: float | Unset = UNSET
+    effort: PostApiSessionsIdMessagesBodyEffort | Unset = UNSET
+    thinking: PostApiSessionsIdMessagesBodyThinking | Unset = UNSET
+    output_format: PostApiSessionsIdMessagesBodyOutputFormat | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,15 +59,15 @@ class PostApiSessionsIdMessagesBody:
 
         max_budget_usd = self.max_budget_usd
 
-        effort: Union[Unset, str] = UNSET
+        effort: str | Unset = UNSET
         if not isinstance(self.effort, Unset):
             effort = self.effort
 
-        thinking: Union[Unset, dict[str, Any]] = UNSET
+        thinking: dict[str, Any] | Unset = UNSET
         if not isinstance(self.thinking, Unset):
             thinking = self.thinking.to_dict()
 
-        output_format: Union[Unset, dict[str, Any]] = UNSET
+        output_format: dict[str, Any] | Unset = UNSET
         if not isinstance(self.output_format, Unset):
             output_format = self.output_format.to_dict()
 
@@ -120,21 +116,21 @@ class PostApiSessionsIdMessagesBody:
         max_budget_usd = d.pop("maxBudgetUsd", UNSET)
 
         _effort = d.pop("effort", UNSET)
-        effort: Union[Unset, PostApiSessionsIdMessagesBodyEffort]
+        effort: PostApiSessionsIdMessagesBodyEffort | Unset
         if isinstance(_effort, Unset):
             effort = UNSET
         else:
             effort = check_post_api_sessions_id_messages_body_effort(_effort)
 
         _thinking = d.pop("thinking", UNSET)
-        thinking: Union[Unset, PostApiSessionsIdMessagesBodyThinking]
+        thinking: PostApiSessionsIdMessagesBodyThinking | Unset
         if isinstance(_thinking, Unset):
             thinking = UNSET
         else:
             thinking = PostApiSessionsIdMessagesBodyThinking.from_dict(_thinking)
 
         _output_format = d.pop("outputFormat", UNSET)
-        output_format: Union[Unset, PostApiSessionsIdMessagesBodyOutputFormat]
+        output_format: PostApiSessionsIdMessagesBodyOutputFormat | Unset
         if isinstance(_output_format, Unset):
             output_format = UNSET
         else:

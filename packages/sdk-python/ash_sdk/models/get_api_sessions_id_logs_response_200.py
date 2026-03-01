@@ -1,9 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -21,11 +19,11 @@ T = TypeVar("T", bound="GetApiSessionsIdLogsResponse200")
 class GetApiSessionsIdLogsResponse200:
     """
     Attributes:
-        logs (list['GetApiSessionsIdLogsResponse200LogsItem']):
+        logs (list[GetApiSessionsIdLogsResponse200LogsItem]):
         source (str):
     """
 
-    logs: list["GetApiSessionsIdLogsResponse200LogsItem"]
+    logs: list[GetApiSessionsIdLogsResponse200LogsItem]
     source: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

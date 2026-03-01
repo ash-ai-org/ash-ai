@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
+from urllib.parse import quote
 from uuid import UUID
 
 import httpx
@@ -21,7 +22,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/sessions/{id}/messages".format(
-            id=id,
+            id=quote(str(id), safe=""),
         ),
     }
 
@@ -33,9 +34,7 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[ApiError, str]]:
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> ApiError | str | None:
     if response.status_code == 200:
         response_200 = cast(str, response.json())
         return response_200
@@ -61,9 +60,7 @@ def _parse_response(
         return None
 
 
-def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[ApiError, str]]:
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[ApiError | str]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -75,9 +72,9 @@ def _build_response(
 def sync_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: PostApiSessionsIdMessagesBody,
-) -> Response[Union[ApiError, str]]:
+) -> Response[ApiError | str]:
     """
     Args:
         id (UUID):
@@ -88,7 +85,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, str]]
+        Response[ApiError | str]
     """
 
     kwargs = _get_kwargs(
@@ -106,9 +103,9 @@ def sync_detailed(
 def sync(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: PostApiSessionsIdMessagesBody,
-) -> Optional[Union[ApiError, str]]:
+) -> ApiError | str | None:
     """
     Args:
         id (UUID):
@@ -119,7 +116,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, str]
+        ApiError | str
     """
 
     return sync_detailed(
@@ -132,9 +129,9 @@ def sync(
 async def asyncio_detailed(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: PostApiSessionsIdMessagesBody,
-) -> Response[Union[ApiError, str]]:
+) -> Response[ApiError | str]:
     """
     Args:
         id (UUID):
@@ -145,7 +142,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[ApiError, str]]
+        Response[ApiError | str]
     """
 
     kwargs = _get_kwargs(
@@ -161,9 +158,9 @@ async def asyncio_detailed(
 async def asyncio(
     id: UUID,
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: PostApiSessionsIdMessagesBody,
-) -> Optional[Union[ApiError, str]]:
+) -> ApiError | str | None:
     """
     Args:
         id (UUID):
@@ -174,7 +171,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[ApiError, str]
+        ApiError | str
     """
 
     return (

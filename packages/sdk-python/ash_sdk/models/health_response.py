@@ -1,10 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -31,19 +28,19 @@ class HealthResponse:
         active_sandboxes (int):
         uptime (int): Seconds since process start
         pool (PoolStats):
-        version (Union[Unset, str]): Ash server version
-        coordinator_id (Union[Unset, str]): Unique coordinator ID (hostname-PID)
-        remote_runners (Union[Unset, int]): Number of registered remote runners
+        version (str | Unset): Ash server version
+        coordinator_id (str | Unset): Unique coordinator ID (hostname-PID)
+        remote_runners (int | Unset): Number of registered remote runners
     """
 
     status: HealthResponseStatus
     active_sessions: int
     active_sandboxes: int
     uptime: int
-    pool: "PoolStats"
-    version: Union[Unset, str] = UNSET
-    coordinator_id: Union[Unset, str] = UNSET
-    remote_runners: Union[Unset, int] = UNSET
+    pool: PoolStats
+    version: str | Unset = UNSET
+    coordinator_id: str | Unset = UNSET
+    remote_runners: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
