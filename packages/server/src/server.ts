@@ -22,6 +22,7 @@ import { queueRoutes } from './routes/queue.js';
 import { attachmentRoutes } from './routes/attachments.js';
 import { usageRoutes } from './routes/usage.js';
 import { workspaceRoutes } from './routes/workspace.js';
+import { apiKeyRoutes } from './routes/api-keys.js';
 import { createTelemetryExporter } from './telemetry/exporter.js';
 import { VERSION } from './version.js';
 
@@ -188,6 +189,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   workspaceRoutes(app, coordinator, dataDir);
   healthRoutes(app, coordinator, pool);
   runnerRoutes(app, coordinator);
+  apiKeyRoutes(app);
 
   coordinator.startLivenessSweep();
 
