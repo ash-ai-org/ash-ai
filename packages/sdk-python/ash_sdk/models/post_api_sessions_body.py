@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_sessions_body_permission_mode import (
+    PostApiSessionsBodyPermissionMode,
+    check_post_api_sessions_body_permission_mode,
+)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_sessions_body_extra_env import PostApiSessionsBodyExtraEnv
+    from ..models.post_api_sessions_body_mcp_servers import (
+        PostApiSessionsBodyMcpServers,
+    )
+    from ..models.post_api_sessions_body_subagents import PostApiSessionsBodySubagents
 
 
 T = TypeVar("T", bound="PostApiSessionsBody")
@@ -23,12 +31,33 @@ class PostApiSessionsBody:
         credential_id (str | Unset):
         extra_env (PostApiSessionsBodyExtraEnv | Unset):
         startup_script (str | Unset):
+        model (str | Unset): Model override for this session. Overrides agent .claude/settings.json default.
+        mcp_servers (PostApiSessionsBodyMcpServers | Unset): Per-session MCP servers. Merged into agent .mcp.json
+            (session overrides agent). Enables sidecar pattern.
+        system_prompt (str | Unset): System prompt override. Replaces agent CLAUDE.md for this session.
+        permission_mode (PostApiSessionsBodyPermissionMode | Unset): Permission mode for the SDK inside the sandbox.
+            Defaults to bypassPermissions (sandbox isolation is the security boundary).
+        allowed_tools (list[str] | Unset): Whitelist of allowed tool names for this session.
+        disallowed_tools (list[str] | Unset): Blacklist of disallowed tool names for this session.
+        betas (list[str] | Unset): Beta feature flags for this session.
+        subagents (PostApiSessionsBodySubagents | Unset): Programmatic subagent definitions. Passed through to the SDK
+            as `agents`.
+        initial_agent (str | Unset): Which subagent to use for the main thread. Maps to SDK `agent` option.
     """
 
     agent: str
     credential_id: str | Unset = UNSET
     extra_env: PostApiSessionsBodyExtraEnv | Unset = UNSET
     startup_script: str | Unset = UNSET
+    model: str | Unset = UNSET
+    mcp_servers: PostApiSessionsBodyMcpServers | Unset = UNSET
+    system_prompt: str | Unset = UNSET
+    permission_mode: PostApiSessionsBodyPermissionMode | Unset = UNSET
+    allowed_tools: list[str] | Unset = UNSET
+    disallowed_tools: list[str] | Unset = UNSET
+    betas: list[str] | Unset = UNSET
+    subagents: PostApiSessionsBodySubagents | Unset = UNSET
+    initial_agent: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -41,6 +70,36 @@ class PostApiSessionsBody:
             extra_env = self.extra_env.to_dict()
 
         startup_script = self.startup_script
+
+        model = self.model
+
+        mcp_servers: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.mcp_servers, Unset):
+            mcp_servers = self.mcp_servers.to_dict()
+
+        system_prompt = self.system_prompt
+
+        permission_mode: str | Unset = UNSET
+        if not isinstance(self.permission_mode, Unset):
+            permission_mode = self.permission_mode
+
+        allowed_tools: list[str] | Unset = UNSET
+        if not isinstance(self.allowed_tools, Unset):
+            allowed_tools = self.allowed_tools
+
+        disallowed_tools: list[str] | Unset = UNSET
+        if not isinstance(self.disallowed_tools, Unset):
+            disallowed_tools = self.disallowed_tools
+
+        betas: list[str] | Unset = UNSET
+        if not isinstance(self.betas, Unset):
+            betas = self.betas
+
+        subagents: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.subagents, Unset):
+            subagents = self.subagents.to_dict()
+
+        initial_agent = self.initial_agent
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -55,6 +114,24 @@ class PostApiSessionsBody:
             field_dict["extraEnv"] = extra_env
         if startup_script is not UNSET:
             field_dict["startupScript"] = startup_script
+        if model is not UNSET:
+            field_dict["model"] = model
+        if mcp_servers is not UNSET:
+            field_dict["mcpServers"] = mcp_servers
+        if system_prompt is not UNSET:
+            field_dict["systemPrompt"] = system_prompt
+        if permission_mode is not UNSET:
+            field_dict["permissionMode"] = permission_mode
+        if allowed_tools is not UNSET:
+            field_dict["allowedTools"] = allowed_tools
+        if disallowed_tools is not UNSET:
+            field_dict["disallowedTools"] = disallowed_tools
+        if betas is not UNSET:
+            field_dict["betas"] = betas
+        if subagents is not UNSET:
+            field_dict["subagents"] = subagents
+        if initial_agent is not UNSET:
+            field_dict["initialAgent"] = initial_agent
 
         return field_dict
 
@@ -62,6 +139,12 @@ class PostApiSessionsBody:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_sessions_body_extra_env import (
             PostApiSessionsBodyExtraEnv,
+        )
+        from ..models.post_api_sessions_body_mcp_servers import (
+            PostApiSessionsBodyMcpServers,
+        )
+        from ..models.post_api_sessions_body_subagents import (
+            PostApiSessionsBodySubagents,
         )
 
         d = dict(src_dict)
@@ -78,11 +161,53 @@ class PostApiSessionsBody:
 
         startup_script = d.pop("startupScript", UNSET)
 
+        model = d.pop("model", UNSET)
+
+        _mcp_servers = d.pop("mcpServers", UNSET)
+        mcp_servers: PostApiSessionsBodyMcpServers | Unset
+        if isinstance(_mcp_servers, Unset):
+            mcp_servers = UNSET
+        else:
+            mcp_servers = PostApiSessionsBodyMcpServers.from_dict(_mcp_servers)
+
+        system_prompt = d.pop("systemPrompt", UNSET)
+
+        _permission_mode = d.pop("permissionMode", UNSET)
+        permission_mode: PostApiSessionsBodyPermissionMode | Unset
+        if isinstance(_permission_mode, Unset):
+            permission_mode = UNSET
+        else:
+            permission_mode = check_post_api_sessions_body_permission_mode(_permission_mode)
+
+        allowed_tools = cast(list[str], d.pop("allowedTools", UNSET))
+
+        disallowed_tools = cast(list[str], d.pop("disallowedTools", UNSET))
+
+        betas = cast(list[str], d.pop("betas", UNSET))
+
+        _subagents = d.pop("subagents", UNSET)
+        subagents: PostApiSessionsBodySubagents | Unset
+        if isinstance(_subagents, Unset):
+            subagents = UNSET
+        else:
+            subagents = PostApiSessionsBodySubagents.from_dict(_subagents)
+
+        initial_agent = d.pop("initialAgent", UNSET)
+
         post_api_sessions_body = cls(
             agent=agent,
             credential_id=credential_id,
             extra_env=extra_env,
             startup_script=startup_script,
+            model=model,
+            mcp_servers=mcp_servers,
+            system_prompt=system_prompt,
+            permission_mode=permission_mode,
+            allowed_tools=allowed_tools,
+            disallowed_tools=disallowed_tools,
+            betas=betas,
+            subagents=subagents,
+            initial_agent=initial_agent,
         )
 
         post_api_sessions_body.additional_properties = d

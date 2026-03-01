@@ -2,8 +2,9 @@
 """
 Example: Python bot using the Ash Python SDK.
 
-Deploys an agent, creates a session, has a multi-turn conversation
-with streaming responses, then cleans up.
+Deploys an agent, creates a session with SDK parity options
+(system_prompt, model, effort, max_turns), has a multi-turn
+conversation with SSE streaming, then cleans up.
 
 Usage:
     python bot.py
@@ -19,7 +20,7 @@ sdk_path = Path(__file__).resolve().parent.parent.parent / "packages" / "sdk-pyt
 sys.path.insert(0, str(sdk_path))
 
 from ash_sdk import AshClient
-from ash_sdk.streaming import MessageEvent, DoneEvent, ErrorEvent
+from ash_sdk.streaming import MessageEvent, TextDeltaEvent, DoneEvent, ErrorEvent
 
 
 def extract_text(data: dict) -> str:
@@ -57,12 +58,17 @@ def main():
     agent = client.deploy_agent(agent_name, agent_dir)
     print(f"Deployed: {agent.name} v{agent.version}")
 
-    # Create session
-    print("\nCreating session...")
-    session = client.create_session(agent_name)
+    # Create session with SDK parity options
+    print("\nCreating session with custom settings...")
+    session = client.create_session(
+        agent_name,
+        system_prompt="You are a concise programming tutor. Answer in 2-3 sentences max.",
+        permission_mode="bypassPermissions",
+        allowed_tools=["Read", "Write", "Bash"],
+    )
     print(f"Session: {session.id} (status: {session.status})")
 
-    # Multi-turn conversation
+    # Multi-turn conversation with per-message options
     questions = [
         "What is a closure in programming?",
         "Give me a one-line example in Python.",
@@ -75,11 +81,18 @@ def main():
             print(f"You: {question}")
             print("Bot: ", end="", flush=True)
 
-            for event in client.send_message_stream(session.id, question):
+            for event in client.send_message_stream(
+                session.id,
+                question,
+                max_turns=1,
+            ):
                 if isinstance(event, MessageEvent):
                     text = extract_text(event.data)
                     if text:
                         print(text, end="", flush=True)
+                elif isinstance(event, TextDeltaEvent):
+                    # Incremental text when include_partial_messages=True
+                    pass
                 elif isinstance(event, ErrorEvent):
                     print(f"\n[Error: {event.error}]")
                 elif isinstance(event, DoneEvent):

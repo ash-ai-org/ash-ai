@@ -28,6 +28,7 @@ class HealthResponse:
         active_sandboxes (int):
         uptime (int): Seconds since process start
         pool (PoolStats):
+        version (str | Unset): Ash server version
         coordinator_id (str | Unset): Unique coordinator ID (hostname-PID)
         remote_runners (int | Unset): Number of registered remote runners
     """
@@ -37,6 +38,7 @@ class HealthResponse:
     active_sandboxes: int
     uptime: int
     pool: PoolStats
+    version: str | Unset = UNSET
     coordinator_id: str | Unset = UNSET
     remote_runners: int | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -51,6 +53,8 @@ class HealthResponse:
         uptime = self.uptime
 
         pool = self.pool.to_dict()
+
+        version = self.version
 
         coordinator_id = self.coordinator_id
 
@@ -67,6 +71,8 @@ class HealthResponse:
                 "pool": pool,
             }
         )
+        if version is not UNSET:
+            field_dict["version"] = version
         if coordinator_id is not UNSET:
             field_dict["coordinatorId"] = coordinator_id
         if remote_runners is not UNSET:
@@ -89,6 +95,8 @@ class HealthResponse:
 
         pool = PoolStats.from_dict(d.pop("pool"))
 
+        version = d.pop("version", UNSET)
+
         coordinator_id = d.pop("coordinatorId", UNSET)
 
         remote_runners = d.pop("remoteRunners", UNSET)
@@ -99,6 +107,7 @@ class HealthResponse:
             active_sandboxes=active_sandboxes,
             uptime=uptime,
             pool=pool,
+            version=version,
             coordinator_id=coordinator_id,
             remote_runners=remote_runners,
         )

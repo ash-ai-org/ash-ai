@@ -8,11 +8,8 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.api_error import ApiError
-from ...models.get_api_sessions_id_files_include_hidden import (
-    GetApiSessionsIdFilesIncludeHidden,
-)
-from ...models.get_api_sessions_id_files_response_200 import (
-    GetApiSessionsIdFilesResponse200,
+from ...models.get_api_sessions_id_logs_response_200 import (
+    GetApiSessionsIdLogsResponse200,
 )
 from ...types import UNSET, Response, Unset
 
@@ -20,21 +17,17 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     id: UUID,
     *,
-    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
+    after: int | Unset = -1,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
-    json_include_hidden: str | Unset = UNSET
-    if not isinstance(include_hidden, Unset):
-        json_include_hidden = include_hidden
-
-    params["includeHidden"] = json_include_hidden
+    params["after"] = after
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/sessions/{id}/files".format(
+        "url": "/api/sessions/{id}/logs".format(
             id=quote(str(id), safe=""),
         ),
         "params": params,
@@ -45,9 +38,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ApiError | GetApiSessionsIdFilesResponse200 | None:
+) -> ApiError | GetApiSessionsIdLogsResponse200 | None:
     if response.status_code == 200:
-        response_200 = GetApiSessionsIdFilesResponse200.from_dict(response.json())
+        response_200 = GetApiSessionsIdLogsResponse200.from_dict(response.json())
 
         return response_200
 
@@ -64,7 +57,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ApiError | GetApiSessionsIdFilesResponse200]:
+) -> Response[ApiError | GetApiSessionsIdLogsResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -77,24 +70,24 @@ def sync_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient | Client,
-    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
-) -> Response[ApiError | GetApiSessionsIdFilesResponse200]:
+    after: int | Unset = -1,
+) -> Response[ApiError | GetApiSessionsIdLogsResponse200]:
     """
     Args:
         id (UUID):
-        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ApiError | GetApiSessionsIdFilesResponse200]
+        Response[ApiError | GetApiSessionsIdLogsResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
-        include_hidden=include_hidden,
+        after=after,
     )
 
     response = client.get_httpx_client().request(
@@ -108,25 +101,25 @@ def sync(
     id: UUID,
     *,
     client: AuthenticatedClient | Client,
-    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
-) -> ApiError | GetApiSessionsIdFilesResponse200 | None:
+    after: int | Unset = -1,
+) -> ApiError | GetApiSessionsIdLogsResponse200 | None:
     """
     Args:
         id (UUID):
-        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ApiError | GetApiSessionsIdFilesResponse200
+        ApiError | GetApiSessionsIdLogsResponse200
     """
 
     return sync_detailed(
         id=id,
         client=client,
-        include_hidden=include_hidden,
+        after=after,
     ).parsed
 
 
@@ -134,24 +127,24 @@ async def asyncio_detailed(
     id: UUID,
     *,
     client: AuthenticatedClient | Client,
-    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
-) -> Response[ApiError | GetApiSessionsIdFilesResponse200]:
+    after: int | Unset = -1,
+) -> Response[ApiError | GetApiSessionsIdLogsResponse200]:
     """
     Args:
         id (UUID):
-        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ApiError | GetApiSessionsIdFilesResponse200]
+        Response[ApiError | GetApiSessionsIdLogsResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
-        include_hidden=include_hidden,
+        after=after,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -163,25 +156,25 @@ async def asyncio(
     id: UUID,
     *,
     client: AuthenticatedClient | Client,
-    include_hidden: GetApiSessionsIdFilesIncludeHidden | Unset = UNSET,
-) -> ApiError | GetApiSessionsIdFilesResponse200 | None:
+    after: int | Unset = -1,
+) -> ApiError | GetApiSessionsIdLogsResponse200 | None:
     """
     Args:
         id (UUID):
-        include_hidden (GetApiSessionsIdFilesIncludeHidden | Unset):
+        after (int | Unset):  Default: -1.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ApiError | GetApiSessionsIdFilesResponse200
+        ApiError | GetApiSessionsIdLogsResponse200
     """
 
     return (
         await asyncio_detailed(
             id=id,
             client=client,
-            include_hidden=include_hidden,
+            after=after,
         )
     ).parsed

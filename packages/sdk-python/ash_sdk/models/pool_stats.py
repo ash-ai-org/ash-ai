@@ -22,6 +22,7 @@ class PoolStats:
         max_capacity (int):
         resume_warm_hits (int):
         resume_cold_hits (int):
+        pre_warm_hits (int):
     """
 
     total: int
@@ -33,6 +34,7 @@ class PoolStats:
     max_capacity: int
     resume_warm_hits: int
     resume_cold_hits: int
+    pre_warm_hits: int
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -54,6 +56,8 @@ class PoolStats:
 
         resume_cold_hits = self.resume_cold_hits
 
+        pre_warm_hits = self.pre_warm_hits
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -67,6 +71,7 @@ class PoolStats:
                 "maxCapacity": max_capacity,
                 "resumeWarmHits": resume_warm_hits,
                 "resumeColdHits": resume_cold_hits,
+                "preWarmHits": pre_warm_hits,
             }
         )
 
@@ -93,6 +98,8 @@ class PoolStats:
 
         resume_cold_hits = d.pop("resumeColdHits")
 
+        pre_warm_hits = d.pop("preWarmHits")
+
         pool_stats = cls(
             total=total,
             cold=cold,
@@ -103,6 +110,7 @@ class PoolStats:
             max_capacity=max_capacity,
             resume_warm_hits=resume_warm_hits,
             resume_cold_hits=resume_cold_hits,
+            pre_warm_hits=pre_warm_hits,
         )
 
         pool_stats.additional_properties = d
