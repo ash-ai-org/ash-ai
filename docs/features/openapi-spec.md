@@ -83,9 +83,9 @@ make openapi
 pnpm --filter '@ash-ai/server' openapi
 ```
 
-## Python SDK
+## [Python SDK](https://pypi.org/project/ash-ai-sdk/)
 
-The Python SDK at `packages/sdk-python/` has hand-written models and a streaming SSE parser. The `generate.sh` script can optionally regenerate models from the OpenAPI spec using `openapi-python-client`.
+The Python SDK at `packages/sdk-python/` ([PyPI](https://pypi.org/project/ash-ai-sdk/)) has hand-written models and a streaming SSE parser. The `generate.sh` script can optionally regenerate models from the OpenAPI spec using `openapi-python-client`.
 
 ## Known Limitations
 

@@ -139,6 +139,7 @@ The SDK covers all Ash API endpoints:
 
 ## Links
 
-- [Documentation](https://ash.dev/docs/sdks/python)
+- [PyPI](https://pypi.org/project/ash-ai-sdk/)
+- [Documentation](https://pypi.org/project/ash-ai-sdk/)
 - [GitHub](https://github.com/ash-ai-org/ash-ai)
 - [TypeScript SDK](https://www.npmjs.com/package/@ash-ai/sdk)

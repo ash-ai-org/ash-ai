@@ -135,7 +135,7 @@ for await (const event of client.sendMessageStream(session.id, 'What is a closur
 await client.endSession(session.id);
 ```
 
-### Option C: Python SDK
+### Option C: [Python SDK](https://pypi.org/project/ash-ai-sdk/)
 
 ```bash
 pip install ash-ai-sdk
