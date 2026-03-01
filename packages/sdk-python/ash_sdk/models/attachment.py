@@ -1,8 +1,10 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import (
+    Any,
+    TypeVar,
+    Union,
+)
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -24,8 +26,8 @@ class Attachment:
         mime_type (str):
         size (int):
         created_at (datetime.datetime):
-        tenant_id (str | Unset):
-        message_id (str | Unset):
+        tenant_id (Union[Unset, str]):
+        message_id (Union[Unset, str]):
     """
 
     id: UUID
@@ -34,8 +36,8 @@ class Attachment:
     mime_type: str
     size: int
     created_at: datetime.datetime
-    tenant_id: str | Unset = UNSET
-    message_id: str | Unset = UNSET
+    tenant_id: Union[Unset, str] = UNSET
+    message_id: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

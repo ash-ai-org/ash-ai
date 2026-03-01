@@ -1,8 +1,11 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import (
+    Any,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -21,17 +24,17 @@ class Credential:
         id (UUID):
         type_ (str):
         created_at (datetime.datetime):
-        tenant_id (str | Unset):
-        label (None | str | Unset):
-        last_used_at (datetime.datetime | None | Unset):
+        tenant_id (Union[Unset, str]):
+        label (Union[None, Unset, str]):
+        last_used_at (Union[None, Unset, datetime.datetime]):
     """
 
     id: UUID
     type_: str
     created_at: datetime.datetime
-    tenant_id: str | Unset = UNSET
-    label: None | str | Unset = UNSET
-    last_used_at: datetime.datetime | None | Unset = UNSET
+    tenant_id: Union[Unset, str] = UNSET
+    label: Union[None, Unset, str] = UNSET
+    last_used_at: Union[None, Unset, datetime.datetime] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -43,13 +46,13 @@ class Credential:
 
         tenant_id = self.tenant_id
 
-        label: None | str | Unset
+        label: Union[None, Unset, str]
         if isinstance(self.label, Unset):
             label = UNSET
         else:
             label = self.label
 
-        last_used_at: None | str | Unset
+        last_used_at: Union[None, Unset, str]
         if isinstance(self.last_used_at, Unset):
             last_used_at = UNSET
         elif isinstance(self.last_used_at, datetime.datetime):
@@ -86,16 +89,16 @@ class Credential:
 
         tenant_id = d.pop("tenantId", UNSET)
 
-        def _parse_label(data: object) -> None | str | Unset:
+        def _parse_label(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         label = _parse_label(d.pop("label", UNSET))
 
-        def _parse_last_used_at(data: object) -> datetime.datetime | None | Unset:
+        def _parse_last_used_at(data: object) -> Union[None, Unset, datetime.datetime]:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -106,9 +109,9 @@ class Credential:
                 last_used_at_type_0 = isoparse(data)
 
                 return last_used_at_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
+            except:  # noqa: E722
                 pass
-            return cast(datetime.datetime | None | Unset, data)
+            return cast(Union[None, Unset, datetime.datetime], data)
 
         last_used_at = _parse_last_used_at(d.pop("lastUsedAt", UNSET))
 

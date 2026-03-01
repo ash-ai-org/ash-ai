@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -19,8 +19,8 @@ def _get_kwargs() -> dict[str, Any]:
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> GetApiAgentsResponse200 | None:
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[GetApiAgentsResponse200]:
     if response.status_code == 200:
         response_200 = GetApiAgentsResponse200.from_dict(response.json())
 
@@ -33,7 +33,7 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[GetApiAgentsResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -45,7 +45,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
 ) -> Response[GetApiAgentsResponse200]:
     """
     Raises:
@@ -67,8 +67,8 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-) -> GetApiAgentsResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[GetApiAgentsResponse200]:
     """
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -85,7 +85,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
 ) -> Response[GetApiAgentsResponse200]:
     """
     Raises:
@@ -105,8 +105,8 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-) -> GetApiAgentsResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[GetApiAgentsResponse200]:
     """
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

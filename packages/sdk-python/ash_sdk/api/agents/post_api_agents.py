@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -31,8 +31,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ApiError | PostApiAgentsResponse201 | None:
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[Union[ApiError, PostApiAgentsResponse201]]:
     if response.status_code == 201:
         response_201 = PostApiAgentsResponse201.from_dict(response.json())
 
@@ -50,8 +50,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ApiError | PostApiAgentsResponse201]:
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[Union[ApiError, PostApiAgentsResponse201]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -62,9 +62,9 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAgentsBody,
-) -> Response[ApiError | PostApiAgentsResponse201]:
+) -> Response[Union[ApiError, PostApiAgentsResponse201]]:
     """
     Args:
         body (PostApiAgentsBody):
@@ -74,7 +74,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ApiError | PostApiAgentsResponse201]
+        Response[Union[ApiError, PostApiAgentsResponse201]]
     """
 
     kwargs = _get_kwargs(
@@ -90,9 +90,9 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAgentsBody,
-) -> ApiError | PostApiAgentsResponse201 | None:
+) -> Optional[Union[ApiError, PostApiAgentsResponse201]]:
     """
     Args:
         body (PostApiAgentsBody):
@@ -102,7 +102,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ApiError | PostApiAgentsResponse201
+        Union[ApiError, PostApiAgentsResponse201]
     """
 
     return sync_detailed(
@@ -113,9 +113,9 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAgentsBody,
-) -> Response[ApiError | PostApiAgentsResponse201]:
+) -> Response[Union[ApiError, PostApiAgentsResponse201]]:
     """
     Args:
         body (PostApiAgentsBody):
@@ -125,7 +125,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ApiError | PostApiAgentsResponse201]
+        Response[Union[ApiError, PostApiAgentsResponse201]]
     """
 
     kwargs = _get_kwargs(
@@ -139,9 +139,9 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: Union[AuthenticatedClient, Client],
     body: PostApiAgentsBody,
-) -> ApiError | PostApiAgentsResponse201 | None:
+) -> Optional[Union[ApiError, PostApiAgentsResponse201]]:
     """
     Args:
         body (PostApiAgentsBody):
@@ -151,7 +151,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ApiError | PostApiAgentsResponse201
+        Union[ApiError, PostApiAgentsResponse201]
     """
 
     return (

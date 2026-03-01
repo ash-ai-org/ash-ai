@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Generate the entire Python SDK from the OpenAPI spec.
+# Generate the Python SDK from the OpenAPI spec.
 #
 # Prerequisites:
-#   pip install openapi-python-client==0.28.2
+#   pip install openapi-python-client>=0.26.0
 #
-# The generated output replaces ash_sdk/ entirely — no hand-written client code.
+# The generated output replaces ash_sdk/ — except for hand-written modules
+# listed in PRESERVE below, which are backed up and restored after generation.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC="${SCRIPT_DIR}/../../packages/server/openapi.json"
 CONFIG="${SCRIPT_DIR}/openapi-python-client-config.yml"
 TMP_DIR=$(mktemp -d)
 GEN_DIR="${TMP_DIR}/out"
+BACKUP_DIR="${TMP_DIR}/preserved"
+
+# Hand-written files that survive regeneration
+PRESERVE=(
+  "streaming.py"
+  "ash_client.py"
+)
 
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -24,9 +32,19 @@ fi
 
 if ! command -v openapi-python-client &>/dev/null; then
   echo "Error: openapi-python-client not found."
-  echo "Install it: pip install openapi-python-client==0.28.2"
+  echo "Install it: pip install openapi-python-client>=0.26.0"
   exit 1
 fi
+
+# Back up hand-written files
+mkdir -p "$BACKUP_DIR"
+for f in "${PRESERVE[@]}"; do
+  src="${SCRIPT_DIR}/ash_sdk/${f}"
+  if [ -f "$src" ]; then
+    cp "$src" "${BACKUP_DIR}/${f}"
+    echo "Preserved: ash_sdk/${f}"
+  fi
+done
 
 # Generate into temp directory using --meta none (skips pyproject.toml generation).
 # With --meta none, the package contents are output directly into the output path.
@@ -40,6 +58,26 @@ openapi-python-client generate \
 # Replace ash_sdk/ with the generated output
 rm -rf "${SCRIPT_DIR}/ash_sdk"
 mv "$GEN_DIR" "${SCRIPT_DIR}/ash_sdk"
+
+# Restore hand-written files
+for f in "${PRESERVE[@]}"; do
+  src="${BACKUP_DIR}/${f}"
+  if [ -f "$src" ]; then
+    cp "$src" "${SCRIPT_DIR}/ash_sdk/${f}"
+    echo "Restored:  ash_sdk/${f}"
+  fi
+done
+
+# Append AshClient export to __init__.py
+INIT="${SCRIPT_DIR}/ash_sdk/__init__.py"
+cat >> "$INIT" << 'PYEOF'
+
+# Hand-written high-level client (preserved across regeneration)
+from .ash_client import AshClient
+
+__all__ += ("AshClient",)  # type: ignore[assignment]
+PYEOF
+echo "Patched:   ash_sdk/__init__.py (added AshClient export)"
 
 # Format if ruff is available
 if command -v ruff &>/dev/null; then

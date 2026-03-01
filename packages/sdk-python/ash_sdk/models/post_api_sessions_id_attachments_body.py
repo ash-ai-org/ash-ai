@@ -1,7 +1,9 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import (
+    Any,
+    TypeVar,
+    Union,
+)
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -18,14 +20,14 @@ class PostApiSessionsIdAttachmentsBody:
     Attributes:
         filename (str):
         content (str): Base64-encoded file content
-        mime_type (str | Unset):  Default: 'application/octet-stream'.
-        message_id (UUID | Unset): Message to attach to (optional — can be linked later)
+        mime_type (Union[Unset, str]):  Default: 'application/octet-stream'.
+        message_id (Union[Unset, UUID]): Message to attach to (optional — can be linked later)
     """
 
     filename: str
     content: str
-    mime_type: str | Unset = "application/octet-stream"
-    message_id: UUID | Unset = UNSET
+    mime_type: Union[Unset, str] = "application/octet-stream"
+    message_id: Union[Unset, UUID] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,7 +37,7 @@ class PostApiSessionsIdAttachmentsBody:
 
         mime_type = self.mime_type
 
-        message_id: str | Unset = UNSET
+        message_id: Union[Unset, str] = UNSET
         if not isinstance(self.message_id, Unset):
             message_id = str(self.message_id)
 
@@ -64,7 +66,7 @@ class PostApiSessionsIdAttachmentsBody:
         mime_type = d.pop("mimeType", UNSET)
 
         _message_id = d.pop("messageId", UNSET)
-        message_id: UUID | Unset
+        message_id: Union[Unset, UUID]
         if isinstance(_message_id, Unset):
             message_id = UNSET
         else:

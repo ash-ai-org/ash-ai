@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional, Union
 
 import httpx
 
@@ -12,12 +12,12 @@ from ...types import UNSET, Response, Unset
 
 def _get_kwargs(
     *,
-    status: GetApiQueueStatus | Unset = UNSET,
-    limit: int | Unset = 50,
+    status: Union[Unset, GetApiQueueStatus] = UNSET,
+    limit: Union[Unset, int] = 50,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
 
-    json_status: str | Unset = UNSET
+    json_status: Union[Unset, str] = UNSET
     if not isinstance(status, Unset):
         json_status = status
 
@@ -36,7 +36,9 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> GetApiQueueResponse200 | None:
+def _parse_response(
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[GetApiQueueResponse200]:
     if response.status_code == 200:
         response_200 = GetApiQueueResponse200.from_dict(response.json())
 
@@ -49,7 +51,7 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[GetApiQueueResponse200]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -61,14 +63,14 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    status: GetApiQueueStatus | Unset = UNSET,
-    limit: int | Unset = 50,
+    client: Union[AuthenticatedClient, Client],
+    status: Union[Unset, GetApiQueueStatus] = UNSET,
+    limit: Union[Unset, int] = 50,
 ) -> Response[GetApiQueueResponse200]:
     """
     Args:
-        status (GetApiQueueStatus | Unset):
-        limit (int | Unset):  Default: 50.
+        status (Union[Unset, GetApiQueueStatus]):
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -92,14 +94,14 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    status: GetApiQueueStatus | Unset = UNSET,
-    limit: int | Unset = 50,
-) -> GetApiQueueResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+    status: Union[Unset, GetApiQueueStatus] = UNSET,
+    limit: Union[Unset, int] = 50,
+) -> Optional[GetApiQueueResponse200]:
     """
     Args:
-        status (GetApiQueueStatus | Unset):
-        limit (int | Unset):  Default: 50.
+        status (Union[Unset, GetApiQueueStatus]):
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -118,14 +120,14 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    status: GetApiQueueStatus | Unset = UNSET,
-    limit: int | Unset = 50,
+    client: Union[AuthenticatedClient, Client],
+    status: Union[Unset, GetApiQueueStatus] = UNSET,
+    limit: Union[Unset, int] = 50,
 ) -> Response[GetApiQueueResponse200]:
     """
     Args:
-        status (GetApiQueueStatus | Unset):
-        limit (int | Unset):  Default: 50.
+        status (Union[Unset, GetApiQueueStatus]):
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -147,14 +149,14 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    status: GetApiQueueStatus | Unset = UNSET,
-    limit: int | Unset = 50,
-) -> GetApiQueueResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+    status: Union[Unset, GetApiQueueStatus] = UNSET,
+    limit: Union[Unset, int] = 50,
+) -> Optional[GetApiQueueResponse200]:
     """
     Args:
-        status (GetApiQueueStatus | Unset):
-        limit (int | Unset):  Default: 50.
+        status (Union[Unset, GetApiQueueStatus]):
+        limit (Union[Unset, int]):  Default: 50.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

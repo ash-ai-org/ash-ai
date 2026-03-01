@@ -1,8 +1,11 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import (
+    Any,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -25,9 +28,9 @@ class Session:
         status (SessionStatus):
         created_at (datetime.datetime):
         last_active_at (datetime.datetime):
-        tenant_id (str | Unset):
-        runner_id (None | str | Unset):
-        parent_session_id (None | Unset | UUID):
+        tenant_id (Union[Unset, str]):
+        runner_id (Union[None, Unset, str]):
+        parent_session_id (Union[None, UUID, Unset]):
     """
 
     id: UUID
@@ -36,9 +39,9 @@ class Session:
     status: SessionStatus
     created_at: datetime.datetime
     last_active_at: datetime.datetime
-    tenant_id: str | Unset = UNSET
-    runner_id: None | str | Unset = UNSET
-    parent_session_id: None | Unset | UUID = UNSET
+    tenant_id: Union[Unset, str] = UNSET
+    runner_id: Union[None, Unset, str] = UNSET
+    parent_session_id: Union[None, UUID, Unset] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -56,13 +59,13 @@ class Session:
 
         tenant_id = self.tenant_id
 
-        runner_id: None | str | Unset
+        runner_id: Union[None, Unset, str]
         if isinstance(self.runner_id, Unset):
             runner_id = UNSET
         else:
             runner_id = self.runner_id
 
-        parent_session_id: None | str | Unset
+        parent_session_id: Union[None, Unset, str]
         if isinstance(self.parent_session_id, Unset):
             parent_session_id = UNSET
         elif isinstance(self.parent_session_id, UUID):
@@ -108,16 +111,16 @@ class Session:
 
         tenant_id = d.pop("tenantId", UNSET)
 
-        def _parse_runner_id(data: object) -> None | str | Unset:
+        def _parse_runner_id(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         runner_id = _parse_runner_id(d.pop("runnerId", UNSET))
 
-        def _parse_parent_session_id(data: object) -> None | Unset | UUID:
+        def _parse_parent_session_id(data: object) -> Union[None, UUID, Unset]:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -128,9 +131,9 @@ class Session:
                 parent_session_id_type_1 = UUID(data)
 
                 return parent_session_id_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
+            except:  # noqa: E722
                 pass
-            return cast(None | Unset | UUID, data)
+            return cast(Union[None, UUID, Unset], data)
 
         parent_session_id = _parse_parent_session_id(d.pop("parentSessionId", UNSET))
 

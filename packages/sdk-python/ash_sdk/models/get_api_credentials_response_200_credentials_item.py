@@ -1,7 +1,10 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import (
+    Any,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -15,20 +18,20 @@ T = TypeVar("T", bound="GetApiCredentialsResponse200CredentialsItem")
 class GetApiCredentialsResponse200CredentialsItem:
     """
     Attributes:
-        id (str | Unset):
-        type_ (str | Unset):
-        label (str | Unset):
-        active (bool | Unset):
-        created_at (str | Unset):
-        last_used_at (None | str | Unset):
+        id (Union[Unset, str]):
+        type_ (Union[Unset, str]):
+        label (Union[Unset, str]):
+        active (Union[Unset, bool]):
+        created_at (Union[Unset, str]):
+        last_used_at (Union[None, Unset, str]):
     """
 
-    id: str | Unset = UNSET
-    type_: str | Unset = UNSET
-    label: str | Unset = UNSET
-    active: bool | Unset = UNSET
-    created_at: str | Unset = UNSET
-    last_used_at: None | str | Unset = UNSET
+    id: Union[Unset, str] = UNSET
+    type_: Union[Unset, str] = UNSET
+    label: Union[Unset, str] = UNSET
+    active: Union[Unset, bool] = UNSET
+    created_at: Union[Unset, str] = UNSET
+    last_used_at: Union[None, Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -42,7 +45,7 @@ class GetApiCredentialsResponse200CredentialsItem:
 
         created_at = self.created_at
 
-        last_used_at: None | str | Unset
+        last_used_at: Union[None, Unset, str]
         if isinstance(self.last_used_at, Unset):
             last_used_at = UNSET
         else:
@@ -79,12 +82,12 @@ class GetApiCredentialsResponse200CredentialsItem:
 
         created_at = d.pop("createdAt", UNSET)
 
-        def _parse_last_used_at(data: object) -> None | str | Unset:
+        def _parse_last_used_at(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         last_used_at = _parse_last_used_at(d.pop("lastUsedAt", UNSET))
 

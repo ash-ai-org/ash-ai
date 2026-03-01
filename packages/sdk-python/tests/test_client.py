@@ -246,3 +246,49 @@ def test_model_additional_properties():
     })
     assert agent["customField"] == "custom_value"
     assert "customField" in agent
+
+
+# -- AshClient high-level client ---------------------------------------------------
+
+
+def test_ash_client_import():
+    """AshClient should be importable from ash_sdk top-level."""
+    from ash_sdk import AshClient
+    assert AshClient is not None
+
+
+def test_ash_client_construction():
+    from ash_sdk import AshClient
+    client = AshClient("http://localhost:4100", token="test-key")
+    assert client.base_url == "http://localhost:4100"
+    assert client.token == "test-key"
+    assert client.timeout == 300.0
+
+
+def test_ash_client_construction_trailing_slash():
+    from ash_sdk import AshClient
+    client = AshClient("http://localhost:4100/", token="test-key")
+    assert client.base_url == "http://localhost:4100"
+
+
+def test_ash_client_headers():
+    from ash_sdk import AshClient
+    client = AshClient("http://localhost:4100", token="my-key")
+    headers = client._headers()
+    assert headers["Authorization"] == "Bearer my-key"
+    assert headers["Content-Type"] == "application/json"
+    assert "Accept" not in headers
+
+    streaming_headers = client._headers(streaming=True)
+    assert streaming_headers["Accept"] == "text/event-stream"
+
+    no_ct_headers = client._headers(content_type=None)
+    assert "Content-Type" not in no_ct_headers
+    assert no_ct_headers["Authorization"] == "Bearer my-key"
+
+
+def test_ash_client_headers_no_token():
+    from ash_sdk import AshClient
+    client = AshClient("http://localhost:4100")
+    headers = client._headers()
+    assert "Authorization" not in headers

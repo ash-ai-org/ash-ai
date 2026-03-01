@@ -1,8 +1,11 @@
-from __future__ import annotations
-
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import (
+    Any,
+    TypeVar,
+    Union,
+    cast,
+)
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -27,11 +30,11 @@ class QueueItem:
         retry_count (int):
         max_retries (int):
         created_at (datetime.datetime):
-        tenant_id (str | Unset):
-        session_id (None | str | Unset):
-        error (None | str | Unset):
-        started_at (None | str | Unset):
-        completed_at (None | str | Unset):
+        tenant_id (Union[Unset, str]):
+        session_id (Union[None, Unset, str]):
+        error (Union[None, Unset, str]):
+        started_at (Union[None, Unset, str]):
+        completed_at (Union[None, Unset, str]):
     """
 
     id: UUID
@@ -42,11 +45,11 @@ class QueueItem:
     retry_count: int
     max_retries: int
     created_at: datetime.datetime
-    tenant_id: str | Unset = UNSET
-    session_id: None | str | Unset = UNSET
-    error: None | str | Unset = UNSET
-    started_at: None | str | Unset = UNSET
-    completed_at: None | str | Unset = UNSET
+    tenant_id: Union[Unset, str] = UNSET
+    session_id: Union[None, Unset, str] = UNSET
+    error: Union[None, Unset, str] = UNSET
+    started_at: Union[None, Unset, str] = UNSET
+    completed_at: Union[None, Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,25 +71,25 @@ class QueueItem:
 
         tenant_id = self.tenant_id
 
-        session_id: None | str | Unset
+        session_id: Union[None, Unset, str]
         if isinstance(self.session_id, Unset):
             session_id = UNSET
         else:
             session_id = self.session_id
 
-        error: None | str | Unset
+        error: Union[None, Unset, str]
         if isinstance(self.error, Unset):
             error = UNSET
         else:
             error = self.error
 
-        started_at: None | str | Unset
+        started_at: Union[None, Unset, str]
         if isinstance(self.started_at, Unset):
             started_at = UNSET
         else:
             started_at = self.started_at
 
-        completed_at: None | str | Unset
+        completed_at: Union[None, Unset, str]
         if isinstance(self.completed_at, Unset):
             completed_at = UNSET
         else:
@@ -140,39 +143,39 @@ class QueueItem:
 
         tenant_id = d.pop("tenantId", UNSET)
 
-        def _parse_session_id(data: object) -> None | str | Unset:
+        def _parse_session_id(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         session_id = _parse_session_id(d.pop("sessionId", UNSET))
 
-        def _parse_error(data: object) -> None | str | Unset:
+        def _parse_error(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         error = _parse_error(d.pop("error", UNSET))
 
-        def _parse_started_at(data: object) -> None | str | Unset:
+        def _parse_started_at(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         started_at = _parse_started_at(d.pop("startedAt", UNSET))
 
-        def _parse_completed_at(data: object) -> None | str | Unset:
+        def _parse_completed_at(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            return cast(Union[None, Unset, str], data)
 
         completed_at = _parse_completed_at(d.pop("completedAt", UNSET))
 

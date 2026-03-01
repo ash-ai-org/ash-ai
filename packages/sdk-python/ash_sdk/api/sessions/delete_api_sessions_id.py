@@ -1,6 +1,5 @@
 from http import HTTPStatus
-from typing import Any
-from urllib.parse import quote
+from typing import Any, Optional, Union
 from uuid import UUID
 
 import httpx
@@ -18,7 +17,7 @@ def _get_kwargs(
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": "/api/sessions/{id}".format(
-            id=quote(str(id), safe=""),
+            id=id,
         ),
     }
 
@@ -26,8 +25,8 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ApiError | DeleteApiSessionsIdResponse200 | None:
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Optional[Union[ApiError, DeleteApiSessionsIdResponse200]]:
     if response.status_code == 200:
         response_200 = DeleteApiSessionsIdResponse200.from_dict(response.json())
 
@@ -45,8 +44,8 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ApiError | DeleteApiSessionsIdResponse200]:
+    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+) -> Response[Union[ApiError, DeleteApiSessionsIdResponse200]]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -58,8 +57,8 @@ def _build_response(
 def sync_detailed(
     id: UUID,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[ApiError | DeleteApiSessionsIdResponse200]:
+    client: Union[AuthenticatedClient, Client],
+) -> Response[Union[ApiError, DeleteApiSessionsIdResponse200]]:
     """
     Args:
         id (UUID):
@@ -69,7 +68,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ApiError | DeleteApiSessionsIdResponse200]
+        Response[Union[ApiError, DeleteApiSessionsIdResponse200]]
     """
 
     kwargs = _get_kwargs(
@@ -86,8 +85,8 @@ def sync_detailed(
 def sync(
     id: UUID,
     *,
-    client: AuthenticatedClient | Client,
-) -> ApiError | DeleteApiSessionsIdResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[Union[ApiError, DeleteApiSessionsIdResponse200]]:
     """
     Args:
         id (UUID):
@@ -97,7 +96,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ApiError | DeleteApiSessionsIdResponse200
+        Union[ApiError, DeleteApiSessionsIdResponse200]
     """
 
     return sync_detailed(
@@ -109,8 +108,8 @@ def sync(
 async def asyncio_detailed(
     id: UUID,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[ApiError | DeleteApiSessionsIdResponse200]:
+    client: Union[AuthenticatedClient, Client],
+) -> Response[Union[ApiError, DeleteApiSessionsIdResponse200]]:
     """
     Args:
         id (UUID):
@@ -120,7 +119,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ApiError | DeleteApiSessionsIdResponse200]
+        Response[Union[ApiError, DeleteApiSessionsIdResponse200]]
     """
 
     kwargs = _get_kwargs(
@@ -135,8 +134,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: UUID,
     *,
-    client: AuthenticatedClient | Client,
-) -> ApiError | DeleteApiSessionsIdResponse200 | None:
+    client: Union[AuthenticatedClient, Client],
+) -> Optional[Union[ApiError, DeleteApiSessionsIdResponse200]]:
     """
     Args:
         id (UUID):
@@ -146,7 +145,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ApiError | DeleteApiSessionsIdResponse200
+        Union[ApiError, DeleteApiSessionsIdResponse200]
     """
 
     return (
