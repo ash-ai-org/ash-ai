@@ -96,7 +96,7 @@ const client = new AshClient({
 });
 ```
 
-### Python SDK
+### [Python SDK](https://pypi.org/project/ash-ai-sdk/)
 
 ```python
 from ash_sdk import AshClient

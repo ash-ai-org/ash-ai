@@ -147,7 +147,7 @@ for await (const event of client.sendMessageStream(sessionId, 'Hello')) {
 }
 ```
 
-## Option B: Python SDK
+## Option B: [Python SDK](https://pypi.org/project/ash-ai-sdk/)
 
 ### Install
 

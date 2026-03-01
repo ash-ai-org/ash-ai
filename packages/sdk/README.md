@@ -31,7 +31,7 @@ await client.endSession(session.id);
 
 ## Documentation
 
-See the [Ash README](https://github.com/ash-ai-org/ash-ai) for full documentation, including the [Python SDK](https://pypi.org/project/ash-ai/).
+See the [Ash README](https://github.com/ash-ai-org/ash-ai) for full documentation, including the [Python SDK](https://pypi.org/project/ash-ai-sdk/).
 
 ## License
 
