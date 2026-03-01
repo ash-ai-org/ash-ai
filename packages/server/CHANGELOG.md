@@ -1,5 +1,14 @@
 # @ash-ai/server
 
+## 0.0.18 - 2026-03-01
+
+### Added
+
+- `POST /api/internal/api-keys` endpoint for per-tenant API key provisioning (#48)
+  - Enables the platform to lazily provision isolated API keys per tenant
+  - Uses `ASH_INTERNAL_SECRET` bearer token auth (same pattern as runner routes)
+  - Returns `{id, key, tenantId}` with a freshly generated key
+
 ## 0.0.17
 
 ### Patch Changes
