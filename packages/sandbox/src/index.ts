@@ -25,6 +25,8 @@ export {
   syncStateToCloud,
   restoreStateFromCloud,
   deleteCloudState,
+  syncAgentToCloud,
+  restoreAgentFromCloud,
 } from './state-persistence.js';
 export type { SnapshotStore } from './snapshot-store.js';
 export { createSnapshotStore, getSnapshotStore, resetSnapshotStore } from './snapshot-store.js';

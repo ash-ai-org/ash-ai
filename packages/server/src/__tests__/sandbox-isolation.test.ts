@@ -62,6 +62,19 @@ describe('sandbox filesystem isolation', () => {
       expect(bindMounts).toContain('/data/sandboxes/abc-123');
     });
 
+    it('creates sandboxes parent dir on tmpfs before bind mount', () => {
+      const opts = makeSandboxOpts('/data', 'abc-123');
+      const args = buildBwrapArgs(opts);
+
+      // --dir /data/sandboxes must appear between --tmpfs /data and --bind
+      const tmpfsIdx = args.findIndex((a, i) => a === '--tmpfs' && args[i + 1] === '/data');
+      const dirIdx = args.findIndex((a, i) => a === '--dir' && args[i + 1] === '/data/sandboxes');
+      const bindIdx = args.findIndex((a, i) => a === '--bind' && args[i + 1] === '/data/sandboxes/abc-123');
+
+      expect(dirIdx).toBeGreaterThan(tmpfsIdx);
+      expect(dirIdx).toBeLessThan(bindIdx);
+    });
+
     it('does not expose agents or sessions directories', () => {
       const opts = makeSandboxOpts('/data');
       const args = buildBwrapArgs(opts);

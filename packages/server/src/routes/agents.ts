@@ -4,6 +4,7 @@ import { join, isAbsolute, relative, basename, extname, dirname } from 'node:pat
 import { upsertAgent, getAgent, listAgents, deleteAgent } from '../db/index.js';
 import type { FileEntry } from '@ash-ai/shared';
 import type { SandboxPool } from '@ash-ai/sandbox';
+import { syncAgentToCloud } from '@ash-ai/sandbox';
 
 // Same skip list as files.ts
 const SKIP_NAMES = new Set([
@@ -136,6 +137,11 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     }
 
     const agent = await upsertAgent(name, resolvedPath, req.tenantId);
+
+    // Best-effort backup to cloud storage (non-blocking)
+    syncAgentToCloud(name, resolvedPath, req.tenantId).catch((err) =>
+      console.error(`[agents] Cloud sync failed for ${name}:`, err)
+    );
 
     // Trigger pre-warming if agent has preWarmCount configured
     const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;

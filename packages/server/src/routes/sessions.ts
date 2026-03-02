@@ -9,7 +9,7 @@ import { classifyBridgeMessage, classifyToStreamEvents } from '@ash-ai/shared';
 import { VERSION } from '../version.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 import type { TelemetryExporter } from '../telemetry/exporter.js';
-import { restoreSessionState, hasPersistedState, restoreStateFromCloud } from '@ash-ai/sandbox';
+import { restoreSessionState, hasPersistedState, restoreStateFromCloud, restoreAgentFromCloud } from '@ash-ai/sandbox';
 import { decryptCredential } from './credentials.js';
 import { touchCredentialUsed } from '../db/index.js';
 import { recordUsageFromMessage } from '../usage/extractor.js';
@@ -120,9 +120,13 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(404).send({ error: `Agent "${agent}" not found`, statusCode: 404 });
     }
 
-    // Validate agent directory exists on disk before attempting sandbox creation
+    // Validate agent directory exists on disk — auto-restore from cloud if missing
     if (!existsSync(agentRecord.path)) {
-      return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${agent}" may need to be re-deployed.`, statusCode: 422 });
+      const restored = await restoreAgentFromCloud(agentRecord.name, agentRecord.path, req.tenantId);
+      if (!restored) {
+        return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${agent}" may need to be re-deployed.`, statusCode: 422 });
+      }
+      console.log(`[sessions] Restored agent "${agent}" from cloud storage`);
     }
 
     // Resolve credential to env vars if provided
@@ -761,7 +765,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     }
 
     if (!existsSync(agent.path)) {
-      return reply.status(422).send({ error: `Agent directory not found at "${agent.path}". The agent "${parentSession.agentName}" may need to be re-deployed.`, statusCode: 422 });
+      const restored = await restoreAgentFromCloud(agent.name, agent.path, req.tenantId);
+      if (!restored) {
+        return reply.status(422).send({ error: `Agent directory not found at "${agent.path}". The agent "${parentSession.agentName}" may need to be re-deployed.`, statusCode: 422 });
+      }
+      console.log(`[sessions] Restored agent "${parentSession.agentName}" from cloud storage`);
     }
 
     // Persist parent workspace state if sandbox is still live
@@ -843,9 +851,13 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(404).send({ error: `Agent "${session.agentName}" not found`, statusCode: 404 });
     }
 
-    // Validate agent directory exists (needed for cold resume when workspace is gone)
+    // Validate agent directory exists — auto-restore from cloud if missing
     if (!existsSync(agentRecord.path)) {
-      return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${session.agentName}" may need to be re-deployed.`, statusCode: 422 });
+      const restored = await restoreAgentFromCloud(agentRecord.name, agentRecord.path, req.tenantId);
+      if (!restored) {
+        return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${session.agentName}" may need to be re-deployed.`, statusCode: 422 });
+      }
+      console.log(`[sessions] Restored agent "${session.agentName}" from cloud storage`);
     }
 
     // Fast path: try the same runner if sandbox is still alive

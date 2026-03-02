@@ -85,6 +85,8 @@ export function buildBwrapArgs(sandboxOpts: SandboxSpawnOpts): string[] {
     '--tmpfs', '/tmp',
     // Hide entire data directory (agents, sessions, sandboxes, etc.)
     '--tmpfs', dataDir,
+    // Ensure sandboxes parent directory exists on tmpfs (needed for nested bind mount)
+    '--dir', sandboxOpts.sandboxesDir,
     // Restore only this sandbox's directory, read-write (workspace + socket)
     '--bind', sandboxOpts.sandboxDir, sandboxOpts.sandboxDir,
     // Per-sandbox home: bind sandboxDir/home/ OVER /home/ash-sandbox so each

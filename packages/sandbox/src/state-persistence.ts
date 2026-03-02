@@ -235,3 +235,70 @@ export async function deleteCloudState(sessionId: string): Promise<void> {
     console.error(`[state-persistence] Cloud delete failed for ${sessionId}:`, err);
   }
 }
+
+// --- Agent cloud persistence ---
+
+/**
+ * Tar.gz an agent directory and upload to cloud storage.
+ * Key: agents/{tenantId}/{agentName}
+ * Best-effort: logs errors, doesn't throw.
+ */
+export async function syncAgentToCloud(agentName: string, agentPath: string, tenantId: string = 'default'): Promise<boolean> {
+  try {
+    const store = await getSnapshotStore();
+    if (!store) return false;
+
+    if (!existsSync(agentPath)) return false;
+
+    const tmpDir = join(agentPath, '..');
+    const tarPath = join(tmpDir, `.agent-${agentName}-sync.tar.gz`);
+    const key = `agents/${tenantId}/${agentName}`;
+    try {
+      execSync(`tar czf ${JSON.stringify(tarPath)} -C ${JSON.stringify(agentPath)} .`, {
+        stdio: 'pipe',
+        timeout: 60_000,
+      });
+      return await store.upload(key, tarPath);
+    } finally {
+      try { unlinkSync(tarPath); } catch { /* ignore */ }
+    }
+  } catch (err) {
+    console.error(`[state-persistence] Agent cloud sync failed for ${agentName}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Download agent tarball from cloud storage and extract into the agent directory.
+ * Returns true if restored, false if store not configured or key not found.
+ * Best-effort: logs errors, doesn't throw.
+ */
+export async function restoreAgentFromCloud(agentName: string, agentPath: string, tenantId: string = 'default'): Promise<boolean> {
+  try {
+    const store = await getSnapshotStore();
+    if (!store) return false;
+
+    const tmpDir = join(agentPath, '..');
+    const tarPath = join(tmpDir, `.agent-${agentName}-restore.tar.gz`);
+    const key = `agents/${tenantId}/${agentName}`;
+
+    mkdirSync(tmpDir, { recursive: true });
+
+    const downloaded = await store.download(key, tarPath);
+    if (!downloaded) return false;
+
+    try {
+      mkdirSync(agentPath, { recursive: true });
+      execSync(`tar xzf ${JSON.stringify(tarPath)} -C ${JSON.stringify(agentPath)}`, {
+        stdio: 'pipe',
+        timeout: 60_000,
+      });
+      return true;
+    } finally {
+      try { unlinkSync(tarPath); } catch { /* ignore */ }
+    }
+  } catch (err) {
+    console.error(`[state-persistence] Agent cloud restore failed for ${agentName}:`, err);
+    return false;
+  }
+}
