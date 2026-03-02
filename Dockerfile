@@ -12,7 +12,7 @@ RUN apt-get update && \
 # gVisor (runsc) for sandbox isolation — syscall-interception via user-space kernel.
 # Stronger than bwrap (namespace-only): kernel exploits don't help because the
 # process never talks to the real kernel. Requires SYS_PTRACE capability at runtime.
-RUN ARCH=$(dpkg --print-architecture) && \
+RUN ARCH=$(uname -m) && \
     curl -fsSL "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/runsc" -o /usr/local/bin/runsc && \
     chmod +x /usr/local/bin/runsc
 
