@@ -6,6 +6,7 @@ export { BridgeClient } from './bridge-client.js';
 export {
   spawnWithLimits,
   buildBwrapArgs,
+  hasBwrap,
   isOomExit,
   getDirSizeKb,
   startDiskMonitor,
