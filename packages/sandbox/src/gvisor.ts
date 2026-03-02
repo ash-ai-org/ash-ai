@@ -216,15 +216,15 @@ export function spawnWithGVisor(
   // Ensure runsc root directory exists
   mkdirSync(RUNSC_ROOT, { recursive: true });
 
-  // runsc run with ptrace platform (works without /dev/kvm)
+  // runsc run with systrap platform (default, works without /dev/kvm)
   // --ignore-cgroups: skip cgroup setup (we manage cgroups externally)
   // --host-uds=all: allow Unix domain sockets to be visible on host filesystem
   //   (needed for bridge.sock communication between host server and sandboxed bridge)
-  // NOTE: --rootless is NOT used — Fargate blocks /proc/self/exe re-exec needed
+  // NOTE: --rootless is NOT used — container blocks /proc/self/exe re-exec needed
   // by rootless mode. We run as root inside the container with SYS_PTRACE capability.
   const child = spawn('runsc', [
     '--root', RUNSC_ROOT,
-    '--platform', 'ptrace',
+    '--platform', 'systrap',
     '--network', 'host',
     '--ignore-cgroups',
     '--host-uds=all',
