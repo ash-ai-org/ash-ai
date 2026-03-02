@@ -217,7 +217,7 @@ Create a session. Spawns a sandboxed bridge process for the named agent.
 }
 ```
 
-Only `agent` is required. All other fields are optional.
+Only `agent` is required — this must be the agent **name** (the `name` field returned by `GET /api/agents`). All other fields are optional.
 
 **Response** `201`:
 
@@ -234,7 +234,7 @@ Only `agent` is required. All other fields are optional.
 }
 ```
 
-**Errors**: `400` missing agent field, `404` agent not found, `500` sandbox creation failed.
+**Errors**: `400` missing agent field, `404` agent not found, `422` agent directory missing from disk (re-deploy the agent), `500` sandbox creation failed.
 
 ---
 

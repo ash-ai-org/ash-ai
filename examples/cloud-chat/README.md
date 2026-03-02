@@ -38,7 +38,7 @@ Browser  ──HTTP──>  Next.js API routes  ──HTTP──>  Ash Cloud Pla
 ```
 
 1. **Agent picker** — fetches available agents from `GET /api/agents`
-2. **Session creation** — `POST /api/sessions` with `{ agentSlug }` (cloud platform field name)
+2. **Session creation** — `POST /api/sessions` with `{ agent }` (the agent name)
 3. **Message streaming** — `POST /api/sessions/:id/messages` returns SSE with granular events:
    - `text_delta` — incremental text tokens
    - `thinking_delta` — model thinking (extended thinking)
@@ -51,7 +51,7 @@ Browser  ──HTTP──>  Next.js API routes  ──HTTP──>  Ash Cloud Pla
 | | Self-hosted (qa-bot) | Cloud (this example) |
 |---|---|---|
 | Agent setup | `deployAgent()` from local folder | Pre-configured in dashboard |
-| Session creation body | `{ agent: "name" }` | `{ agentSlug: "slug" }` |
+| Session creation body | `{ agent: "name" }` | `{ agent: "name" }` |
 | SDK dependency | `@ash-ai/sdk` | Raw `fetch` (standalone) |
 | Server URL | `http://localhost:4100` | `https://ash-cloud-platform.vercel.app` |
 | API key source | `ash start` auto-generates | Dashboard > Settings > API Keys |
