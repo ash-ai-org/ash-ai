@@ -1,5 +1,16 @@
 # @ash-ai/sandbox
 
+## 0.0.19 - 2026-03-02
+
+### Fixed
+
+- Fix bridge EACCES on socket creation: add `--dir` for intermediate sandboxes parent directory on bwrap tmpfs overlay, ensuring bind mounts work correctly after data directory isolation change.
+
+### Added
+
+- Agent file persistence via S3: `syncAgentToCloud()` and `restoreAgentFromCloud()` functions for backing up and restoring agent files across ECS redeploys.
+- Export `hasBwrap` from package for use in tests.
+
 ## 0.0.18 - 2026-03-01
 
 ### Fixed

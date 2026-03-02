@@ -1,5 +1,16 @@
 # @ash-ai/server
 
+## 0.0.21 - 2026-03-02
+
+### Added
+
+- Auto-restore agent files from S3 when agent directory is missing (survives ECS redeploys). Applied to session create, resume, and fork handlers.
+- Sync agent files to S3 on deploy (fire-and-forget).
+
+### Changed
+
+- Updated dependencies: @ash-ai/sandbox@0.0.19
+
 ## 0.0.18 - 2026-03-01
 
 ### Added
