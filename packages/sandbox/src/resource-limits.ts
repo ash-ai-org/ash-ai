@@ -1,6 +1,6 @@
 import { execSync, spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import type { SandboxLimits } from '@ash-ai/shared';
 import { DEFAULT_SANDBOX_LIMITS, DISK_CHECK_INTERVAL_MS } from '@ash-ai/shared';
 import { hasGVisor, spawnWithGVisor } from './gvisor.js';
@@ -66,21 +66,25 @@ export function hasBwrap(): boolean {
  *
  * Strategy:
  *   1. Bind entire host filesystem read-only (--ro-bind / /)
- *   2. Overlay sandboxesDir with empty tmpfs (hides all other sandboxes)
+ *   2. Overlay the entire data directory with tmpfs (hides agents, sessions, sandboxes, etc.)
  *   3. Bind this sandbox's dir back read-write (workspace + socket)
  *   4. Private /tmp, fresh /dev and /proc, PID namespace
  */
 function buildBwrapArgs(sandboxOpts: SandboxSpawnOpts): string[] {
+  // dataDir is the parent of sandboxesDir (e.g. /data/).
+  // Hiding the entire data dir prevents sandboxes from seeing agents/, sessions/, etc.
+  const dataDir = dirname(sandboxOpts.sandboxesDir);
+
   // Mount order matters: parent tmpfs mounts before child bind mounts.
   // bwrap processes them in order, and later mounts override earlier ones
   // at overlapping paths.
   return [
     // Full host filesystem, read-only
     '--ro-bind', '/', '/',
-    // Private /tmp — must come BEFORE sandboxes mounts (sandboxesDir may be under /tmp)
+    // Private /tmp — must come BEFORE data dir mounts (sandboxesDir may be under /tmp)
     '--tmpfs', '/tmp',
-    // Hide all other sandboxes (creates empty tmpfs over sandboxesDir)
-    '--tmpfs', sandboxOpts.sandboxesDir,
+    // Hide entire data directory (agents, sessions, sandboxes, etc.)
+    '--tmpfs', dataDir,
     // Restore only this sandbox's directory, read-write (workspace + socket)
     '--bind', sandboxOpts.sandboxDir, sandboxOpts.sandboxDir,
     // Per-sandbox home: bind sandboxDir/home/ OVER /home/ash-sandbox so each

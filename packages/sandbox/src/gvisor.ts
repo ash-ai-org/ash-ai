@@ -1,6 +1,6 @@
 import { execSync, spawn, type SpawnOptions } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import type { SandboxLimits } from '@ash-ai/shared';
 import type { SpawnResult, SandboxSpawnOpts } from './resource-limits.js';
 import { createCgroup, addToCgroup, removeCgroup } from './resource-limits.js';
@@ -76,10 +76,14 @@ export function generateOciSpec(
 
   const envArray = Object.entries(env).map(([k, v]) => `${k}=${v}`);
 
+  // dataDir is the parent of sandboxesDir (e.g. /data/).
+  // Hiding the entire data dir prevents sandboxes from seeing agents/, sessions/, etc.
+  const dataDir = dirname(sandboxOpts.sandboxesDir);
+
   // Mounts mirror buildBwrapArgs() from resource-limits.ts:
   //   --ro-bind / /             → root.path = "/", root.readonly = true
   //   --tmpfs /tmp              → tmpfs mount at /tmp
-  //   --tmpfs sandboxesDir      → tmpfs mount (hides other sandboxes)
+  //   --tmpfs dataDir           → tmpfs mount (hides agents, sessions, sandboxes, etc.)
   //   --bind sandboxDir         → bind mount rw
   //   --bind homeDir → /home/ash-sandbox  → bind mount rw
   //   --dev /dev                → tmpfs mount for /dev
@@ -119,9 +123,9 @@ export function generateOciSpec(
       source: 'tmpfs',
       options: ['nosuid', 'nodev', 'mode=1777'],
     },
-    // Hide all other sandboxes — empty tmpfs over sandboxesDir
+    // Hide entire data directory (agents, sessions, sandboxes, etc.)
     {
-      destination: sandboxOpts.sandboxesDir,
+      destination: dataDir,
       type: 'tmpfs',
       source: 'tmpfs',
       options: ['nosuid', 'nodev', 'mode=755'],
