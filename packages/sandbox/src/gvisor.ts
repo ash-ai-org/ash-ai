@@ -3,6 +3,7 @@ import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SandboxLimits } from '@ash-ai/shared';
 import type { SpawnResult, SandboxSpawnOpts } from './resource-limits.js';
+import { createCgroup, addToCgroup, removeCgroup } from './resource-limits.js';
 
 // =============================================================================
 // Types — OCI Runtime Spec (subset needed for gVisor)
@@ -31,11 +32,6 @@ interface OciSpec {
   mounts: OciMount[];
   linux: {
     namespaces: Array<{ type: string }>;
-    resources: {
-      memory?: { limit: number };
-      cpu?: { quota: number; period: number };
-      pids?: { limit: number };
-    };
   };
 }
 
@@ -63,12 +59,12 @@ export function hasGVisor(): boolean {
 
 /**
  * Generate an OCI runtime spec (config.json) that mirrors the current bwrap
- * mount setup. Resource limits are embedded in the spec so runsc manages
- * cgroups directly — no manual cgroup setup needed.
+ * mount setup. Resource limits are NOT in the spec — cgroups are managed
+ * externally (same as the bwrap path) because Fargate's cgroup filesystem
+ * is read-only and runsc can't create its own cgroups there.
  */
 export function generateOciSpec(
   sandboxOpts: SandboxSpawnOpts,
-  limits: SandboxLimits,
   command: string,
   args: string[],
   env: Record<string, string>,
@@ -171,15 +167,6 @@ export function generateOciSpec(
         { type: 'mount' },
         { type: 'ipc' },
       ],
-      resources: {
-        memory: { limit: limits.memoryMb * 1024 * 1024 },
-        cpu: {
-          // Same convention as cgroup cpu.max: quota/period in microseconds
-          quota: limits.cpuPercent * 1000,
-          period: 100000,
-        },
-        pids: { limit: limits.maxProcesses },
-      },
     },
   };
 }
@@ -193,8 +180,10 @@ const RUNSC_ROOT = '/var/run/runsc/ash';
 /**
  * Spawn a sandboxed process using gVisor (runsc).
  *
- * runsc handles cgroups, mounts, namespaces, and syscall interception — no
- * manual cgroup setup or bwrap needed.
+ * runsc handles mounts, namespaces, and syscall interception. Cgroups are
+ * managed externally (same as the bwrap path) because Fargate's cgroup
+ * filesystem is read-only — runsc can't create its own cgroups there.
+ * We pass --ignore-cgroups so runsc skips cgroup setup entirely.
  */
 export function spawnWithGVisor(
   command: string,
@@ -205,6 +194,9 @@ export function spawnWithGVisor(
 ): SpawnResult {
   const bundleDir = join(sandboxOpts.sandboxDir, 'bundle');
   mkdirSync(bundleDir, { recursive: true });
+
+  // Set up cgroup for resource limits (same as bwrap path)
+  const cgroupPath = createCgroup(sandboxOpts.sandboxId, limits);
 
   // Extract uid/gid from spawn opts (runsc handles user switching via OCI spec)
   const spawnOpts = { ...opts } as Record<string, unknown>;
@@ -217,18 +209,22 @@ export function spawnWithGVisor(
   // Build environment from spawn opts
   const env = (spawnOpts.env ?? process.env) as Record<string, string>;
 
-  // Generate OCI spec
-  const spec = generateOciSpec(sandboxOpts, limits, command, args, env, sandboxUid, sandboxGid);
+  // Generate OCI spec (no resource limits — cgroups managed externally)
+  const spec = generateOciSpec(sandboxOpts, command, args, env, sandboxUid, sandboxGid);
   writeFileSync(join(bundleDir, 'config.json'), JSON.stringify(spec, null, 2));
 
   // Ensure runsc root directory exists
   mkdirSync(RUNSC_ROOT, { recursive: true });
 
   // runsc run with ptrace platform (works without /dev/kvm)
+  // --ignore-cgroups: skip cgroup setup (we manage cgroups externally)
+  // --rootless: run inside existing user namespace (needed in containers)
   const child = spawn('runsc', [
     '--root', RUNSC_ROOT,
     '--platform', 'ptrace',
     '--network', 'host',
+    '--ignore-cgroups',
+    '--rootless',
     'run',
     '--bundle', bundleDir,
     sandboxOpts.sandboxId,
@@ -239,10 +235,19 @@ export function spawnWithGVisor(
 
   console.log(`[resource-limits] Spawned sandbox ${sandboxOpts.sandboxId.slice(0, 8)} with gVisor (runsc) syscall-interception isolation`);
 
+  // Add runsc process to cgroup for resource limits
+  if (child.pid) {
+    try {
+      addToCgroup(cgroupPath, child.pid);
+    } catch (err) {
+      console.error(`[resource-limits] Failed to add PID ${child.pid} to cgroup: ${err}`);
+    }
+  }
+
   const cleanup = () => {
     // runsc delete to clean up container state
     try {
-      execSync(`runsc --root=${RUNSC_ROOT} delete --force ${sandboxOpts.sandboxId}`, {
+      execSync(`runsc --root=${RUNSC_ROOT} --rootless --ignore-cgroups delete --force ${sandboxOpts.sandboxId}`, {
         timeout: 5000,
         stdio: 'ignore',
       });
@@ -254,6 +259,7 @@ export function spawnWithGVisor(
     } catch {
       // bundle dir may already be gone
     }
+    removeCgroup(cgroupPath);
   };
 
   return { child, cleanup };
