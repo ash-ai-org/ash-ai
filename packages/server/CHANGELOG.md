@@ -1,5 +1,11 @@
 # @ash-ai/server
 
+## 0.0.22 - 2026-03-02
+
+### Changed
+
+- Updated dependencies: @ash-ai/sandbox@0.0.20
+
 ## 0.0.21 - 2026-03-02
 
 ### Added

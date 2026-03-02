@@ -1,5 +1,11 @@
 # @ash-ai/sandbox
 
+## 0.0.20 - 2026-03-02
+
+### Fixed
+
+- Fix sandbox /tmp permissions: use per-sandbox tmp directory bind-mounted over /tmp instead of root-owned tmpfs, allowing the sandbox user to write to /tmp (needed for Claude Code's Bash tool).
+
 ## 0.0.19 - 2026-03-02
 
 ### Fixed
