@@ -162,9 +162,14 @@ export class SandboxManager {
     // Lives inside sandboxDir so it's already covered by the bwrap bind mount,
     // then mounted OVER /home/ash-sandbox so each sandbox is fully isolated.
     let sandboxHomeDir: string | undefined;
+    let sandboxTmpDir: string | undefined;
     if (sandboxUid !== undefined) {
       sandboxHomeDir = join(sandboxDir, 'home');
       mkdirSync(sandboxHomeDir, { recursive: true });
+      // Per-sandbox /tmp directory — writable by the sandbox user.
+      // Bind-mounted over /tmp inside bwrap so Claude Code's Bash tool can use it.
+      sandboxTmpDir = join(sandboxDir, 'tmp');
+      mkdirSync(sandboxTmpDir, { recursive: true });
       // Seed with base Claude config from the image's /home/ash-sandbox
       const baseHome = '/home/ash-sandbox';
       const claudeDir = join(sandboxHomeDir, '.claude');
@@ -256,7 +261,7 @@ export class SandboxManager {
       [this.bridgeEntry],
       spawnOpts as import('node:child_process').SpawnOptions,
       limits,
-      { sandboxId: id, workspaceDir, agentDir: opts.agentDir, sandboxDir, sandboxesDir: this.sandboxesDir, homeDir: sandboxHomeDir },
+      { sandboxId: id, workspaceDir, agentDir: opts.agentDir, sandboxDir, sandboxesDir: this.sandboxesDir, homeDir: sandboxHomeDir, tmpDir: sandboxTmpDir },
     );
 
     child.stderr?.on('data', (chunk: Buffer) => {

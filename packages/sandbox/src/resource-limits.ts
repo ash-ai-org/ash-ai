@@ -28,6 +28,12 @@ export interface SandboxSpawnOpts {
    * private writable home — no shared state between sandboxes.
    */
   homeDir?: string;
+  /**
+   * Per-sandbox tmp directory (e.g. sandboxDir/tmp/).
+   * When set, bind-mounted OVER /tmp so each sandbox gets its own private
+   * writable tmp directory (needed for Claude Code's Bash tool).
+   */
+  tmpDir?: string;
 }
 
 // =============================================================================
@@ -81,8 +87,11 @@ export function buildBwrapArgs(sandboxOpts: SandboxSpawnOpts): string[] {
   return [
     // Full host filesystem, read-only
     '--ro-bind', '/', '/',
-    // Private /tmp — must come BEFORE data dir mounts (sandboxesDir may be under /tmp)
-    '--tmpfs', '/tmp',
+    // Private /tmp — bind per-sandbox tmp dir if available (writable by sandbox user),
+    // otherwise fall back to tmpfs (root-owned, may not be writable by non-root sandbox user).
+    ...(sandboxOpts.tmpDir
+      ? ['--bind', sandboxOpts.tmpDir, '/tmp']
+      : ['--tmpfs', '/tmp']),
     // Hide entire data directory (agents, sessions, sandboxes, etc.)
     '--tmpfs', dataDir,
     // Ensure sandboxes parent directory exists on tmpfs (needed for nested bind mount)
