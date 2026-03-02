@@ -1,5 +1,11 @@
 # @ash-ai/sandbox
 
+## 0.0.18 - 2026-03-01
+
+### Fixed
+
+- Fix sandbox isolation: hide entire data directory instead of just sandboxes/. Previously, bwrap and gVisor only hid `/data/sandboxes/` with a tmpfs overlay, leaving `/data/agents/` and `/data/sessions/` visible read-only to sandboxed processes.
+
 ## 0.0.15 - 2026-02-28
 
 ### Changed
