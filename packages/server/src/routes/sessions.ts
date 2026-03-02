@@ -107,6 +107,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         201: sessionResponse,
         400: { $ref: 'ApiError#' },
         404: { $ref: 'ApiError#' },
+        422: { $ref: 'ApiError#' },
         500: { $ref: 'ApiError#' },
         503: { $ref: 'ApiError#' },
       },
@@ -117,6 +118,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
       return reply.status(404).send({ error: `Agent "${agent}" not found`, statusCode: 404 });
+    }
+
+    // Validate agent directory exists on disk before attempting sandbox creation
+    if (!existsSync(agentRecord.path)) {
+      return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${agent}" may need to be re-deployed.`, statusCode: 422 });
     }
 
     // Resolve credential to env vars if provided
@@ -738,6 +744,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       response: {
         201: sessionResponse,
         404: { $ref: 'ApiError#' },
+        422: { $ref: 'ApiError#' },
         500: { $ref: 'ApiError#' },
         503: { $ref: 'ApiError#' },
       },
@@ -751,6 +758,10 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     const agent = await getAgent(parentSession.agentName, req.tenantId);
     if (!agent) {
       return reply.status(404).send({ error: `Agent "${parentSession.agentName}" not found`, statusCode: 404 });
+    }
+
+    if (!existsSync(agent.path)) {
+      return reply.status(422).send({ error: `Agent directory not found at "${agent.path}". The agent "${parentSession.agentName}" may need to be re-deployed.`, statusCode: 422 });
     }
 
     // Persist parent workspace state if sandbox is still live
@@ -809,6 +820,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         200: sessionResponse,
         404: { $ref: 'ApiError#' },
         410: { $ref: 'ApiError#' },
+        422: { $ref: 'ApiError#' },
         500: { $ref: 'ApiError#' },
         503: { $ref: 'ApiError#' },
       },
@@ -829,6 +841,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     const agentRecord = await getAgent(session.agentName, req.tenantId);
     if (!agentRecord) {
       return reply.status(404).send({ error: `Agent "${session.agentName}" not found`, statusCode: 404 });
+    }
+
+    // Validate agent directory exists (needed for cold resume when workspace is gone)
+    if (!existsSync(agentRecord.path)) {
+      return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${session.agentName}" may need to be re-deployed.`, statusCode: 422 });
     }
 
     // Fast path: try the same runner if sandbox is still alive
