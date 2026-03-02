@@ -219,12 +219,15 @@ export function spawnWithGVisor(
   // runsc run with ptrace platform (works without /dev/kvm)
   // --ignore-cgroups: skip cgroup setup (we manage cgroups externally)
   // --rootless: run inside existing user namespace (needed in containers)
+  // --host-uds=all: allow Unix domain sockets to be visible on host filesystem
+  //   (needed for bridge.sock communication between host server and sandboxed bridge)
   const child = spawn('runsc', [
     '--root', RUNSC_ROOT,
     '--platform', 'ptrace',
     '--network', 'host',
     '--ignore-cgroups',
     '--rootless',
+    '--host-uds=all',
     'run',
     '--bundle', bundleDir,
     sandboxOpts.sandboxId,
@@ -247,7 +250,7 @@ export function spawnWithGVisor(
   const cleanup = () => {
     // runsc delete to clean up container state
     try {
-      execSync(`runsc --root=${RUNSC_ROOT} --rootless --ignore-cgroups delete --force ${sandboxOpts.sandboxId}`, {
+      execSync(`runsc --root=${RUNSC_ROOT} --rootless --ignore-cgroups --host-uds=all delete --force ${sandboxOpts.sandboxId}`, {
         timeout: 5000,
         stdio: 'ignore',
       });
