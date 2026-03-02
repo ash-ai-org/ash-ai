@@ -4,9 +4,10 @@ LABEL org.opencontainers.image.source=https://github.com/ash-ai-org/ash-ai
 LABEL org.opencontainers.image.description="Ash server — deploy and orchestrate hosted AI agents"
 LABEL org.opencontainers.image.licenses=MIT
 
-# bubblewrap for sandbox isolation (fallback), procps for ps/kill utilities
+# bubblewrap for sandbox isolation (fallback), procps for ps/kill utilities,
+# ca-certificates + curl for downloading gVisor binary
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bubblewrap procps curl && \
+    apt-get install -y --no-install-recommends bubblewrap procps ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
 # gVisor (runsc) for sandbox isolation — syscall-interception via user-space kernel.
