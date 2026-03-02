@@ -5,6 +5,7 @@ export type { PoolEntry, SandboxPoolOpts, LiveSandboxState, SandboxDb } from './
 export { BridgeClient } from './bridge-client.js';
 export {
   spawnWithLimits,
+  buildBwrapArgs,
   isOomExit,
   getDirSizeKb,
   startDiskMonitor,
@@ -13,6 +14,7 @@ export {
   removeCgroup,
   DEFAULT_SANDBOX_LIMITS,
 } from './resource-limits.js';
+export { generateOciSpec } from './gvisor.js';
 export type { SpawnResult, SandboxSpawnOpts } from './resource-limits.js';
 export {
   persistSessionState,

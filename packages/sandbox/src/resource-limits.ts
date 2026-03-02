@@ -70,7 +70,7 @@ export function hasBwrap(): boolean {
  *   3. Bind this sandbox's dir back read-write (workspace + socket)
  *   4. Private /tmp, fresh /dev and /proc, PID namespace
  */
-function buildBwrapArgs(sandboxOpts: SandboxSpawnOpts): string[] {
+export function buildBwrapArgs(sandboxOpts: SandboxSpawnOpts): string[] {
   // dataDir is the parent of sandboxesDir (e.g. /data/).
   // Hiding the entire data dir prevents sandboxes from seeing agents/, sessions/, etc.
   const dataDir = dirname(sandboxOpts.sandboxesDir);
