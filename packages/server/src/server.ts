@@ -142,7 +142,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
 
   // Rate limiting — sensible defaults for all routes
   await app.register(rateLimit, {
-    max: 100,
+    max: 1500,
     timeWindow: '15 minutes',
   });
 
