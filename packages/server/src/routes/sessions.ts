@@ -73,16 +73,22 @@ export async function writeSSE(raw: ServerResponse, frame: string): Promise<void
 export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinator, dataDir: string, telemetry: TelemetryExporter): void {
   // Create session — picks the best runner via coordinator
   app.post('/api/sessions', {
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: '15 minutes',
+      },
+    },
     schema: {
       tags: ['sessions'],
       body: {
         type: 'object',
         properties: {
-          agent: { type: 'string' },
-          credentialId: { type: 'string' },
+          agent: { type: 'string', minLength: 1, maxLength: 255 },
+          credentialId: { type: 'string', maxLength: 255 },
           extraEnv: { type: 'object', additionalProperties: { type: 'string' } },
-          startupScript: { type: 'string' },
-          model: { type: 'string', description: 'Model override for this session. Overrides agent .claude/settings.json default.' },
+          startupScript: { type: 'string', maxLength: 100_000 },
+          model: { type: 'string', maxLength: 100, description: 'Model override for this session. Overrides agent .claude/settings.json default.' },
           mcpServers: {
             type: 'object',
             description: 'Per-session MCP servers. Merged into agent .mcp.json (session overrides agent). Enables sidecar pattern.',
@@ -96,7 +102,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
               },
             },
           },
-          systemPrompt: { type: 'string', description: 'System prompt override. Replaces agent CLAUDE.md for this session.' },
+          systemPrompt: { type: 'string', maxLength: 1_000_000, description: 'System prompt override. Replaces agent CLAUDE.md for this session.' },
           permissionMode: { type: 'string', enum: ['bypassPermissions', 'permissionsByAgent', 'default'], description: 'Permission mode for the SDK inside the sandbox. Defaults to bypassPermissions (sandbox isolation is the security boundary).' },
           allowedTools: { type: 'array', items: { type: 'string' }, description: 'Whitelist of allowed tool names for this session.' },
           disallowedTools: { type: 'array', items: { type: 'string' }, description: 'Blacklist of disallowed tool names for this session.' },
@@ -268,7 +274,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       body: {
         type: 'object',
         properties: {
-          model: { type: 'string', description: 'Model override for subsequent queries.' },
+          model: { type: 'string', maxLength: 100, description: 'Model override for subsequent queries.' },
           allowedTools: { type: 'array', items: { type: 'string' }, description: 'Whitelist of allowed tool names.' },
           disallowedTools: { type: 'array', items: { type: 'string' }, description: 'Blacklist of disallowed tool names.' },
           betas: { type: 'array', items: { type: 'string' }, description: 'Beta feature flags.' },
@@ -386,9 +392,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       body: {
         type: 'object',
         properties: {
-          content: { type: 'string' },
+          content: { type: 'string', maxLength: 100_000 },
           includePartialMessages: { type: 'boolean' },
-          model: { type: 'string', description: 'Model override for this query. Overrides session and agent defaults.' },
+          model: { type: 'string', maxLength: 100, description: 'Model override for this query. Overrides session and agent defaults.' },
           maxTurns: { type: 'integer', minimum: 1, description: 'Maximum agentic turns for this query.' },
           maxBudgetUsd: { type: 'number', minimum: 0, description: 'Maximum budget in USD for this query.' },
           effort: { type: 'string', enum: ['low', 'medium', 'high', 'max'], description: 'Effort level for this query.' },

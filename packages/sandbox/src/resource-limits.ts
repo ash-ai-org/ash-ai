@@ -1,4 +1,4 @@
-import { execSync, spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { execSync, execFileSync, spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { SandboxLimits } from '@ash-ai/shared';
@@ -364,8 +364,16 @@ export function isOomExit(code: number | null, signal: string | null): boolean {
 // =============================================================================
 
 export function getDirSizeKb(dir: string): number {
-  const output = execSync(`du -sk '${dir}'`, { timeout: 5000 }).toString().trim();
-  return parseInt(output.split('\t')[0], 10);
+  try {
+    const output = execFileSync('du', ['-sk', dir], { timeout: 5000 }).toString().trim();
+    return parseInt(output.split('\t')[0], 10);
+  } catch (err: unknown) {
+    // If du timed out (e.g. symlink loops), treat as exceeding disk limit
+    if (err instanceof Error && (err.message?.includes('TIMEOUT') || err.message?.includes('ETIMEDOUT') || (err as NodeJS.ErrnoException).code === 'ETIMEDOUT')) {
+      return Number.MAX_SAFE_INTEGER;
+    }
+    throw err;
+  }
 }
 
 export function startDiskMonitor(

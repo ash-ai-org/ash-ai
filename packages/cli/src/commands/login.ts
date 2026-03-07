@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { createInterface } from 'node:readline';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { Command } from 'commander';
@@ -26,8 +26,10 @@ export function getCredentials(): AshCredentials | null {
 }
 
 function saveCredentials(credentials: AshCredentials): void {
-  mkdirSync(join(homedir(), '.ash'), { recursive: true });
-  writeFileSync(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2) + '\n');
+  const dir = join(homedir(), '.ash');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  chmodSync(dir, 0o700);
+  writeFileSync(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2) + '\n', { mode: 0o600 });
 }
 
 function startPastePrompt(cloudUrl: string, loginUrl: string, server: Server): void {

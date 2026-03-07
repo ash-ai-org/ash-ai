@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { timingSafeEqual } from 'node:crypto';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 
 const internalSecret = process.env.ASH_INTERNAL_SECRET;
@@ -6,12 +7,30 @@ const internalSecret = process.env.ASH_INTERNAL_SECRET;
 /**
  * Validate internal endpoint auth. If ASH_INTERNAL_SECRET is set,
  * requires matching Authorization: Bearer <secret> header.
- * No-op when secret is not configured (dev/single-machine mode).
+ * In production, rejects all requests when secret is not configured.
+ * No-op when secret is not configured in non-production (dev/single-machine mode).
  */
 function validateInternalAuth(req: FastifyRequest, reply: FastifyReply): boolean {
-  if (!internalSecret) return true;
+  if (!internalSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      reply.status(503).send({ error: 'Internal endpoints disabled — ASH_INTERNAL_SECRET is required in production' });
+      return false;
+    }
+    return true;
+  }
   const auth = req.headers.authorization;
-  if (!auth || auth !== `Bearer ${internalSecret}`) {
+  if (!auth) {
+    reply.status(401).send({ error: 'Unauthorized — invalid or missing internal secret' });
+    return false;
+  }
+  const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (provided.length === 0) {
+    reply.status(401).send({ error: 'Unauthorized — invalid or missing internal secret' });
+    return false;
+  }
+  const expected = Buffer.from(internalSecret);
+  const actual = Buffer.from(provided);
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
     reply.status(401).send({ error: 'Unauthorized — invalid or missing internal secret' });
     return false;
   }

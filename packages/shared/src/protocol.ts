@@ -113,6 +113,76 @@ export function encode(msg: BridgeCommand | BridgeEvent): string {
   return JSON.stringify(msg) + '\n';
 }
 
+/** All valid command discriminator values */
+const VALID_COMMANDS = new Set(['query', 'resume', 'interrupt', 'shutdown', 'exec']);
+/** All valid event discriminator values */
+const VALID_EVENTS = new Set(['ready', 'message', 'error', 'done', 'exec_result', 'log']);
+/** Keys that indicate prototype pollution attempts */
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Required fields for each command type (beyond the `cmd` discriminator).
+ */
+const COMMAND_REQUIRED_FIELDS: Record<string, string[]> = {
+  query: ['prompt', 'sessionId'],
+  resume: ['sessionId'],
+  exec: ['command'],
+  // interrupt and shutdown have no additional required fields
+};
+
+function hasDangerousKeys(obj: Record<string, unknown>): boolean {
+  for (const key of Object.keys(obj)) {
+    if (DANGEROUS_KEYS.has(key)) return true;
+  }
+  return false;
+}
+
 export function decode(line: string): BridgeCommand | BridgeEvent {
-  return JSON.parse(line.trim());
+  const parsed: unknown = JSON.parse(line.trim());
+
+  // Must be a plain object (not null, not array, not primitive)
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Protocol error: decoded value must be a plain object');
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  // Reject prototype pollution attempts
+  if (hasDangerousKeys(obj)) {
+    throw new Error('Protocol error: message contains forbidden keys');
+  }
+
+  // Validate discriminator: must have exactly one of `cmd` or `ev`
+  const hasCmd = 'cmd' in obj;
+  const hasEv = 'ev' in obj;
+
+  if (!hasCmd && !hasEv) {
+    throw new Error('Protocol error: message must have a "cmd" or "ev" field');
+  }
+  if (hasCmd && hasEv) {
+    throw new Error('Protocol error: message must not have both "cmd" and "ev" fields');
+  }
+
+  if (hasCmd) {
+    if (typeof obj.cmd !== 'string' || !VALID_COMMANDS.has(obj.cmd)) {
+      throw new Error(`Protocol error: unknown command type: ${String(obj.cmd)}`);
+    }
+    // Validate required fields for known command types
+    const requiredFields = COMMAND_REQUIRED_FIELDS[obj.cmd];
+    if (requiredFields) {
+      for (const field of requiredFields) {
+        if (!(field in obj)) {
+          throw new Error(`Protocol error: command "${obj.cmd}" missing required field "${field}"`);
+        }
+      }
+    }
+  }
+
+  if (hasEv) {
+    if (typeof obj.ev !== 'string' || !VALID_EVENTS.has(obj.ev)) {
+      throw new Error(`Protocol error: unknown event type: ${String(obj.ev)}`);
+    }
+  }
+
+  return obj as unknown as BridgeCommand | BridgeEvent;
 }

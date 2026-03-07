@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -19,8 +19,10 @@ export function loadConfig(): AshConfig {
 }
 
 export function saveConfig(config: AshConfig): void {
-  mkdirSync(join(homedir(), '.ash'), { recursive: true });
-  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n');
+  const dir = join(homedir(), '.ash');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  chmodSync(dir, 0o700);
+  writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
 }
 
 export function getServerUrl(): string {

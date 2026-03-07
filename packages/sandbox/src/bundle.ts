@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, unlinkSync, readdirSync, lstatSync, realpathSync } from 'node:fs';
 import { join, basename, resolve, relative } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -6,10 +6,10 @@ import { randomUUID } from 'node:crypto';
 
 const SKIP_DIRS = ['node_modules', '.git', '__pycache__', '.cache', '.npm', '.pnpm-store', '.yarn', '.venv', 'venv', '.tmp', 'tmp'];
 const SKIP_FILES = ['.env', '.env.local', '.env.production', '.env.development', '.DS_Store'];
-const TAR_EXCLUDE = [
+const TAR_EXCLUDE_ARGS = [
   ...SKIP_DIRS.map(d => `--exclude=${d}`),
   ...SKIP_FILES.map(f => `--exclude=${f}`),
-].join(' ');
+];
 
 /** Maximum bundle size (100 MB). */
 const MAX_BUNDLE_SIZE = 100 * 1024 * 1024;
@@ -27,10 +27,9 @@ export function createBundle(workspaceDir: string): Buffer {
 
   const tmpPath = join(tmpdir(), `ash-bundle-${randomUUID()}.tar.gz`);
   try {
-    execSync(
-      `tar czf ${JSON.stringify(tmpPath)} -h ${TAR_EXCLUDE} -C ${JSON.stringify(workspaceDir)} .`,
-      { stdio: 'pipe', timeout: 120_000 },
-    );
+    execFileSync('tar', [
+      'czf', tmpPath, '-h', ...TAR_EXCLUDE_ARGS, '-C', workspaceDir, '.',
+    ], { stdio: 'pipe', timeout: 120_000 });
     const bundle = readFileSync(tmpPath);
     if (bundle.length > MAX_BUNDLE_SIZE) {
       throw new Error(`Bundle exceeds maximum size of ${MAX_BUNDLE_SIZE} bytes`);
@@ -94,10 +93,9 @@ export function extractBundle(bundle: Buffer, targetDir: string): void {
   const tmpPath = join(tmpdir(), `ash-bundle-${randomUUID()}.tar.gz`);
   try {
     writeFileSync(tmpPath, bundle);
-    execSync(
-      `tar xzf ${JSON.stringify(tmpPath)} --no-same-owner --no-same-permissions -C ${JSON.stringify(targetDir)}`,
-      { stdio: 'pipe', timeout: 120_000 },
-    );
+    execFileSync('tar', [
+      'xzf', tmpPath, '--no-same-owner', '--no-same-permissions', '-C', targetDir,
+    ], { stdio: 'pipe', timeout: 120_000 });
     // Post-extraction validation: remove symlinks that escape, reject path traversal
     validateExtractedPaths(targetDir);
   } finally {

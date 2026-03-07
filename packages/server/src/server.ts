@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import rateLimit from '@fastify/rate-limit';
+import cors from '@fastify/cors';
 import { join, resolve } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
@@ -124,6 +126,19 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
 
   const app = Fastify({ logger: true });
 
+  // CORS — reject cross-origin by default; allow origins from ALLOWED_ORIGINS env
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
+  await app.register(cors, {
+    origin: allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : false,
+    credentials: true,
+  });
+
+  // Rate limiting — sensible defaults for all routes
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '15 minutes',
+  });
+
   // OpenAPI / Swagger
   await app.register(swagger, {
     openapi: {
@@ -144,7 +159,13 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
       ],
     },
   });
-  await app.register(swaggerUi, { routePrefix: '/docs' });
+
+  // Swagger UI: only register in non-production environments
+  if (process.env.NODE_ENV !== 'production') {
+    await app.register(swaggerUi, { routePrefix: '/docs' });
+  } else {
+    app.log.warn('Swagger UI is disabled in production. Set NODE_ENV != "production" to enable /docs.');
+  }
   registerSchemas(app);
 
   // Auto-generate API key on first start if no keys exist
@@ -165,12 +186,10 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
 
     console.log('');
     console.log('==========================================================');
-    console.log('  Auto-generated API key (save this — it won\'t be shown again):');
-    console.log('');
-    console.log(`  ${plainKey}`);
-    console.log('');
-    console.log('  The key has been saved to:');
+    console.log('  Auto-generated API key has been saved to:');
     console.log(`  ${bootstrapPath}`);
+    console.log('');
+    console.log('  Read that file to retrieve your key (permissions: 0600).');
     console.log('==========================================================');
     console.log('');
   }

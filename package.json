@@ -31,20 +31,20 @@
     "release:all": "./scripts/release/release-all.sh"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.0",
-    "@types/node": "^22.0.0",
-    "@types/pg": "^8.16.0",
-    "pg": "^8.18.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "@changesets/changelog-git": "^0.2.0"
+    "@changesets/changelog-git": "^0.2.1",
+    "@changesets/cli": "^2.30.0",
+    "@types/node": "^22.19.15",
+    "@types/pg": "^8.18.0",
+    "pg": "^8.20.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.45"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.71"
   }
 }
