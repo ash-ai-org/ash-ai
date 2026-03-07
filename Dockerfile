@@ -4,18 +4,10 @@ LABEL org.opencontainers.image.source=https://github.com/ash-ai-org/ash-ai
 LABEL org.opencontainers.image.description="Ash server — deploy and orchestrate hosted AI agents"
 LABEL org.opencontainers.image.licenses=MIT
 
-# bubblewrap for sandbox isolation (fallback), procps for ps/kill utilities,
-# ca-certificates + curl for downloading gVisor binary
+# bubblewrap for sandbox isolation, procps for ps/kill utilities
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bubblewrap procps ca-certificates curl && \
+    apt-get install -y --no-install-recommends bubblewrap procps && \
     rm -rf /var/lib/apt/lists/*
-
-# gVisor (runsc) for sandbox isolation — syscall-interception via user-space kernel.
-# Stronger than bwrap (namespace-only): kernel exploits don't help because the
-# process never talks to the real kernel. Requires SYS_PTRACE capability at runtime.
-RUN ARCH=$(uname -m) && \
-    curl -fsSL "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/runsc" -o /usr/local/bin/runsc && \
-    chmod +x /usr/local/bin/runsc
 
 WORKDIR /app
 

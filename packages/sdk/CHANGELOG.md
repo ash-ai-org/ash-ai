@@ -1,5 +1,12 @@
 # @ash-ai/sdk
 
+## 0.0.19 - 2026-03-06
+
+### Changed
+
+- Remove `startupScript` from session creation options (#60)
+- Updated dependencies: @ash-ai/shared@0.0.19 (#60)
+
 ## 0.0.18 - 2026-03-06
 
 ### Changed

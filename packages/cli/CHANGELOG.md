@@ -1,5 +1,12 @@
 # @ash-ai/cli
 
+## 0.0.18 - 2026-03-06
+
+### Added
+
+- `ash deploy -e KEY=VALUE` flag (repeatable) to set default agent env vars (#60)
+- `ash session create -e KEY=VALUE` flag (repeatable) to pass extra env to sessions (#60)
+
 ## 0.0.17 - 2026-03-06
 
 ### Fixed

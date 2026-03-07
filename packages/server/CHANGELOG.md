@@ -1,5 +1,22 @@
 # @ash-ai/server
 
+## 0.0.26 - 2026-03-06
+
+### Added
+
+- `env` column on agents table with SQLite and Postgres migrations (#60)
+- `PATCH /api/agents/:name` endpoint to update agent environment variables (#60)
+- `updateAgent()` DB method for partial agent updates (#60)
+- Agent-level env vars merged into session sandbox: agent.env -> credential -> session extraEnv -> ASH_PERMISSION_MODE (#60)
+
+### Changed
+
+- `upsertAgent()` accepts optional `env` parameter, persisted as JSON (#60)
+
+### Removed
+
+- `startupScript` field from session creation API — replaced by file-based startup.sh (#60)
+
 ## 0.0.25 - 2026-03-06
 
 ### Fixed

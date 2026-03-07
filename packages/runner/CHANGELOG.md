@@ -1,5 +1,12 @@
 # @ash-ai/runner
 
+## 0.0.18 - 2026-03-06
+
+### Changed
+
+- Remove `startupScript` from sandbox creation route (#60)
+- Updated dependencies: @ash-ai/shared@0.0.19, @ash-ai/sandbox@0.0.23 (#60)
+
 ## 0.0.17 - 2026-03-06
 
 ### Changed
