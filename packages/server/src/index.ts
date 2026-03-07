@@ -47,6 +47,9 @@ try {
   if (mode === 'standalone') {
     app.log.info(`Bridge entry: ${bridgeEntry}`);
   }
+  if (process.env.NODE_ENV === 'production') {
+    app.log.warn('Server is listening on plain HTTP. In production, place behind a TLS-terminating reverse proxy (e.g. nginx, Caddy, ALB).');
+  }
 } catch (err) {
   app.log.error(err);
   process.exit(1);

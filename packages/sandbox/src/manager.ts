@@ -1,7 +1,7 @@
-import { type ChildProcess, execSync, execFileSync } from 'node:child_process';
+import { type ChildProcess, execFileSync } from 'node:child_process';
 import { mkdirSync, cpSync, unlinkSync, existsSync, chmodSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { join, resolve, sep } from 'node:path';
+
 import { randomUUID } from 'node:crypto';
 import { SANDBOX_ENV_ALLOWLIST, DEFAULT_SANDBOX_LIMITS, INSTALL_SCRIPT_TIMEOUT_MS, BRIDGE_READY_TIMEOUT_MS, startTimer, logTiming } from '@ash-ai/shared';
 import type { SandboxLimits, SandboxTimings, McpServerConfig } from '@ash-ai/shared';
@@ -93,14 +93,20 @@ export class SandboxManager {
   async create(opts: CreateSandboxOpts): Promise<ManagedSandbox> {
     const totalTimer = startTimer();
     const id = opts.id ?? randomUUID();
-    const shortId = id.slice(0, 8);
+    if (!/^[a-f0-9-]+$/i.test(id)) {
+      throw new Error(`Invalid sandbox ID: ${id}`);
+    }
     const sandboxDir = join(this.sandboxesDir, id);
+    const resolvedSandboxDir = resolve(sandboxDir);
+    if (!resolvedSandboxDir.startsWith(resolve(this.sandboxesDir) + sep)) {
+      throw new Error('Sandbox directory escapes sandboxes root');
+    }
+    const shortId = id.slice(0, 8);
     const workspaceDir = join(sandboxDir, 'workspace');
-    // Linux: socket in sandboxDir (visible via bwrap bind-mount, not exposed in /tmp).
-    // macOS: socket in /tmp (no bwrap, and macOS limits Unix socket paths to 104 bytes).
-    const socketPath = process.platform === 'linux'
-      ? join(sandboxDir, 'bridge.sock')
-      : join(tmpdir(), `ash-${shortId}.sock`);
+    // Socket inside sandboxDir on all platforms — prevents symlink attacks via /tmp.
+    // Note: macOS limits Unix socket paths to 104 bytes. sandboxesDir must be short enough.
+    mkdirSync(sandboxDir, { recursive: true });
+    const socketPath = join(sandboxDir, 'bridge.sock');
     const limits: SandboxLimits = { ...this.defaultLimits, ...opts.limits };
 
     // --- Phase: agent copy ---
@@ -181,7 +187,11 @@ export class SandboxManager {
       }
       env.HOME = baseHome; // bwrap maps sandboxDir/home/ → /home/ash-sandbox
       // Recursively chown so the non-root sandbox user can write to all files
-      execSync(`chown -R ${sandboxUid}:${sandboxGid ?? sandboxUid} '${sandboxDir}'`);
+      const uid = sandboxUid;
+      const gid = sandboxGid ?? sandboxUid;
+      if (!Number.isInteger(uid) || uid < 0 || uid > 65535) throw new Error(`Invalid UID: ${uid}`);
+      if (!Number.isInteger(gid) || gid < 0 || gid > 65535) throw new Error(`Invalid GID: ${gid}`);
+      execFileSync('chown', ['-R', `${uid}:${gid}`, sandboxDir]);
     } else {
       env.HOME = workspaceDir;
     }
@@ -320,9 +330,20 @@ export class SandboxManager {
     // --- Phase: bridge connect ---
     // Socket is guaranteed listening (bridge signaled readiness). No polling needed.
     const bridgeConnectTimer = startTimer();
-    const client = new BridgeClient(socketPath);
-    await client.connect();
-    const bridgeConnectMs = bridgeConnectTimer();
+    let client: BridgeClient;
+    let bridgeConnectMs: number;
+    try {
+      // Restrict socket permissions to owner only (prevents local user hijacking)
+      chmodSync(socketPath, 0o600);
+      client = new BridgeClient(socketPath);
+      await client.connect();
+      bridgeConnectMs = bridgeConnectTimer();
+    } catch (connectErr) {
+      // Clean up spawned process and resources on connect failure
+      try { child.kill('SIGKILL'); } catch { /* ignore */ }
+      resourceCleanup();
+      throw connectErr;
+    }
 
     // --- Timing summary ---
     const totalMs = totalTimer();
@@ -387,14 +408,24 @@ export class SandboxManager {
     sandbox.client.disconnect();
 
     if (sandbox.process.exitCode === null) {
-      sandbox.process.kill('SIGTERM');
+      // Kill entire process group to catch children spawned by Claude Code
+      const pid = sandbox.process.pid;
+      try {
+        if (pid) process.kill(-pid, 'SIGTERM');
+      } catch {
+        sandbox.process.kill('SIGTERM');
+      }
       // Wait for exit with timeout
       await Promise.race([
         new Promise<void>((resolve) => sandbox.process.on('exit', resolve)),
         new Promise<void>((resolve) => setTimeout(resolve, 5000)),
       ]);
       if (sandbox.process.exitCode === null) {
-        sandbox.process.kill('SIGKILL');
+        try {
+          if (pid) process.kill(-pid, 'SIGKILL');
+        } catch {
+          sandbox.process.kill('SIGKILL');
+        }
       }
     }
 

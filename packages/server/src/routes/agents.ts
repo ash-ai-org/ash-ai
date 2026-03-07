@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { existsSync, readdirSync, statSync, readFileSync, createReadStream, mkdirSync, writeFileSync } from 'node:fs';
-import { join, isAbsolute, relative, basename, extname, dirname } from 'node:path';
+import { join, isAbsolute, relative, basename, extname, dirname, resolve, sep } from 'node:path';
 import { upsertAgent, getAgent, listAgents, deleteAgent } from '../db/index.js';
 import type { FileEntry } from '@ash-ai/shared';
 import type { SandboxPool } from '@ash-ai/sandbox';
@@ -56,14 +56,20 @@ const nameParam = {
 export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: SandboxPool | null): void {
   // Deploy agent (provide local path to agent directory, or create managed agent from systemPrompt/files)
   app.post('/api/agents', {
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: '15 minutes',
+      },
+    },
     schema: {
       tags: ['agents'],
       body: {
         type: 'object',
         properties: {
-          name: { type: 'string' },
-          path: { type: 'string' },
-          systemPrompt: { type: 'string' },
+          name: { type: 'string', minLength: 1, maxLength: 255, pattern: '^[a-zA-Z0-9_-]+$' },
+          path: { type: 'string', maxLength: 4096 },
+          systemPrompt: { type: 'string', maxLength: 1_000_000 },
           files: {
             type: 'array',
             items: {
@@ -116,8 +122,9 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
         for (const file of files) {
           // Path traversal protection
           if (file.path.includes('..') || file.path.startsWith('/')) continue;
-          const fileDest = join(resolvedPath, file.path);
-          if (!fileDest.startsWith(resolvedPath)) continue;
+          const fileDest = resolve(join(resolvedPath, file.path));
+          const resolvedBase = resolve(resolvedPath);
+          if (!fileDest.startsWith(resolvedBase + sep)) continue;
           mkdirSync(dirname(fileDest), { recursive: true });
           writeFileSync(fileDest, Buffer.from(file.content, 'base64'));
           if (file.path === 'CLAUDE.md') hasClaudeMd = true;

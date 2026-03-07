@@ -230,6 +230,19 @@ async function handleCommand(conn: net.Socket, cmd: BridgeCommand): Promise<void
   }
 }
 
+// Maximum buffer size to prevent memory exhaustion from a single giant message (10MB)
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Sanitize an error message for sending over the socket.
+ * Strips file paths and other internal details to prevent information disclosure.
+ * The full error is logged server-side for debugging.
+ */
+function sanitizeErrorMessage(msg: string): string {
+  // Replace absolute file paths (Unix and Windows-style)
+  return msg.replace(/(?:\/[\w.\-]+)+(?:\/[\w.\-]+)|(?:[A-Z]:\\[\w.\-\\]+)/g, '<path>');
+}
+
 // Unix socket server
 const server = net.createServer((conn) => {
   // Fire-and-forget for ready — connection just opened, buffer is empty
@@ -238,6 +251,15 @@ const server = net.createServer((conn) => {
   let buffer = '';
   conn.on('data', (chunk) => {
     buffer += chunk.toString();
+
+    // Guard against memory exhaustion: reject connections that send
+    // more data than MAX_BUFFER_SIZE without a newline delimiter.
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      console.error(`[bridge] Buffer exceeded ${MAX_BUFFER_SIZE} bytes, destroying connection`);
+      conn.destroy();
+      return;
+    }
+
     let newline: number;
     while ((newline = buffer.indexOf('\n')) !== -1) {
       const line = buffer.slice(0, newline);
@@ -245,7 +267,9 @@ const server = net.createServer((conn) => {
       if (line.trim()) {
         const cmd = decode(line) as BridgeCommand;
         handleCommand(conn, cmd).catch(async (err) => {
-          await send(conn, { ev: 'error', error: String(err) });
+          const fullMessage = String(err);
+          console.error(`[bridge] handleCommand error: ${fullMessage}`);
+          await send(conn, { ev: 'error', error: sanitizeErrorMessage(fullMessage) });
         });
       }
     }

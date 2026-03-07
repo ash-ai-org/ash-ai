@@ -1,6 +1,6 @@
 import { join, basename } from 'node:path';
 import { cpSync, mkdirSync, rmSync, existsSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { getSnapshotStore } from './snapshot-store.js';
 
 const SESSIONS_SUBDIR = 'sessions';
@@ -173,7 +173,7 @@ export async function syncStateToCloud(dataDir: string, sessionId: string, tenan
 
     const tarPath = join(sessionStateDir(dataDir, sessionId, tenantId), 'workspace.tar.gz');
     try {
-      execSync(`tar czf ${JSON.stringify(tarPath)} -C ${JSON.stringify(srcDir)} .`, {
+      execFileSync('tar', ['czf', tarPath, '-C', srcDir, '.'], {
         stdio: 'pipe',
         timeout: 60_000,
       });
@@ -209,7 +209,7 @@ export async function restoreStateFromCloud(dataDir: string, sessionId: string, 
 
     try {
       mkdirSync(destDir, { recursive: true });
-      execSync(`tar xzf ${JSON.stringify(tarPath)} -C ${JSON.stringify(destDir)}`, {
+      execFileSync('tar', ['xzf', tarPath, '-C', destDir], {
         stdio: 'pipe',
         timeout: 60_000,
       });
@@ -254,7 +254,7 @@ export async function syncAgentToCloud(agentName: string, agentPath: string, ten
     const tarPath = join(tmpDir, `.agent-${agentName}-sync.tar.gz`);
     const key = `agents/${tenantId}/${agentName}`;
     try {
-      execSync(`tar czf ${JSON.stringify(tarPath)} -C ${JSON.stringify(agentPath)} .`, {
+      execFileSync('tar', ['czf', tarPath, '-C', agentPath, '.'], {
         stdio: 'pipe',
         timeout: 60_000,
       });
@@ -289,7 +289,7 @@ export async function restoreAgentFromCloud(agentName: string, agentPath: string
 
     try {
       mkdirSync(agentPath, { recursive: true });
-      execSync(`tar xzf ${JSON.stringify(tarPath)} -C ${JSON.stringify(agentPath)}`, {
+      execFileSync('tar', ['xzf', tarPath, '-C', agentPath], {
         stdio: 'pipe',
         timeout: 60_000,
       });

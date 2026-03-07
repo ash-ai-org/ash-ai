@@ -1,4 +1,4 @@
-import { execSync, spawn, type SpawnOptions } from 'node:child_process';
+import { execSync, execFileSync, spawn, type SpawnOptions } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { SandboxLimits } from '@ash-ai/shared';
@@ -254,10 +254,14 @@ export function spawnWithGVisor(
   const cleanup = () => {
     // runsc delete to clean up container state
     try {
-      execSync(`runsc --root=${RUNSC_ROOT} --ignore-cgroups --host-uds=all delete --force ${sandboxOpts.sandboxId}`, {
-        timeout: 5000,
-        stdio: 'ignore',
-      });
+      execFileSync('runsc', [
+        '--root', RUNSC_ROOT,
+        '--ignore-cgroups',
+        '--host-uds=all',
+        'delete',
+        '--force',
+        sandboxOpts.sandboxId,
+      ], { timeout: 5000, stdio: 'ignore' });
     } catch {
       // container may already be gone
     }
