@@ -1,5 +1,11 @@
 # @ash-ai/cli
 
+## 0.0.19 - 2026-03-06
+
+### Removed
+
+- `ASH_SANDBOX_BACKEND` env var passthrough from `ash start` command (#62)
+
 ## 0.0.18 - 2026-03-06
 
 ### Added

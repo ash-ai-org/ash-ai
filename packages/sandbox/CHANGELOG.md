@@ -1,5 +1,16 @@
 # @ash-ai/sandbox
 
+## 0.0.24 - 2026-03-06
+
+### Removed
+
+- gVisor (runsc) sandbox backend and `ASH_SANDBOX_BACKEND` env var (#62)
+- `generateOciSpec` export — OCI spec generation no longer needed (#62)
+
+### Changed
+
+- Simplified Linux sandbox to single code path: bwrap + cgroups with cgroups-only fallback (#62)
+
 ## 0.0.23 - 2026-03-06
 
 ### Changed
