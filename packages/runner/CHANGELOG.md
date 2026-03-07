@@ -1,5 +1,11 @@
 # @ash-ai/runner
 
+## 0.0.19 - 2026-03-06
+
+### Changed
+
+- Updated dependencies: @ash-ai/sandbox@0.0.25, @ash-ai/server@0.0.28
+
 ## 0.0.18 - 2026-03-06
 
 ### Changed

@@ -1,5 +1,25 @@
 # @ash-ai/server
 
+## 0.0.28 - 2026-03-06
+
+### Added
+
+- `bulkPauseActiveSessions()` DB method — safety net for ungraceful shutdown (#64)
+- Startup orphan recovery: pauses any sessions left in active/starting state (#64)
+- API key recovery: regenerates bootstrap file when CLI has lost access (#64)
+
+### Changed
+
+- Agent API responses now redact env values (returns `***` instead of secrets) (#64)
+- Default pre-warm count is 1 for all agents (previously required explicit config) (#64)
+- Graceful shutdown uses `pool.drainAll()` instead of `pool.destroyAll()` (#64)
+- `.DS_Store` files skipped in file listing and upload (#64)
+- Updated dependencies: @ash-ai/sandbox@0.0.25
+
+### Fixed
+
+- `PATCH /api/agents/:name` now returns 404 when agent not found (#64)
+
 ## 0.0.27 - 2026-03-06
 
 ### Changed

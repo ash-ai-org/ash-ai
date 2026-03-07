@@ -1,5 +1,25 @@
 # @ash-ai/cli
 
+## 0.0.20 - 2026-03-06
+
+### Added
+
+- `ash link` / `ash unlink` commands replacing `ash connect` / `ash disconnect` (#64)
+- Agent file upload via API — `ash deploy` now uploads files instead of copying to shared filesystem (#64)
+- `.env` and `.env.local` file support in agent directories during deploy (#64)
+- Agent name normalization (invalid chars replaced with hyphens) (#64)
+- API key bootstrap recovery in `ash rebuild` (#64)
+
+### Changed
+
+- `ash login` now prints `ash link` hint after successful authentication (#64)
+- Simplified `getServerUrl()` and `getApiKey()` — removed credentials.json fallback (#64)
+- Updated dependencies: dotenv (#64)
+
+### Removed
+
+- `ash connect` / `ash disconnect` commands (replaced by `ash link` / `ash unlink`) (#64)
+
 ## 0.0.19 - 2026-03-06
 
 ### Removed
