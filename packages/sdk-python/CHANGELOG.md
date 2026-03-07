@@ -1,5 +1,12 @@
 # ash-ai-sdk (Python)
 
+## 0.0.19 - 2026-03-06
+
+### Changed
+
+- Remove `startupScript` from session creation options (#60)
+- Remove unused `startup_script` parameter from `AshClient.create_session()` (#60)
+
 ## 0.0.14 - 2026-02-28
 
 ### Changed

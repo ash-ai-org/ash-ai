@@ -1,5 +1,16 @@
 # @ash-ai/shared
 
+## 0.0.19 - 2026-03-06
+
+### Added
+
+- `env` field on `Agent` and `AgentUpdate` types for default session environment variables (#60)
+- Configurable sandbox memory limit via `ASH_SANDBOX_MEMORY_MB` environment variable (#60)
+
+### Removed
+
+- `startupScript` field from `CreateSessionRequest` — replaced by file-based `startup.sh` in agent directory (#60)
+
 ## 0.0.18 - 2026-03-06
 
 ### Changed

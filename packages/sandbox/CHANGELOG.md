@@ -1,5 +1,16 @@
 # @ash-ai/sandbox
 
+## 0.0.23 - 2026-03-06
+
+### Changed
+
+- Startup script is now auto-detected from `startup.sh` in the agent directory instead of passed via API (#60)
+- Graceful chmod fallback for Unix sockets on Docker Desktop VirtioFS (#60)
+
+### Removed
+
+- `startupScript` option from `CreateSandboxOpts` (#60)
+
 ## 0.0.22 - 2026-03-06
 
 ### Fixed
