@@ -7,7 +7,7 @@ import type { FileEntry, WriteFileInput, WriteFileResult } from '@ash-ai/shared'
 
 // Always skip — these are large/noisy and never useful to browse
 const ALWAYS_SKIP = new Set([
-  'node_modules', '.git', '__pycache__',
+  'node_modules', '.git', '__pycache__', '.DS_Store',
 ]);
 
 // Additional dirs to skip when includeHidden is false
@@ -355,6 +355,12 @@ export function fileRoutes(app: FastifyInstance, coordinator: RunnerCoordinator,
     let totalSize = 0;
 
     for (const file of files) {
+      // Skip junk files silently
+      if (basename(file.path) === '.DS_Store') {
+        results.push({ path: file.path, written: false, error: 'Skipped: .DS_Store' });
+        continue;
+      }
+
       const relPath = targetPath === '.' ? file.path : join(targetPath, file.path);
 
       // Path traversal protection

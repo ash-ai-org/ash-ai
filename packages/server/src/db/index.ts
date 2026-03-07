@@ -44,6 +44,8 @@ export interface Db {
   listSessionsByRunner(runnerId: string): Promise<Session[]>;
   /** Bulk-pause all active/starting sessions on a runner. Returns count of paused sessions. */
   bulkPauseSessionsByRunner(runnerId: string): Promise<number>;
+  /** Bulk-pause all active/starting sessions (safety net for ungraceful shutdown). Returns count of paused sessions. */
+  bulkPauseActiveSessions(): Promise<number>;
   updateSessionConfig(id: string, model: string | null | undefined, config: SessionConfig | null): Promise<void>;
   touchSession(id: string): Promise<void>;
   // Sandboxes (insertSandbox is tenant-scoped)
@@ -214,6 +216,10 @@ export async function listSessionsByRunner(runnerId: string): Promise<Session[]>
 
 export async function bulkPauseSessionsByRunner(runnerId: string): Promise<number> {
   return getDb().bulkPauseSessionsByRunner(runnerId);
+}
+
+export async function bulkPauseActiveSessions(): Promise<number> {
+  return getDb().bulkPauseActiveSessions();
 }
 
 export async function updateSessionConfig(id: string, model: string | null | undefined, config: SessionConfig | null): Promise<void> {

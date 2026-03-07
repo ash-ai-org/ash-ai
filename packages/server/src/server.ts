@@ -4,9 +4,9 @@ import swaggerUi from '@fastify/swagger-ui';
 import rateLimit from '@fastify/rate-limit';
 import cors from '@fastify/cors';
 import { join, resolve } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
-import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner, listAgents, listApiKeysByTenant, insertApiKey } from './db/index.js';
+import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner, listAgents, listApiKeysByTenant, insertApiKey, bulkPauseActiveSessions } from './db/index.js';
 import { QueueProcessor } from './queue/processor.js';
 import { randomUUID } from 'node:crypto';
 import { SandboxManager, SandboxPool, persistSessionState, syncStateToCloud } from '@ash-ai/sandbox';
@@ -99,6 +99,14 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
       },
     });
     await pool.init();
+
+    // Safety net: mark any sessions left in active/starting as paused.
+    // This handles ungraceful shutdowns (SIGKILL, power loss) where drainAll() didn't run.
+    const paused = await bulkPauseActiveSessions();
+    if (paused > 0) {
+      console.log(`[server] Startup: paused ${paused} orphaned active session(s)`);
+    }
+
     pool.startIdleSweep();
     pool.startColdCleanup();
 
@@ -106,8 +114,9 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
     listAgents().then(async (agents) => {
       for (const agent of agents) {
         const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;
-        if (typeof preWarmCount === 'number' && preWarmCount > 0 && agent.path) {
-          await pool!.warmUp(agent.name, agent.path, preWarmCount);
+        const warmCount = typeof preWarmCount === 'number' ? preWarmCount : 1;
+        if (warmCount > 0 && agent.path) {
+          await pool!.warmUp(agent.name, agent.path, warmCount);
         }
       }
     }).catch((err) => {
@@ -166,20 +175,22 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   }
   registerSchemas(app);
 
-  // Auto-generate API key on first start if no keys exist
+  // Ensure an API key exists and is recoverable by the CLI.
+  // The bootstrap file (`initial-api-key`) is written on every startup so the CLI
+  // can pick it up. The CLI deletes the file after reading it.
   let hasDbKeys = false;
   const existingKeys = await listApiKeysByTenant('default');
   hasDbKeys = existingKeys.length > 0;
+  const bootstrapPath = join(dataDir, 'initial-api-key');
 
   if (!hasDbKeys && !opts.apiKey) {
+    // First start: generate a new key
     const plainKey = generateApiKey();
     const hmacSecret = process.env.ASH_CREDENTIAL_KEY;
     const keyHash = hashApiKey(plainKey, hmacSecret);
     await insertApiKey(randomUUID(), 'default', keyHash, 'auto-generated');
     hasDbKeys = true;
 
-    // Write bootstrap file for CLI to pick up
-    const bootstrapPath = join(dataDir, 'initial-api-key');
     writeFileSync(bootstrapPath, plainKey, { mode: 0o600 });
 
     console.log('');
@@ -190,6 +201,14 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
     console.log('  Read that file to retrieve your key (permissions: 0600).');
     console.log('==========================================================');
     console.log('');
+  } else if (hasDbKeys && !opts.apiKey && !existsSync(bootstrapPath)) {
+    // DB has keys but bootstrap file is gone (CLI already consumed it, or key was lost).
+    // Generate a fresh key so the CLI can recover without nuking the DB.
+    const plainKey = generateApiKey();
+    const hmacSecret = process.env.ASH_CREDENTIAL_KEY;
+    const keyHash = hashApiKey(plainKey, hmacSecret);
+    await insertApiKey(randomUUID(), 'default', keyHash, 'cli-recovery');
+    writeFileSync(bootstrapPath, plainKey, { mode: 0o600 });
   }
 
   // Auth
@@ -272,7 +291,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
     if (pool) {
       pool.stopIdleSweep();
       pool.stopColdCleanup();
-      await pool.destroyAll();
+      await pool.drainAll();
     }
     await closeDb();
     await app.close();

@@ -113,8 +113,8 @@ The CLI reads the API key from `~/.ash/config.json` automatically (saved by `ash
 export ASH_API_KEY=your-secret-key
 ash agent list
 
-# Or save it to config when connecting to a remote server
-ash connect http://your-server:4100 --api-key your-secret-key
+# Or save it to config when linking to a remote server
+ash link http://your-server:4100 --api-key your-secret-key
 ```
 
 Key precedence: `ASH_API_KEY` env var > `~/.ash/config.json` `api_key` field.
@@ -168,4 +168,4 @@ Auth hook: Fastify `onRequest` hook in `auth.ts`. Checks DB keys first (HMAC-SHA
 
 - No per-user keys or RBAC (multi-tenant API keys are supported via the DB)
 - No rate limiting on failed auth attempts
-- Bootstrap file mechanism requires shared filesystem between server and CLI (works for Docker with mounted `~/.ash`, not for remote-only servers — use `ash connect --api-key` for those)
+- Bootstrap file mechanism requires shared filesystem between server and CLI (works for Docker with mounted `~/.ash`, not for remote-only servers — use `ash link --api-key` for those)

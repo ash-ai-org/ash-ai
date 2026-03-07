@@ -37,6 +37,13 @@ export async function deployAgent(name: string, path: string, env?: Record<strin
   return (await res.json() as { agent: unknown }).agent;
 }
 
+export async function deployAgentWithFiles(name: string, files: Array<{ path: string; content: string }>, env?: Record<string, string>) {
+  const body: Record<string, unknown> = { name, files };
+  if (env) body.env = env;
+  const res = await request('POST', '/api/agents', body);
+  return (await res.json() as { agent: unknown }).agent;
+}
+
 export async function listAgents() {
   const res = await request('GET', '/api/agents');
   return (await res.json() as { agents: unknown[] }).agents;

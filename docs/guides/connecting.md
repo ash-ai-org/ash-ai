@@ -225,19 +225,18 @@ Install the CLI globally:
 npm install -g @ash-ai/cli
 ```
 
-Connect to your server:
+Link to your server:
 
 ```bash
-ash connect http://your-server:4100 --api-key YOUR_API_KEY
+ash link http://your-server:4100 --api-key YOUR_API_KEY
 ```
 
-This saves the server URL and API key to `~/.ash/config.json`. All subsequent commands target this server and authenticate automatically until you run `ash disconnect`.
+This saves the server URL and API key to `~/.ash/config.json`. All subsequent commands target this server automatically until you run `ash unlink`.
 
-You can also use environment variables instead:
+You can also override per-command with environment variables:
 
 ```bash
-export ASH_SERVER_URL=http://your-server:4100
-export ASH_API_KEY=YOUR_API_KEY
+ASH_SERVER_URL=http://your-server:4100 ash agent list
 ```
 
 ### Check Server and Agents

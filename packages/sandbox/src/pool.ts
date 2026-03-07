@@ -89,6 +89,10 @@ export class SandboxPool {
       if (warm) {
         this._preWarmHits++;
         console.log(`[pool] Claimed pre-warmed sandbox ${warm.id.slice(0, 8)} for session ${opts.sessionId}`);
+        // Replenish: fire-and-forget a replacement warm sandbox
+        this.warmUp(opts.agentName, opts.agentDir, 1, { extraEnv: opts.extraEnv }).catch((err) =>
+          console.error(`[pool] Replenish warm failed for ${opts.agentName}:`, err)
+        );
         return warm;
       }
     }
@@ -177,6 +181,26 @@ export class SandboxPool {
     await Promise.all(ids.map((id) => this.destroy(id)));
     // Also clean cold entries from DB
     // (destroyAll is for full shutdown — clean everything)
+  }
+
+  /**
+   * Graceful shutdown: persist session state for all live sandboxes
+   * (via onBeforeEvict callback), then destroy them all.
+   * Unlike destroyAll(), this ensures session workspace and state are saved
+   * so sessions can be cold-resumed after restart.
+   */
+  async drainAll(): Promise<void> {
+    // Persist state for each live sandbox that has a session
+    if (this.onBeforeEvict) {
+      for (const [, entry] of this.live) {
+        try {
+          await this.onBeforeEvict(entry);
+        } catch (err) {
+          console.error(`[pool] Failed to persist state for sandbox ${entry.sandbox.id}:`, err);
+        }
+      }
+    }
+    await this.destroyAll();
   }
 
   // --- State transitions ---

@@ -12,7 +12,7 @@ import { statusCommand } from './commands/status.js';
 import { logsCommand } from './commands/logs.js';
 import { chatCommand } from './commands/chat.js';
 import { loginCommand, logoutCommand } from './commands/login.js';
-import { connectCommand, disconnectCommand } from './commands/connect.js';
+import { linkCommand, unlinkCommand } from './commands/link.js';
 import { rebuildCommand } from './commands/rebuild.js';
 
 // Detect dev mode: flag from dev.ts entry point, argv[1], or ASH_DEV env var
@@ -35,8 +35,8 @@ program.addCommand(deployCommand());
 program.addCommand(sessionCommand());
 program.addCommand(agentCommand());
 program.addCommand(healthCommand());
-program.addCommand(connectCommand());
-program.addCommand(disconnectCommand());
+program.addCommand(linkCommand());
+program.addCommand(unlinkCommand());
 program.addCommand(loginCommand());
 program.addCommand(logoutCommand());
 
