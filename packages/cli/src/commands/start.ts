@@ -82,9 +82,6 @@ export function startCommand(): Command {
       const envPassthrough: string[] = [];
 
       // Pass through sandbox config env vars if set
-      if (process.env.ASH_SANDBOX_BACKEND) {
-        envPassthrough.push('ASH_SANDBOX_BACKEND');
-      }
       if (process.env.ASH_SANDBOX_MEMORY_MB) {
         envPassthrough.push('ASH_SANDBOX_MEMORY_MB');
       }
