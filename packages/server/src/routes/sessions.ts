@@ -13,6 +13,9 @@ import { restoreSessionState, hasPersistedState, restoreStateFromCloud, restoreA
 import { decryptCredential } from './credentials.js';
 import { touchCredentialUsed } from '../db/index.js';
 import { recordUsageFromMessage } from '../usage/extractor.js';
+import { trace, context, propagation, SpanStatusCode } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('ash-coordinator');
 
 /** Structured log line for every resume — always on, not gated by ASH_DEBUG_TIMING. */
 function logResume(path: 'warm' | 'cold', sessionId: string, agentName: string, source?: 'local' | 'cloud' | 'fresh'): void {
@@ -115,8 +118,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
   }, async (req, reply) => {
     const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt, permissionMode, allowedTools, disallowedTools, betas, subagents, initialAgent } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string; permissionMode?: string; allowedTools?: string[]; disallowedTools?: string[]; betas?: string[]; subagents?: Record<string, unknown>; initialAgent?: string };
 
+    return tracer.startActiveSpan('ash.session.create', { attributes: { 'ash.agent.name': agent } }, async (span) => {
+    try {
     const agentRecord = await getAgent(agent, req.tenantId);
     if (!agentRecord) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: 'Agent not found' });
       return reply.status(404).send({ error: `Agent "${agent}" not found`, statusCode: 404 });
     }
 
@@ -124,6 +130,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     if (!existsSync(agentRecord.path)) {
       const restored = await restoreAgentFromCloud(agentRecord.name, agentRecord.path, req.tenantId);
       if (!restored) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Agent directory not found' });
         return reply.status(422).send({ error: `Agent directory not found at "${agentRecord.path}". The agent "${agent}" may need to be re-deployed.`, statusCode: 422 });
       }
       console.log(`[sessions] Restored agent "${agent}" from cloud storage`);
@@ -134,6 +141,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     if (credentialId) {
       const cred = await decryptCredential(credentialId, req.tenantId);
       if (!cred) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Invalid credential' });
         return reply.status(400).send({ error: 'Invalid or inaccessible credential', statusCode: 400 });
       }
       const envKey = cred.type === 'anthropic' ? 'ANTHROPIC_API_KEY' : cred.type === 'openai' ? 'OPENAI_API_KEY' : 'ASH_CUSTOM_API_KEY';
@@ -152,10 +160,14 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     }
 
     const sessionId = randomUUID();
+    span.setAttribute('ash.session.id', sessionId);
 
     try {
+      span.addEvent('selectBackend.start');
       const { backend, runnerId } = await coordinator.selectBackend();
+      span.addEvent('selectBackend.end');
 
+      span.addEvent('createSandbox.start');
       const handle = await backend.createSandbox({
         sessionId,
         agentDir: agentRecord.path,
@@ -171,9 +183,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           );
         },
       });
+      span.addEvent('createSandbox.end');
 
       // Resolve effective model: explicit request > agent record > null (SDK default)
       const effectiveModel = model || agentRecord.model || undefined;
+      if (effectiveModel) span.setAttribute('ash.model', effectiveModel);
 
       // Build session-level SDK config (persisted on session, injected into every query)
       const sessionConfig: SessionConfig | null = (allowedTools || disallowedTools || betas || subagents || initialAgent)
@@ -192,11 +206,15 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(201).send({ session: { ...session, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+      span.recordException(err instanceof Error ? err : new Error(msg));
       if (msg.includes('capacity reached') || msg.includes('No runners available')) {
         return reply.status(503).send({ error: msg, statusCode: 503 });
       }
       return reply.status(500).send({ error: `Failed to create session: ${msg}`, statusCode: 500 });
     }
+    } finally { span.end(); }
+    });
   });
 
   // List sessions (optional ?agent=name filter)
@@ -403,17 +421,31 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
     const { content, includePartialMessages, model: messageModel, maxTurns, maxBudgetUsd, effort, thinking, outputFormat } = req.body as { content: string; includePartialMessages?: boolean; model?: string; maxTurns?: number; maxBudgetUsd?: number; effort?: 'low' | 'medium' | 'high' | 'max'; thinking?: { type: string; budgetTokens?: number }; outputFormat?: { type: string; schema: Record<string, unknown> } };
 
+    const messageSpan = tracer.startSpan('ash.session.message', {
+      attributes: {
+        'ash.session.id': session.id,
+        'ash.agent.name': session.agentName,
+        'ash.sandbox.id': session.sandboxId,
+      },
+    });
+    const messageCtx = trace.setSpan(context.active(), messageSpan);
+    if (session.model) messageSpan.setAttribute('ash.model', session.model);
+
     let backend;
     try {
       backend = await coordinator.getBackendForRunnerAsync(session.runnerId);
     } catch {
       await updateSessionStatus(session.id, 'error');
+      messageSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Runner not available' });
+      messageSpan.end();
       return reply.status(500).send({ error: 'Runner not available', statusCode: 500 });
     }
 
     const sandbox = backend.getSandbox(session.sandboxId);
     if (!sandbox) {
       await updateSessionStatus(session.id, 'error');
+      messageSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Sandbox not found' });
+      messageSpan.end();
       return reply.status(500).send({ error: 'Sandbox not found', statusCode: 500 });
     }
 
@@ -443,6 +475,11 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     let eventCount = 0;
     let firstEventMs = 0;
 
+    // Inject trace context for bridge propagation
+    const carrier: Record<string, string> = {};
+    propagation.inject(messageCtx, carrier);
+    const traceContext = carrier['traceparent'];
+
     try {
       // Model precedence: per-message > session-level > agent default (.claude/settings.json)
       const queryModel = messageModel || session.model || undefined;
@@ -468,6 +505,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         ...(cfg?.betas && { betas: cfg.betas }),
         ...(cfg?.subagents && { subagents: cfg.subagents }),
         ...(cfg?.initialAgent && { initialAgent: cfg.initialAgent }),
+        // Distributed tracing context
+        ...(traceContext && { traceContext }),
       });
 
       for await (const event of events) {
@@ -528,12 +567,15 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      messageSpan.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+      messageSpan.recordException(err instanceof Error ? err : new Error(msg));
       reply.raw.write(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`);
       // Signal stream completion — the session remains active (not ended)
       reply.raw.write(`event: done\ndata: ${JSON.stringify({ sessionId: session.id })}\n\n`);
     } finally {
       // Mark waiting after message processing completes
       backend.markWaiting(session.sandboxId);
+      messageSpan.end();
     }
 
     if (elapsed) {
@@ -687,10 +729,13 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
+    return tracer.startActiveSpan('ash.session.pause', async (span) => {
+    try {
     const session = await getSession(req.params.id);
     if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
+    span.setAttribute('ash.session.id', session.id);
     if (session.status !== 'active') {
       return reply.status(400).send({ error: `Cannot pause session with status "${session.status}"`, statusCode: 400 });
     }
@@ -705,6 +750,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'paused' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
     telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'paused' } });
     return reply.send({ session: { ...session, status: 'paused' } });
+    } finally { span.end(); }
+    });
   });
 
   // Stop session — explicit user action (distinct from pause which is idle-based)
@@ -719,10 +766,13 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
+    return tracer.startActiveSpan('ash.session.stop', async (span) => {
+    try {
     const session = await getSession(req.params.id);
     if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
+    span.setAttribute('ash.session.id', session.id);
     if (session.status !== 'active' && session.status !== 'starting') {
       return reply.status(400).send({ error: `Cannot stop session with status "${session.status}"`, statusCode: 400 });
     }
@@ -738,6 +788,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
     insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'stopped' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
     telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'stopped' } });
     return reply.send({ session: { ...session, status: 'stopped' as const } });
+    } finally { span.end(); }
+    });
   });
 
   // Fork session — create a new session branching from parent's state and messages
@@ -834,10 +886,13 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
+    return tracer.startActiveSpan('ash.session.resume', async (span) => {
+    try {
     const session = await getSession(req.params.id);
     if (!session || session.tenantId !== req.tenantId) {
       return reply.status(404).send({ error: 'Session not found', statusCode: 404 });
     }
+    span.setAttribute('ash.session.id', session.id);
     if (session.status === 'ended') {
       return reply.status(410).send({ error: 'Session has ended — create a new session', statusCode: 410 });
     }
@@ -866,6 +921,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       if (oldBackend.isSandboxAlive(session.sandboxId)) {
         oldBackend.recordWarmHit();
         logResume('warm', session.id, session.agentName);
+        span.setAttribute('ash.resume.path', 'warm');
         await updateSessionStatus(session.id, 'active');
         insertSessionEvent(session.id, 'lifecycle', JSON.stringify({ action: 'resumed', path: 'warm' }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
         telemetry.emit({ sessionId: session.id, agentName: session.agentName, type: 'lifecycle', data: { status: 'active', action: 'resumed', path: 'warm' } });
@@ -894,6 +950,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       } else {
         resumeSource = 'local';
       }
+
+      span.setAttribute('ash.resume.path', 'cold');
+      span.setAttribute('ash.resume.source', resumeSource);
 
       const workspaceAvailable = existsSync(oldWorkspaceDir);
       const { backend, runnerId } = await coordinator.selectBackend();
@@ -929,11 +988,15 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.send({ session: { ...session, sandboxId: handle.sandboxId, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+      span.recordException(err instanceof Error ? err : new Error(msg));
       if (msg.includes('capacity reached') || msg.includes('No runners available')) {
         return reply.status(503).send({ error: msg, statusCode: 503 });
       }
       return reply.status(500).send({ error: `Failed to resume session: ${msg}`, statusCode: 500 });
     }
+    } finally { span.end(); }
+    });
   });
 
   // End session

@@ -1,129 +1,121 @@
 # OpenTelemetry Distributed Tracing
 
-## Status: Proposed
+## Status: Implemented
 
-## Problem
+All 4 phases are implemented and shipping. Tracing is opt-in via `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
-Ash has basic observability (Prometheus metrics at `/metrics`, structured JSON logs, health endpoint) but no distributed tracing. Enterprise deployments need trace propagation from client applications through the coordinator, into sandboxes, and through to model API calls. Without this, debugging latency issues across the Ash stack requires correlating logs manually.
-
-## Current Observability
-
-| Layer | What exists | What's missing |
-|-------|------------|----------------|
-| Coordinator (Fastify) | `/health` JSON, `/metrics` Prometheus, structured Pino logs | No OTEL spans, no trace context propagation |
-| Bridge (sandbox) | `ASH_DEBUG_TIMING` stderr timing lines | No OTEL spans, no tool-call-level tracing |
-| Client → Coordinator | HTTP request/response | No trace context headers (traceparent) |
-| Bridge → Model API | HTTPS via Claude Code SDK | No span instrumentation around SDK calls |
-
-## Proposed Architecture
-
-### Layer 1: Coordinator-Level Tracing (Low effort)
-
-Standard Node.js OTEL auto-instrumentation on the Fastify server. This gives HTTP request spans for free.
+## Quick Start
 
 ```bash
-# Start with auto-instrumentation
-node --require @opentelemetry/auto-instrumentations-node/register \
-  ./node_modules/.bin/ash start
-```
+# Start a local Jaeger instance
+docker run -d --name jaeger -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one
 
-Or configure programmatically:
+# Start Ash with tracing enabled
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 ash start
 
-```typescript
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-
-const sdk = new NodeSDK({
-  traceExporter: new OTLPTraceExporter({ url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT }),
-  instrumentations: [getNodeAutoInstrumentations()],
-  serviceName: 'ash-coordinator',
-});
-sdk.start();
-```
-
-**What this covers automatically:**
-- HTTP request/response spans (every API call)
-- Database query spans (SQLite/Postgres via knex/drizzle instrumentation)
-- Outbound HTTP spans (coordinator → runner communication)
-
-**Manual spans to add:**
-- `session.create` — wraps sandbox creation + DB insert
-- `session.message` — wraps the full message flow (command → bridge → SSE)
-- `session.resume` — wraps warm/cold path decision + sandbox restoration
-- `session.pause` / `session.end` — lifecycle transitions
-- `sandbox.create` — wraps agent copy + install + bridge spawn + connect
-
-**Implementation**: Add `@opentelemetry/api` as a dependency of `@ash-ai/server`. Create spans in `routes/sessions.ts` around the key operations. ~100 lines of code.
-
-### Layer 2: Bridge-Level Tracing (Medium effort)
-
-Instrument the bridge's `runAndStream()` function to create spans for each SDK message as it streams. This gives tool-call-level tracing equivalent to what custom wrappers provide.
-
-**Span hierarchy:**
-```
-ash.session.message (coordinator)
-  └── ash.bridge.query (bridge)
-       ├── ash.agent.turn (per SDK turn)
-       │    ├── ash.agent.thinking (thinking block)
-       │    ├── ash.tool.use (tool_use block)
-       │    │    └── ash.tool.result (tool_result)
-       │    └── ash.agent.text (text block)
-       └── ash.agent.result (final result)
-```
-
-**Attributes on spans:**
-- `ash.session.id`, `ash.agent.name`
-- `ash.tool.name`, `ash.tool.id` (on tool spans)
-- `ash.tokens.input`, `ash.tokens.output` (on result span)
-- `ash.model` (on query span)
-
-**Challenge**: The bridge runs inside the sandbox as a separate process. Trace context must propagate from the coordinator through the Unix socket protocol to the bridge. Options:
-
-1. **Propagate via bridge command** — Add `traceContext` field to `QueryCommand` in the bridge protocol. Bridge extracts it and creates child spans. This is the cleanest approach.
-2. **Propagate via env var** — Set `TRACEPARENT` env var on sandbox creation. Only works for the first request; subsequent messages in the same session wouldn't get new trace contexts.
-
-Recommended: Option 1 (protocol-level propagation).
-
-**Implementation**: Add `@opentelemetry/api` as a dependency of `@ash-ai/bridge`. Parse incoming `traceContext` from commands, create spans around `runQuery()`, classify SDK messages into spans. ~200 lines of code.
-
-### Layer 3: Trace Context Propagation to Model API (Low effort, after Layer 2)
-
-Once the bridge has OTEL context, the Claude Code SDK's outbound HTTP calls can automatically pick up trace context if the Node.js HTTP instrumentation is loaded. The `traceparent` header would flow through to the API gateway, enabling end-to-end traces from client app → Ash → model provider.
-
-**Requirement**: The API gateway must support W3C Trace Context headers (`traceparent`, `tracestate`).
-
-## Implementation Plan
-
-| Phase | Scope | Effort | Prerequisite |
-|-------|-------|--------|--------------|
-| 1 | Coordinator auto-instrumentation + manual session spans | Low | None |
-| 2 | Bridge protocol `traceContext` field | Low | Phase 1 |
-| 3 | Bridge span instrumentation (tool-call level) | Medium | Phase 2 |
-| 4 | Trace propagation to model API | Low | Phase 3 |
-
-## Dependencies
-
-```
-@opentelemetry/api                            # Core API (both coordinator + bridge)
-@opentelemetry/sdk-node                       # SDK setup (coordinator)
-@opentelemetry/auto-instrumentations-node     # Auto HTTP/DB instrumentation (coordinator)
-@opentelemetry/exporter-trace-otlp-grpc       # OTLP exporter (coordinator)
+# Open Jaeger UI
+open http://localhost:16686
+# Search for service: ash-coordinator
 ```
 
 ## Configuration
 
-```bash
-# Enable OTEL (coordinator)
-OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-OTEL_SERVICE_NAME=ash-coordinator
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | gRPC endpoint for OTLP trace export. Tracing is disabled when not set. |
+| `OTEL_SERVICE_NAME` | `ash-coordinator` (server) / `ash-bridge` (bridge) | Service name in traces |
 
-# Enable bridge tracing (future)
-ASH_BRIDGE_TRACING=1
+**Zero impact when not configured** — no OTEL SDK is initialized, no spans created, no dependencies loaded.
+
+## Architecture
+
+### Trace Flow
+
+```
+Client App
+  └── HTTP POST /api/sessions/:id/messages
+       └── ash.session.message (coordinator span)
+            │  attributes: ash.session.id, ash.agent.name, ash.model, ash.sandbox.id
+            │
+            └── [traceparent propagated via bridge protocol]
+                 └── ash.bridge.query (bridge span, linked to coordinator trace)
+                      │  attributes: ash.session.id, ash.model
+                      │
+                      ├── ash.agent.turn
+                      │    ├── ash.agent.thinking
+                      │    ├── ash.tool.use (ash.tool.name, ash.tool.id)
+                      │    └── ash.agent.text
+                      │
+                      └── result attributes: ash.cost_usd, ash.num_turns,
+                          ash.tokens.input, ash.tokens.output
 ```
 
-## Open Questions
+### Layer 1: Coordinator (packages/server)
 
-1. **Sampling**: Should Ash configure a default sampler, or leave it to the deployment? Head-based sampling at the coordinator means bridge spans are also sampled. Tail-based requires the collector.
-2. **Performance**: Adding spans to every streamed SDK message could add overhead. Need to benchmark before/after.
-3. **SDK instrumentation**: Does the Claude Code SDK have its own OTEL support? If so, the bridge instrumentation might get spans for free.
+**Auto-instrumentation** gives free spans for:
+- Every Fastify HTTP request/response
+- Outbound HTTP (coordinator → runner)
+- Database queries
+
+**Manual spans** in `routes/sessions.ts`:
+- `ash.session.create` — sandbox creation + DB insert
+- `ash.session.message` — full message flow (command → bridge → SSE response)
+- `ash.session.pause` — session pause lifecycle
+- `ash.session.stop` — session stop + sandbox destroy
+- `ash.session.resume` — warm/cold path with `ash.resume.path` and `ash.resume.source` attributes
+
+Span events on `ash.session.create`:
+- `selectBackend.start` / `selectBackend.end`
+- `createSandbox.start` / `createSandbox.end`
+
+### Layer 2: Bridge Protocol
+
+The `traceContext` field (W3C `traceparent` string) is added to `QueryCommand`, `ResumeCommand`, and `ExecCommand` in `packages/shared/src/protocol.ts`. The coordinator injects the current trace context when sending commands; the bridge extracts it to create child spans.
+
+`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` are in the sandbox env allowlist, so the bridge process can export its own spans.
+
+### Layer 3: Bridge Span Instrumentation (packages/bridge)
+
+The bridge's `runAndStream()` uses a span state machine to classify SDK streaming messages into a hierarchical span tree:
+
+- `stream_event` + `message_start` → open `ash.agent.turn`
+- `stream_event` + `content_block_start` → open `ash.agent.thinking` / `ash.tool.use` / `ash.agent.text` (parented to current turn)
+- `stream_event` + `content_block_stop` → close block span
+- `stream_event` + `message_stop` → close turn span
+- `type: 'result'` → record `ash.cost_usd`, `ash.num_turns`, `ash.tokens.input`, `ash.tokens.output`
+
+When `includePartialMessages` is false, only complete messages (`assistant`, `user`, `result`) are received — the span hierarchy is flatter but still captures the query-level span with usage attributes.
+
+### Layer 4: Model API Trace Propagation
+
+The bridge includes `@opentelemetry/instrumentation-http` which automatically instruments outbound HTTP/HTTPS calls. When the Claude Agent SDK makes API calls, the `traceparent` header is injected automatically — no application code changes needed.
+
+## Files
+
+| File | Role |
+|------|------|
+| `packages/server/src/telemetry/tracing.ts` | Coordinator OTEL SDK init (NodeSDK + auto-instrumentations + OTLP exporter) |
+| `packages/server/src/index.ts` | Calls `initTracing()` at startup, `shutdownTracing()` on SIGTERM |
+| `packages/server/src/routes/sessions.ts` | Manual spans + trace context injection into bridge commands |
+| `packages/shared/src/protocol.ts` | `traceContext?: string` on QueryCommand, ResumeCommand, ExecCommand |
+| `packages/shared/src/constants.ts` | OTEL env vars in SANDBOX_ENV_ALLOWLIST |
+| `packages/bridge/src/tracing.ts` | Bridge OTEL SDK init (lightweight — OTLP exporter + HTTP instrumentation) |
+| `packages/bridge/src/index.ts` | Span state machine in `runAndStream()` |
+
+## Testing
+
+```bash
+# All tests pass with tracing disabled (default)
+pnpm test
+
+# Smoke test with Jaeger
+docker run -d --name jaeger -p 16686:16686 -p 4317:4317 jaegertracing/all-in-one
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 ash start
+# Create session, send message, check Jaeger UI
+```
+
+## Open Questions (Resolved)
+
+1. **Sampling**: Left to deployment. No default sampler configured — the collector or OTEL SDK env vars (`OTEL_TRACES_SAMPLER`) control this.
+2. **Performance**: Spans are only created when the SDK is initialized (requires `OTEL_EXPORTER_OTLP_ENDPOINT`). When disabled, `@opentelemetry/api` returns no-op implementations with negligible overhead.
+3. **SDK instrumentation**: The Claude Agent SDK does not have built-in OTEL support, so bridge-level instrumentation provides the tool-call visibility.

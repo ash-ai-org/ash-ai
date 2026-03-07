@@ -1,0 +1,17 @@
+{
+  "projectTitle": "Ash AI Agent Framework",
+  "description": "Open-source framework for deploying AI agents with sandboxed execution, session persistence, streaming responses, and horizontal scaling",
+  "folders": ["website/docs", "README.md"],
+  "excludeFolders": ["node_modules", "dist", ".git", "reference_do_not_edit"],
+  "excludeFiles": ["*.test.ts", "*.spec.ts"],
+  "rules": [
+    "Ash uses Bearer token authentication with API keys, not OAuth or JWT",
+    "Sessions persist across restarts using a three-layer storage architecture (live workspace, local snapshot, cloud snapshot via S3/GCS)",
+    "Streaming uses Server-Sent Events (SSE), not WebSockets",
+    "Each agent session runs in an isolated sandbox with restricted environment variables and resource limits",
+    "Ash scales horizontally with coordinators (control plane) and runners (data plane) that share state via Postgres/CockroachDB",
+    "The TypeScript SDK is @ash-ai/sdk, the Python SDK is ash-ai-sdk (auto-generated from OpenAPI spec)",
+    "Authorization is tenant-scoped via API keys. Role-based access control is implemented at the application layer using MCP sidecars and system prompt overrides",
+    "Use client.sendMessageStream() for streaming responses, not client.sendMessage()"
+  ]
+}

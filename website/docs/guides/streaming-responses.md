@@ -256,6 +256,195 @@ while (true) {
 }
 ```
 
+## Error Handling
+
+Errors can arrive at two levels: **connection errors** (network failure, server restart) throw exceptions, and **agent errors** (sandbox crash, SDK error) arrive as `error` events within the stream. Handle both:
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+try {
+  for await (const event of client.sendMessageStream(sessionId, 'Hello')) {
+    if (event.type === 'message') {
+      const text = extractTextFromEvent(event.data);
+      if (text) process.stdout.write(text);
+    } else if (event.type === 'error') {
+      // Agent-level error (sandbox crash, OOM, SDK error)
+      console.error('Agent error:', event.data.error);
+    } else if (event.type === 'done') {
+      console.log('\nDone.');
+    }
+  }
+} catch (err) {
+  // Connection-level error (network failure, server restart, 404)
+  console.error('Connection error:', err.message);
+}
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+try:
+    for event in client.send_message_stream(session_id, "Hello"):
+        if event.type == "message":
+            data = event.data
+            if data.get("type") == "assistant":
+                for block in data.get("message", {}).get("content", []):
+                    if block.get("type") == "text":
+                        print(block["text"], end="")
+        elif event.type == "error":
+            # Agent-level error (sandbox crash, OOM, SDK error)
+            print(f"Agent error: {event.data.get('error')}")
+        elif event.type == "done":
+            print("\nDone.")
+except Exception as e:
+    # Connection-level error (network failure, server restart)
+    print(f"Connection error: {e}")
+```
+
+</TabItem>
+</Tabs>
+
+## Reconnection with Retry
+
+When an SSE stream disconnects (server restart, network blip, load balancer timeout), retry with exponential backoff. If the session's sandbox was destroyed, resume it before retrying.
+
+<Tabs groupId="sdk-language">
+<TabItem value="typescript" label="TypeScript">
+
+```typescript
+import { AshClient, extractTextFromEvent } from '@ash-ai/sdk';
+
+const client = new AshClient({
+  serverUrl: 'http://localhost:4100',
+  apiKey: process.env.ASH_API_KEY,
+});
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function streamWithRetry(
+  sessionId: string,
+  content: string,
+  maxRetries = 3,
+): Promise<string> {
+  let fullText = '';
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      for await (const event of client.sendMessageStream(sessionId, content)) {
+        if (event.type === 'message') {
+          const text = extractTextFromEvent(event.data);
+          if (text) {
+            fullText += text;
+            process.stdout.write(text);
+          }
+        } else if (event.type === 'error') {
+          throw new Error(`Agent error: ${event.data.error}`);
+        }
+      }
+      return fullText; // Stream completed successfully
+    } catch (err) {
+      console.warn(`Stream attempt ${attempt + 1} failed: ${(err as Error).message}`);
+
+      if (attempt === maxRetries - 1) throw err;
+
+      // Check if the session needs recovery before retrying
+      try {
+        const session = await client.getSession(sessionId);
+        if (session.status === 'paused' || session.status === 'error') {
+          await client.resumeSession(sessionId);
+          console.log('Session resumed after disconnect');
+        }
+      } catch {
+        // Server might be temporarily unreachable — wait and retry
+      }
+
+      // Exponential backoff: 1s, 2s, 4s
+      await sleep(Math.pow(2, attempt) * 1000);
+    }
+  }
+
+  return fullText;
+}
+
+// Usage
+const session = await client.createSession('my-agent');
+const result = await streamWithRetry(session.id, 'Analyze this code');
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+import time
+from ash_ai import AshClient, AshApiError
+
+client = AshClient(
+    server_url="http://localhost:4100",
+    api_key=os.environ["ASH_API_KEY"],
+)
+
+def stream_with_retry(session_id: str, content: str, max_retries: int = 3) -> str:
+    full_text = ""
+
+    for attempt in range(max_retries):
+        try:
+            for event in client.send_message_stream(session_id, content):
+                if event.type == "message":
+                    data = event.data
+                    if data.get("type") == "assistant":
+                        for block in data.get("message", {}).get("content", []):
+                            if block.get("type") == "text":
+                                full_text += block["text"]
+                                print(block["text"], end="", flush=True)
+                elif event.type == "error":
+                    raise Exception(f"Agent error: {event.data.get('error')}")
+            return full_text  # Stream completed successfully
+
+        except Exception as e:
+            print(f"\nStream attempt {attempt + 1} failed: {e}")
+
+            if attempt == max_retries - 1:
+                raise
+
+            # Check if the session needs recovery
+            try:
+                session = client.get_session(session_id)
+                if session.status in ("paused", "error"):
+                    client.resume_session(session_id)
+                    print("Session resumed after disconnect")
+            except Exception:
+                pass  # Server temporarily unreachable
+
+            # Exponential backoff
+            time.sleep(2 ** attempt)
+
+    return full_text
+
+# Usage
+session = client.create_session("my-agent")
+result = stream_with_retry(session.id, "Analyze this code")
+```
+
+</TabItem>
+</Tabs>
+
+## Backpressure
+
+Ash handles backpressure automatically on the server side. When your client reads the SSE stream slowly, the server pauses the upstream agent rather than buffering unbounded data in memory.
+
+**What this means for your client:**
+
+- **You do not need to implement client-side backpressure.** Read the stream at whatever pace you can handle. If you process events slowly, the server waits.
+- **Memory is bounded.** The server buffers at most one SSE frame plus the kernel TCP send buffer (typically 128 KB - 1 MB). There is no application-level buffering.
+- **Slow clients get disconnected after 30 seconds.** If your client stops reading for more than 30 seconds, the server closes the stream with a timeout error. Reconnect and resume the session to continue.
+
+See [SSE Backpressure](../architecture/sse-backpressure.md) for the full server-side implementation.
+
 ## Helper Functions Reference
 
 The `@ash-ai/shared` package exports three helper functions for extracting content from stream events:

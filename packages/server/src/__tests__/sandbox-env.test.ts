@@ -39,6 +39,7 @@ describe('sandbox environment isolation', () => {
       'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_CUSTOM_HEADERS',
       'ASH_DEBUG_TIMING', 'ASH_REAL_SDK', 'ASH_PERMISSION_MODE',
       'CLAUDE_CODE_EXECUTABLE',
+      'OTEL_EXPORTER_OTLP_ENDPOINT', 'OTEL_SERVICE_NAME',
     ]);
     const actual = new Set(SANDBOX_ENV_ALLOWLIST);
     expect(actual).toEqual(expected);

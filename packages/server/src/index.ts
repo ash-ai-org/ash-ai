@@ -1,3 +1,7 @@
+// OTEL must initialize before any HTTP modules are imported
+import { initTracing, shutdownTracing } from './telemetry/tracing.js';
+await initTracing();
+
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
@@ -32,8 +36,8 @@ const { app, shutdown } = await createAshServer({
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => { await shutdown(); process.exit(0); });
-process.on('SIGINT', async () => { await shutdown(); process.exit(0); });
+process.on('SIGTERM', async () => { await shutdownTracing(); await shutdown(); process.exit(0); });
+process.on('SIGINT', async () => { await shutdownTracing(); await shutdown(); process.exit(0); });
 
 // Start
 try {
