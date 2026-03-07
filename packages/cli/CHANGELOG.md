@@ -1,5 +1,11 @@
 # @ash-ai/cli
 
+## 0.0.17 - 2026-03-06
+
+### Fixed
+
+- Set `~/.ash/` directory permissions to 0700 and credential/config files to 0600 (#58)
+
 ## 0.0.16 - 2026-03-06
 
 ### Changed

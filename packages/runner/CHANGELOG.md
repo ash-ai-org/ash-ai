@@ -1,5 +1,12 @@
 # @ash-ai/runner
 
+## 0.0.17 - 2026-03-06
+
+### Changed
+
+- Updated fastify to >=5.8.1 (Content-Type validation bypass CVE fix)
+- Updated dependencies: @ash-ai/shared@0.0.18, @ash-ai/sandbox@0.0.22
+
 ## 0.0.16 - 2026-03-06
 
 ### Changed

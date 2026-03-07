@@ -1,5 +1,17 @@
 # @ash-ai/mcp-server
 
+## 0.0.14 - 2026-03-06
+
+### Changed
+
+- Updated dependencies
+
+## 0.0.13 - 2026-03-06
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.12 - 2026-02-28
 
 ### Changed
