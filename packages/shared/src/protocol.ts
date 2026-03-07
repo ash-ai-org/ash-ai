@@ -28,11 +28,15 @@ export interface QueryCommand {
   betas?: string[];
   subagents?: Record<string, unknown>;
   initialAgent?: string;
+  /** W3C traceparent header for distributed tracing */
+  traceContext?: string;
 }
 
 export interface ResumeCommand {
   cmd: 'resume';
   sessionId: string;
+  /** W3C traceparent header for distributed tracing */
+  traceContext?: string;
 }
 
 export interface InterruptCommand {
@@ -47,6 +51,8 @@ export interface ExecCommand {
   cmd: 'exec';
   command: string;
   timeout?: number;
+  /** W3C traceparent header for distributed tracing */
+  traceContext?: string;
 }
 
 export type BridgeCommand =

@@ -1,3 +1,7 @@
+// OTEL must initialize before any HTTP modules are imported
+import { initBridgeTracing, shutdownBridgeTracing, extractTraceContext, getBridgeTracer } from './tracing.js';
+await initBridgeTracing();
+
 import net from 'node:net';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -5,6 +9,7 @@ import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import { encode, decode, type BridgeCommand, type BridgeEvent, timingEnabled, startTimer, logTiming } from '@ash-ai/shared';
 import { runQuery } from './sdk.js';
+import { context as otelContext, trace as otelTrace, SpanStatusCode, type Span } from '@opentelemetry/api';
 
 const execAsync = promisify(execCb);
 
@@ -56,6 +61,7 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
   betas?: string[];
   subagents?: Record<string, unknown>;
   initialAgent?: string;
+  traceContext?: string;
 }): Promise<void> {
   currentAbort = new AbortController();
 
@@ -65,7 +71,23 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
   let sdkFirstTokenMs = 0;
   const cmdParseMs = elapsed?.() ?? 0;
 
+  // Set up OTEL tracing — link to coordinator's trace via traceContext
+  const tracer = getBridgeTracer();
+  const parentCtx = extractTraceContext(sdkOpts?.traceContext);
+  const querySpan = tracer.startSpan('ash.bridge.query', {
+    attributes: {
+      'ash.session.id': sessionId,
+      ...(sdkOpts?.model && { 'ash.model': sdkOpts.model }),
+    },
+  }, parentCtx);
+  const queryCtx = otelTrace.setSpan(parentCtx, querySpan);
+
+  // Span state machine for streaming messages
+  let turnSpan: Span | null = null;
+  let blockSpan: Span | null = null;
+
   try {
+    await otelContext.with(queryCtx, async () => {
     for await (const message of runQuery({
       prompt,
       sessionId,
@@ -73,23 +95,79 @@ async function runAndStream(conn: net.Socket, prompt: string, sessionId: string,
       workspaceDir,
       claudeMd,
       resume,
-      signal: currentAbort.signal,
+      signal: currentAbort!.signal,
       ...sdkOpts,
     })) {
       eventCount++;
       if (eventCount === 1 && elapsed) {
         sdkFirstTokenMs = elapsed();
       }
-      // Capture the SDK's session_id from result messages for future resume
+
       const msg = message as Record<string, unknown>;
+
+      // Span instrumentation based on message type
+      if (msg.type === 'stream_event') {
+        const event = msg.event as Record<string, unknown> | undefined;
+        const eventType = event?.type as string | undefined;
+
+        if (eventType === 'message_start') {
+          turnSpan = tracer.startSpan('ash.agent.turn', {}, queryCtx);
+        } else if (eventType === 'content_block_start') {
+          // Parent block spans to the turn span when available, otherwise query span
+          const blockParent = turnSpan ? otelTrace.setSpan(queryCtx, turnSpan) : queryCtx;
+          const block = event?.content_block as Record<string, unknown> | undefined;
+          const blockType = block?.type as string;
+          if (blockType === 'thinking') {
+            blockSpan = tracer.startSpan('ash.agent.thinking', {}, blockParent);
+          } else if (blockType === 'tool_use') {
+            const toolName = block?.name as string | undefined;
+            const toolId = block?.id as string | undefined;
+            blockSpan = tracer.startSpan('ash.tool.use', {
+              attributes: {
+                ...(toolName && { 'ash.tool.name': toolName }),
+                ...(toolId && { 'ash.tool.id': toolId }),
+              },
+            }, blockParent);
+          } else if (blockType === 'text') {
+            blockSpan = tracer.startSpan('ash.agent.text', {}, blockParent);
+          }
+        } else if (eventType === 'content_block_stop') {
+          if (blockSpan) { blockSpan.end(); blockSpan = null; }
+        } else if (eventType === 'message_stop') {
+          if (turnSpan) { turnSpan.end(); turnSpan = null; }
+        }
+      } else if (msg.type === 'user') {
+        // Tool result message — record as a span event on the query
+        querySpan.addEvent('ash.tool.result');
+      } else if (msg.type === 'result') {
+        // Final result — record usage attributes
+        if (typeof msg.cost_usd === 'number') querySpan.setAttribute('ash.cost_usd', msg.cost_usd);
+        if (typeof msg.num_turns === 'number') querySpan.setAttribute('ash.num_turns', msg.num_turns);
+        // Extract token counts from usage if available
+        const usage = msg.usage as Record<string, unknown> | undefined;
+        if (usage) {
+          if (typeof usage.input_tokens === 'number') querySpan.setAttribute('ash.tokens.input', usage.input_tokens);
+          if (typeof usage.output_tokens === 'number') querySpan.setAttribute('ash.tokens.output', usage.output_tokens);
+        }
+      }
+
+      // Capture the SDK's session_id from result messages for future resume
       if (msg.session_id && typeof msg.session_id === 'string') {
         sdkSessionIds.set(sessionId, msg.session_id);
       }
       await send(conn, { ev: 'message', data: message });
     }
+    });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await send(conn, { ev: 'error', error: msg });
+    const errMsg = err instanceof Error ? err.message : String(err);
+    querySpan.setStatus({ code: SpanStatusCode.ERROR, message: errMsg });
+    querySpan.recordException(err instanceof Error ? err : new Error(errMsg));
+    await send(conn, { ev: 'error', error: errMsg });
+  } finally {
+    // Clean up any unclosed spans
+    if (blockSpan) (blockSpan as Span).end();
+    if (turnSpan) (turnSpan as Span).end();
+    querySpan.end();
   }
 
   if (elapsed) {
@@ -117,7 +195,7 @@ async function handleCommand(conn: net.Socket, cmd: BridgeCommand): Promise<void
       const shouldResume = count > 0;
       // Extract SDK-passthrough fields (everything except cmd, prompt, sessionId)
       const { cmd: _, prompt: __, sessionId: ___, ...sdkOpts } = cmd;
-      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, sdkOpts);
+      return runAndStream(conn, cmd.prompt, cmd.sessionId, shouldResume, sdkOpts as typeof sdkOpts & { traceContext?: string });
     }
 
     case 'resume':
@@ -184,8 +262,9 @@ server.listen(socketPath, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   currentAbort?.abort();
   server.close();
+  await shutdownBridgeTracing();
   process.exit(0);
 });
