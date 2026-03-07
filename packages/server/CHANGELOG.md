@@ -1,5 +1,12 @@
 # @ash-ai/server
 
+## 0.0.27 - 2026-03-06
+
+### Changed
+
+- Removed gVisor OCI spec tests from sandbox-isolation test suite (#62)
+- Updated dependencies: @ash-ai/sandbox@0.0.24
+
 ## 0.0.26 - 2026-03-06
 
 ### Added
