@@ -1,5 +1,17 @@
 # @ash-ai/bridge
 
+## 0.0.16 - 2026-03-06
+
+### Added
+
+- OpenTelemetry tracing: `ash.bridge.query`, `ash.agent.turn`, `ash.tool.use`, `ash.agent.thinking`, `ash.agent.text` spans (#55)
+- Distributed trace context propagation via W3C traceparent from coordinator (#55)
+- Token usage and cost attributes on query spans (#55)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.17
+
 ## 0.0.15 - 2026-02-28
 
 ### Added
