@@ -1,5 +1,12 @@
 # @ash-ai/bridge
 
+## 0.0.17 - 2026-03-06
+
+### Fixed
+
+- Add 10MB buffer size limit on bridge socket to prevent memory exhaustion (#58)
+- Sanitize error messages to strip file paths before sending over socket (#58)
+
 ## 0.0.16 - 2026-03-06
 
 ### Added

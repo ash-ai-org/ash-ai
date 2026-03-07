@@ -1,5 +1,16 @@
 # @ash-ai/sandbox
 
+## 0.0.22 - 2026-03-06
+
+### Fixed
+
+- Fix command injection in gVisor cleanup, disk monitoring, chown, tar operations by replacing `execSync` with `execFileSync` (#58)
+- Fix path traversal via custom sandboxId with regex validation and resolved path check (#58)
+- Fix Unix socket symlink attack on macOS by placing socket inside sandboxDir on all platforms (#58)
+- Kill entire process group on sandbox cleanup instead of just bridge process (#58)
+- Clean up resources (child process, cgroups) on bridge connect failure (#58)
+- Treat `du` timeout as disk limit exceeded to defend against symlink loops (#58)
+
 ## 0.0.21 - 2026-03-06
 
 ### Changed

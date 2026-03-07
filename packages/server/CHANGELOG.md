@@ -1,5 +1,26 @@
 # @ash-ai/server
 
+## 0.0.25 - 2026-03-06
+
+### Fixed
+
+- Remove plaintext API key from server startup stdout — key is saved to file only (#58)
+- Fix path prefix collision in agent file upload with `resolve()` + `path.sep` (#58)
+- Require `ASH_INTERNAL_SECRET` in production and use `timingSafeEqual` for comparison (#58)
+
+### Added
+
+- Add `@fastify/rate-limit` with 100 req/15min global, 20 req/15min on session/agent creation (#58)
+- Add `@fastify/cors` with `ALLOWED_ORIGINS` env var, rejecting cross-origin by default (#58)
+- Add `maxLength` constraints to all string body fields in API schemas (#58)
+- Disable Swagger UI in production (#58)
+- Log HTTPS warning when running in production without TLS (#58)
+
+### Changed
+
+- Updated fastify to >=5.8.1 (Content-Type validation bypass CVE fix)
+- Updated dependencies: @ash-ai/shared@0.0.18
+
 ## 0.0.24 - 2026-03-06
 
 ### Added

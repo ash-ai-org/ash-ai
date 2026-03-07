@@ -1,5 +1,11 @@
 # @ash-ai/shared
 
+## 0.0.18 - 2026-03-06
+
+### Changed
+
+- Add runtime validation to bridge protocol `decode()`: plain object check, discriminator validation, required field checks, and prototype pollution defense (#58)
+
 ## 0.0.17 - 2026-03-06
 
 ### Added
