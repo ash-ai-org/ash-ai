@@ -3,8 +3,6 @@ import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { SandboxLimits } from '@ash-ai/shared';
 import { DEFAULT_SANDBOX_LIMITS, DISK_CHECK_INTERVAL_MS } from '@ash-ai/shared';
-import { hasGVisor, spawnWithGVisor } from './gvisor.js';
-
 export { DEFAULT_SANDBOX_LIMITS };
 
 // =============================================================================
@@ -198,20 +196,10 @@ function spawnWithUlimit(
 // =============================================================================
 
 /**
- * Sandbox backend selection via ASH_SANDBOX_BACKEND env var.
- * Values: "gvisor" | "bwrap" | "auto" (default)
- *
- * "auto" detection order on Linux:
- *   1. gVisor (runsc) — strongest: syscall-interception via user-space kernel
- *   2. bwrap           — namespace isolation (kernel exploit = escape)
- *   3. cgroups-only    — resource limits only (outer container provides isolation)
+ * Sandbox backend on Linux:
+ *   1. bwrap + cgroups — namespace + filesystem isolation (default)
+ *   2. cgroups-only    — resource limits only (outer container provides isolation)
  */
-function getSandboxBackend(): 'gvisor' | 'bwrap' | 'auto' {
-  const val = process.env.ASH_SANDBOX_BACKEND?.toLowerCase();
-  if (val === 'gvisor' || val === 'bwrap') return val;
-  return 'auto';
-}
-
 export function spawnWithLimits(
   command: string,
   args: string[],
@@ -220,43 +208,6 @@ export function spawnWithLimits(
   sandboxOpts: SandboxSpawnOpts,
 ): SpawnResult {
   if (process.platform === 'linux') {
-    const backend = getSandboxBackend();
-
-    // Explicit gVisor backend requested
-    if (backend === 'gvisor') {
-      if (!hasGVisor()) {
-        throw new Error(
-          'ASH_SANDBOX_BACKEND=gvisor but runsc is not available. ' +
-          'Install gVisor (runsc) or set ASH_SANDBOX_BACKEND=auto.',
-        );
-      }
-      return spawnWithGVisor(command, args, opts, limits, sandboxOpts);
-    }
-
-    // Explicit bwrap backend requested
-    if (backend === 'bwrap') {
-      if (!hasCgroups()) {
-        throw new Error(
-          'SECURITY: cgroups not available on Linux. ' +
-          'Sandbox isolation requires cgroups v2 with /sys/fs/cgroup/ash writable.',
-        );
-      }
-      if (!hasBwrap()) {
-        throw new Error(
-          'ASH_SANDBOX_BACKEND=bwrap but bwrap namespace creation failed. ' +
-          'Ensure bubblewrap is installed and CAP_SYS_ADMIN is available.',
-        );
-      }
-      return spawnWithCgroups(command, args, opts, limits, sandboxOpts);
-    }
-
-    // Auto-detect: try strongest isolation first
-    // 1. gVisor (strongest — syscall interception)
-    if (hasGVisor()) {
-      return spawnWithGVisor(command, args, opts, limits, sandboxOpts);
-    }
-
-    // 2. bwrap + cgroups (namespace isolation)
     if (!hasCgroups()) {
       throw new Error(
         'SECURITY: cgroups not available on Linux. ' +
@@ -265,7 +216,7 @@ export function spawnWithLimits(
       );
     }
     if (!hasBwrap()) {
-      // 3. cgroups-only (Fargate/environments where bwrap can't create namespaces)
+      // cgroups-only (environments where bwrap can't create namespaces)
       console.warn('[resource-limits] bwrap not available — falling back to cgroups-only (no filesystem isolation)');
       return spawnWithCgroupsOnly(command, args, opts, limits, sandboxOpts);
     }

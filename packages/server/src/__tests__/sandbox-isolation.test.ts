@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { buildBwrapArgs, generateOciSpec, hasBwrap } from '@ash-ai/sandbox';
+import { buildBwrapArgs, hasBwrap } from '@ash-ai/sandbox';
 import type { SandboxSpawnOpts } from '@ash-ai/sandbox';
 import { execSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -105,62 +105,6 @@ describe('sandbox filesystem isolation', () => {
       }
 
       expect(tmpfsMounts).toContain('/var/ash/data');
-    });
-  });
-
-  describe('generateOciSpec', () => {
-    it('hides the entire data directory, not just sandboxesDir', () => {
-      const opts = makeSandboxOpts('/data');
-      const spec = generateOciSpec(opts, 'node', ['bridge.js'], { PATH: '/usr/bin' });
-
-      const tmpfsMounts = spec.mounts
-        .filter((m) => m.type === 'tmpfs')
-        .map((m) => m.destination);
-
-      expect(tmpfsMounts).toContain('/data');
-      expect(tmpfsMounts).not.toContain('/data/sandboxes');
-    });
-
-    it('restores only the current sandbox directory', () => {
-      const opts = makeSandboxOpts('/data', 'abc-123');
-      const spec = generateOciSpec(opts, 'node', ['bridge.js'], { PATH: '/usr/bin' });
-
-      const bindMounts = spec.mounts
-        .filter((m) => m.type === 'bind')
-        .map((m) => m.destination);
-
-      expect(bindMounts).toContain('/data/sandboxes/abc-123');
-    });
-
-    it('does not expose agents or sessions directories', () => {
-      const opts = makeSandboxOpts('/data');
-      const spec = generateOciSpec(opts, 'node', ['bridge.js'], { PATH: '/usr/bin' });
-
-      const bindMounts = spec.mounts
-        .filter((m) => m.type === 'bind')
-        .map((m) => m.destination);
-
-      for (const mount of bindMounts) {
-        expect(mount).not.toContain('/data/agents');
-        expect(mount).not.toContain('/data/sessions');
-      }
-    });
-
-    it('mount order: tmpfs for data dir comes before bind for sandbox dir', () => {
-      const opts = makeSandboxOpts('/data', 'sandbox-1');
-      const spec = generateOciSpec(opts, 'node', ['bridge.js'], { PATH: '/usr/bin' });
-
-      const dataTmpfsIdx = spec.mounts.findIndex(
-        (m) => m.type === 'tmpfs' && m.destination === '/data',
-      );
-      const sandboxBindIdx = spec.mounts.findIndex(
-        (m) => m.type === 'bind' && m.destination === '/data/sandboxes/sandbox-1',
-      );
-
-      expect(dataTmpfsIdx).toBeGreaterThan(-1);
-      expect(sandboxBindIdx).toBeGreaterThan(-1);
-      // tmpfs must come before bind so the bind overrides it for the specific path
-      expect(dataTmpfsIdx).toBeLessThan(sandboxBindIdx);
     });
   });
 
