@@ -1,5 +1,12 @@
 # @ash-ai/shared
 
+## 0.0.17 - 2026-03-06
+
+### Added
+
+- `traceContext` field on `QueryCommand`, `ResumeCommand`, and `ExecCommand` for W3C traceparent propagation (#55)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_SERVICE_NAME` added to `SANDBOX_ENV_ALLOWLIST` (#55)
+
 ## 0.0.16 - 2026-02-28
 
 ### Added

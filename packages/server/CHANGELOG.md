@@ -1,5 +1,16 @@
 # @ash-ai/server
 
+## 0.0.24 - 2026-03-06
+
+### Added
+
+- OpenTelemetry tracing on session lifecycle: create, message, pause, stop, resume spans (#55)
+- Trace context injection into bridge protocol for end-to-end distributed traces (#55)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.17
+
 ## 0.0.23
 
 ### Patch Changes
