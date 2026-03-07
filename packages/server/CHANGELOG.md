@@ -1,5 +1,11 @@
 # @ash-ai/server
 
+## 0.0.30 - 2026-03-07
+
+### Changed
+
+- Bump global rate limit from 100 to 1500 requests per 15 minutes (hosted multi-tenant traffic shares a single IP)
+
 ## 0.0.29 - 2026-03-07
 
 ### Fixed
