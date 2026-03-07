@@ -1,5 +1,11 @@
 # @ash-ai/server
 
+## 0.0.29 - 2026-03-07
+
+### Fixed
+
+- Pre-warmed sandboxes now receive agent environment variables via `extraEnv` (#66)
+
 ## 0.0.28 - 2026-03-06
 
 ### Added

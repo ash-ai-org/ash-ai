@@ -1,5 +1,12 @@
 # @ash-ai/cli
 
+## 0.0.21 - 2026-03-07
+
+### Fixed
+
+- `ash --version` now reads version from package.json instead of hardcoded '0.1.0' (#66)
+- `ash status` pool display only shows non-zero counts and includes waiting state (#66)
+
 ## 0.0.20 - 2026-03-06
 
 ### Added
