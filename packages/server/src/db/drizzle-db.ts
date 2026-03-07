@@ -15,6 +15,12 @@ function parseConfig(raw: string | null | undefined): SessionConfig | null {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+/** Parse JSON env column. Returns undefined on null/invalid. */
+function parseEnv(raw: string | null | undefined): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  try { return JSON.parse(raw); } catch { return undefined; }
+}
+
 /**
  * Unified Db implementation backed by Drizzle ORM.
  * Works with both SQLite (better-sqlite3) and PostgreSQL (pg) drivers.
@@ -131,9 +137,10 @@ export class DrizzleDb implements Db {
 
   // -- Agents -----------------------------------------------------------------
 
-  async upsertAgent(name: string, path: string, tenantId: string = 'default'): Promise<Agent> {
+  async upsertAgent(name: string, path: string, tenantId: string = 'default', env?: Record<string, string>): Promise<Agent> {
     const { agents } = this.schema;
     const now = new Date().toISOString();
+    const envJson = env ? JSON.stringify(env) : null;
 
     // Check for existing agent to get id and version
     const existing = await this.drizzle
@@ -145,15 +152,18 @@ export class DrizzleDb implements Db {
     const version = existing.length > 0 ? existing[0].version + 1 : 1;
     const id = existing.length > 0 ? existing[0].id : randomUUID();
 
+    const set: Record<string, unknown> = { version, path, updatedAt: now };
+    if (env !== undefined) set.env = envJson;
+
     await this.drizzle
       .insert(agents)
-      .values({ id, tenantId, name, version, path, createdAt: now, updatedAt: now })
+      .values({ id, tenantId, name, version, path, env: envJson, createdAt: now, updatedAt: now })
       .onConflictDoUpdate({
         target: [agents.tenantId, agents.name],
-        set: { version, path, updatedAt: now },
+        set,
       });
 
-    return { id, name, tenantId, version, path, createdAt: now, updatedAt: now };
+    return { id, name, tenantId, version, path, createdAt: now, updatedAt: now, ...(env && { env }) };
   }
 
   async getAgent(name: string, tenantId: string = 'default'): Promise<Agent | null> {
@@ -165,7 +175,8 @@ export class DrizzleDb implements Db {
       .limit(1);
     if (rows.length === 0) return null;
     const r = rows[0];
-    return { id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path, createdAt: r.createdAt, updatedAt: r.updatedAt };
+    const env = parseEnv(r.env);
+    return { id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path, createdAt: r.createdAt, updatedAt: r.updatedAt, ...(env && { env }) };
   }
 
   async listAgents(tenantId: string = 'default'): Promise<Agent[]> {
@@ -175,7 +186,26 @@ export class DrizzleDb implements Db {
       .from(agents)
       .where(eq(agents.tenantId, tenantId))
       .orderBy(asc(agents.name));
-    return rows.map((r: any) => ({ id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path, createdAt: r.createdAt, updatedAt: r.updatedAt }));
+    return rows.map((r: any) => {
+      const env = parseEnv(r.env);
+      return { id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path, createdAt: r.createdAt, updatedAt: r.updatedAt, ...(env && { env }) };
+    });
+  }
+
+  async updateAgent(name: string, updates: { env?: Record<string, string> }, tenantId: string = 'default'): Promise<Agent | null> {
+    const { agents } = this.schema;
+    const now = new Date().toISOString();
+    const set: Record<string, unknown> = { updatedAt: now };
+    if (updates.env !== undefined) {
+      set.env = Object.keys(updates.env).length > 0 ? JSON.stringify(updates.env) : null;
+    }
+
+    await this.drizzle
+      .update(agents)
+      .set(set)
+      .where(and(eq(agents.tenantId, tenantId), eq(agents.name, name)));
+
+    return this.getAgent(name, tenantId);
   }
 
   async deleteAgent(name: string, tenantId: string = 'default'): Promise<boolean> {

@@ -19,6 +19,7 @@ export const agents = sqliteTable('agents', {
   name: text('name').notNull(),
   version: integer('version').notNull().default(1),
   path: text('path').notNull(),
+  env: text('env'),  // JSON blob of default env vars for sessions
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => [

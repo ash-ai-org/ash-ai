@@ -26,11 +26,10 @@ starting --> active --> paused --> active (resume)
 **TypeScript:**
 ```typescript
 const session = await client.createSession('my-agent');
-// Optional: pass credential, extra env, startup script
+// Optional: pass credential, extra env
 const session = await client.createSession('my-agent', {
   credentialId: 'cred-id',
   extraEnv: { MY_VAR: 'value' },
-  startupScript: 'npm install',
 });
 ```
 

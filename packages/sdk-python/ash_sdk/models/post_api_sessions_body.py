@@ -30,7 +30,6 @@ class PostApiSessionsBody:
         agent (str):
         credential_id (str | Unset):
         extra_env (PostApiSessionsBodyExtraEnv | Unset):
-        startup_script (str | Unset):
         model (str | Unset): Model override for this session. Overrides agent .claude/settings.json default.
         mcp_servers (PostApiSessionsBodyMcpServers | Unset): Per-session MCP servers. Merged into agent .mcp.json
             (session overrides agent). Enables sidecar pattern.
@@ -48,7 +47,6 @@ class PostApiSessionsBody:
     agent: str
     credential_id: str | Unset = UNSET
     extra_env: PostApiSessionsBodyExtraEnv | Unset = UNSET
-    startup_script: str | Unset = UNSET
     model: str | Unset = UNSET
     mcp_servers: PostApiSessionsBodyMcpServers | Unset = UNSET
     system_prompt: str | Unset = UNSET
@@ -68,8 +66,6 @@ class PostApiSessionsBody:
         extra_env: dict[str, Any] | Unset = UNSET
         if not isinstance(self.extra_env, Unset):
             extra_env = self.extra_env.to_dict()
-
-        startup_script = self.startup_script
 
         model = self.model
 
@@ -112,8 +108,6 @@ class PostApiSessionsBody:
             field_dict["credentialId"] = credential_id
         if extra_env is not UNSET:
             field_dict["extraEnv"] = extra_env
-        if startup_script is not UNSET:
-            field_dict["startupScript"] = startup_script
         if model is not UNSET:
             field_dict["model"] = model
         if mcp_servers is not UNSET:
@@ -159,8 +153,6 @@ class PostApiSessionsBody:
         else:
             extra_env = PostApiSessionsBodyExtraEnv.from_dict(_extra_env)
 
-        startup_script = d.pop("startupScript", UNSET)
-
         model = d.pop("model", UNSET)
 
         _mcp_servers = d.pop("mcpServers", UNSET)
@@ -198,7 +190,6 @@ class PostApiSessionsBody:
             agent=agent,
             credential_id=credential_id,
             extra_env=extra_env,
-            startup_script=startup_script,
             model=model,
             mcp_servers=mcp_servers,
             system_prompt=system_prompt,

@@ -24,7 +24,6 @@ export class RemoteRunnerBackend implements RunnerBackend {
       skipAgentCopy: opts.skipAgentCopy,
       limits: opts.limits as Record<string, number> | undefined,
       extraEnv: opts.extraEnv,
-      startupScript: opts.startupScript,
       mcpServers: opts.mcpServers,
       systemPrompt: opts.systemPrompt,
     });

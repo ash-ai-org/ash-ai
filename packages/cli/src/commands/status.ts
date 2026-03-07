@@ -26,6 +26,11 @@ export function statusCommand(): Command {
           console.log(`  Active sessions:  ${h.activeSessions ?? 'unknown'}`);
           console.log(`  Active sandboxes: ${h.activeSandboxes ?? 'unknown'}`);
           console.log(`  Uptime:           ${h.uptime ?? 'unknown'}s`);
+
+          const pool = h.pool as Record<string, number> | undefined;
+          if (pool) {
+            console.log(`  Pool: ${pool.warm} warm, ${pool.warming} warming, ${pool.cold} cold, ${pool.running} running (max ${pool.maxCapacity})`);
+          }
         } catch {
           console.log('  Health check failed (server may still be starting)');
         }

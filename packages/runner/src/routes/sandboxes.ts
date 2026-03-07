@@ -43,7 +43,6 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
       skipAgentCopy?: boolean;
       limits?: Record<string, number>;
       extraEnv?: Record<string, string>;
-      startupScript?: string;
       mcpServers?: Record<string, unknown>;
       systemPrompt?: string;
     };
@@ -57,7 +56,6 @@ export function sandboxRoutes(app: FastifyInstance, pool: SandboxPool, dataDir: 
         skipAgentCopy: body.skipAgentCopy,
         limits: body.limits,
         extraEnv: body.extraEnv,
-        startupScript: body.startupScript,
         mcpServers: body.mcpServers as Record<string, import('@ash-ai/shared').McpServerConfig> | undefined,
         systemPrompt: body.systemPrompt,
       });

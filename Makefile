@@ -1,4 +1,4 @@
-.PHONY: install build clean test test-integration test-cli test-restore typecheck bench bench-sandbox bench-sandbox-crdb bench-all \
+.PHONY: install build clean rebuild test test-integration test-cli test-restore typecheck bench bench-sandbox bench-sandbox-crdb bench-all \
        link build-standalone \
        server qa-bot deploy-qa-bot \
        dev dev-no-sandbox kill logs \
@@ -26,6 +26,10 @@ link: build
 # Build standalone binaries (requires bun)
 build-standalone: build
 	./scripts/build-standalone.sh
+
+# Rebuild everything: all packages + Docker image + link CLI globally
+rebuild: build docker-build
+	cd packages/cli && pnpm link --global
 
 clean:
 	pnpm clean

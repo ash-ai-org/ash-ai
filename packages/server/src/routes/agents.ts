@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { existsSync, readdirSync, statSync, readFileSync, createReadStream, mkdirSync, writeFileSync } from 'node:fs';
 import { join, isAbsolute, relative, basename, extname, dirname, resolve, sep } from 'node:path';
-import { upsertAgent, getAgent, listAgents, deleteAgent } from '../db/index.js';
+import { upsertAgent, getAgent, listAgents, updateAgent, deleteAgent } from '../db/index.js';
 import type { FileEntry } from '@ash-ai/shared';
 import type { SandboxPool } from '@ash-ai/sandbox';
 import { syncAgentToCloud } from '@ash-ai/sandbox';
@@ -81,6 +81,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
               required: ['path', 'content'],
             },
           },
+          env: { type: 'object', additionalProperties: { type: 'string' }, description: 'Default environment variables injected into every session sandbox' },
         },
         required: ['name'],
       },
@@ -94,11 +95,12 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       },
     },
   }, async (req, reply) => {
-    const { name, path: inputPath, systemPrompt, files } = req.body as {
+    const { name, path: inputPath, systemPrompt, files, env } = req.body as {
       name: string;
       path?: string;
       systemPrompt?: string;
       files?: Array<{ path: string; content: string }>;
+      env?: Record<string, string>;
     };
 
     let resolvedPath: string;
@@ -143,7 +145,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       }
     }
 
-    const agent = await upsertAgent(name, resolvedPath, req.tenantId);
+    const agent = await upsertAgent(name, resolvedPath, req.tenantId, env);
 
     // Best-effort backup to cloud storage (non-blocking)
     syncAgentToCloud(name, resolvedPath, req.tenantId).catch((err) =>
@@ -153,9 +155,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     // Trigger pre-warming if agent has preWarmCount configured
     const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;
     if (pool && typeof preWarmCount === 'number' && preWarmCount > 0) {
-      pool.warmUp(agent.name, agent.path, preWarmCount, {
-        startupScript: (agent.config as Record<string, unknown> | undefined)?.startupScript as string | undefined,
-      }).catch((err) =>
+      pool.warmUp(agent.name, agent.path, preWarmCount).catch((err) =>
         console.error(`[server] Pre-warm failed for ${agent.name}:`, err)
       );
     }
@@ -224,6 +224,38 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
     return reply.send({ ok: true });
+  });
+
+  // Update agent
+  app.patch<{ Params: { name: string } }>('/api/agents/:name', {
+    schema: {
+      tags: ['agents'],
+      params: nameParam,
+      body: {
+        type: 'object',
+        properties: {
+          env: { type: 'object', additionalProperties: { type: 'string' }, description: 'Default environment variables injected into every session sandbox' },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: { agent: { $ref: 'Agent#' } },
+          required: ['agent'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const { env } = req.body as { env?: Record<string, string> };
+
+    const existing = await getAgent(req.params.name, req.tenantId);
+    if (!existing) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+
+    const agent = await updateAgent(req.params.name, { env }, req.tenantId);
+    return reply.send({ agent });
   });
 
   // List files in agent directory

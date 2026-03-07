@@ -81,6 +81,14 @@ export function startCommand(): Command {
       // Build envPassthrough list from --database-url and --env flags
       const envPassthrough: string[] = [];
 
+      // Pass through sandbox config env vars if set
+      if (process.env.ASH_SANDBOX_BACKEND) {
+        envPassthrough.push('ASH_SANDBOX_BACKEND');
+      }
+      if (process.env.ASH_SANDBOX_MEMORY_MB) {
+        envPassthrough.push('ASH_SANDBOX_MEMORY_MB');
+      }
+
       if (opts.databaseUrl) {
         process.env.ASH_DATABASE_URL = opts.databaseUrl;
         envPassthrough.push('ASH_DATABASE_URL');

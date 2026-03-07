@@ -8,11 +8,14 @@ import { sessionRoutes } from '../routes/sessions.js';
 import { initDb, closeDb, upsertAgent } from '../db/index.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
 
-function mockCoordinator(): RunnerCoordinator {
+function mockCoordinator(captureOpts?: { createSandboxOpts?: any[] }): RunnerCoordinator {
   return {
     selectBackend: async () => ({
       backend: {
-        createSandbox: async () => ({ sandboxId: 'sbx-1', workspaceDir: '/tmp/ws' }),
+        createSandbox: async (opts: any) => {
+          if (captureOpts) captureOpts.createSandboxOpts!.push(opts);
+          return { sandboxId: 'sbx-1', workspaceDir: '/tmp/ws' };
+        },
       },
       runnerId: '__local__',
     }),
@@ -90,5 +93,57 @@ describe('POST /api/sessions', () => {
     // but should NOT be 422 or 404
     expect(res.statusCode).not.toBe(422);
     expect(res.statusCode).not.toBe(404);
+  });
+
+  it('passes agent-level env to sandbox creation', async () => {
+    const captured: any[] = [];
+    const agentDir = join(dataDir, 'agents', 'env-agent');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'CLAUDE.md'), '# Test');
+    await upsertAgent('env-agent', agentDir, undefined, { AGENT_KEY: 'agent-val' });
+
+    const app = Fastify();
+    app.decorateRequest('tenantId', '');
+    app.addHook('onRequest', async (req) => { req.tenantId = 'default'; });
+    registerSchemas(app);
+    sessionRoutes(app, mockCoordinator({ createSandboxOpts: captured }), dataDir, noopTelemetry());
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { agent: 'env-agent' },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].extraEnv).toEqual({ AGENT_KEY: 'agent-val' });
+  });
+
+  it('session-level extraEnv overrides agent-level env', async () => {
+    const captured: any[] = [];
+    const agentDir = join(dataDir, 'agents', 'env-agent');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'CLAUDE.md'), '# Test');
+    await upsertAgent('env-agent', agentDir, undefined, { SHARED: 'agent', AGENT_ONLY: 'yes' });
+
+    const app = Fastify();
+    app.decorateRequest('tenantId', '');
+    app.addHook('onRequest', async (req) => { req.tenantId = 'default'; });
+    registerSchemas(app);
+    sessionRoutes(app, mockCoordinator({ createSandboxOpts: captured }), dataDir, noopTelemetry());
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { agent: 'env-agent', extraEnv: { SHARED: 'session', SESSION_ONLY: 'yes' } },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].extraEnv).toEqual({
+      SHARED: 'session',        // session overrides agent
+      AGENT_ONLY: 'yes',        // agent-level preserved
+      SESSION_ONLY: 'yes',      // session-level added
+    });
   });
 });

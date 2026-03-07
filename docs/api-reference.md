@@ -86,11 +86,14 @@ Deploy (register) an agent. Upserts — if the name exists, the version incremen
 ```json
 {
   "name": "my-agent",
-  "path": "/absolute/path/to/agent-dir"
+  "path": "/absolute/path/to/agent-dir",
+  "env": { "API_ENDPOINT": "https://api.example.com" }
 }
 ```
 
 The directory at `path` must contain a `CLAUDE.md` file.
+
+Optional `env` sets default environment variables injected into every session's sandbox. See [agent-env.md](./features/agent-env.md) for merge order.
 
 **Response** `201`:
 
@@ -142,11 +145,12 @@ Update an existing agent's metadata.
 {
   "description": "Updated description",
   "model": "claude-sonnet-4-5-20250929",
-  "status": "active"
+  "status": "active",
+  "env": { "API_ENDPOINT": "https://api-v2.example.com" }
 }
 ```
 
-All fields are optional: `name`, `slug`, `description`, `model`, `backend`, `systemPrompt`, `status`, `config`.
+All fields are optional: `name`, `slug`, `description`, `model`, `backend`, `systemPrompt`, `status`, `config`, `env`.
 
 **Response** `200`: `{ "agent": { ... } }`
 
@@ -204,7 +208,6 @@ Create a session. Spawns a sandboxed bridge process for the named agent.
   "model": "claude-sonnet-4-5-20250929",
   "credentialId": "uuid",
   "extraEnv": { "MY_VAR": "value" },
-  "startupScript": "pip install pandas",
   "mcpServers": {
     "my-tools": { "url": "https://my-app.com/mcp/tenant-123" }
   },
@@ -218,6 +221,8 @@ Create a session. Spawns a sandboxed bridge process for the named agent.
 ```
 
 Only `agent` is required — this must be the agent **name** (the `name` field returned by `GET /api/agents`). All other fields are optional.
+
+**Env merge order** (lowest to highest priority): `agent.env` → `credentialId` env → `extraEnv` → `ASH_PERMISSION_MODE`. See [agent-env.md](./features/agent-env.md).
 
 **Response** `201`:
 

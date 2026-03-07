@@ -99,8 +99,10 @@ export class AshClient {
 
   // -- Agents -----------------------------------------------------------------
 
-  async deployAgent(name: string, path: string): Promise<Agent> {
-    const res = await this.request<{ agent: Agent }>('POST', '/api/agents', { name, path });
+  async deployAgent(name: string, path: string, opts?: { env?: Record<string, string> }): Promise<Agent> {
+    const body: Record<string, unknown> = { name, path };
+    if (opts?.env) body.env = opts.env;
+    const res = await this.request<{ agent: Agent }>('POST', '/api/agents', body);
     return res.agent;
   }
 
@@ -160,7 +162,6 @@ export class AshClient {
   async createSession(agent: string, opts?: {
     credentialId?: string;
     extraEnv?: Record<string, string>;
-    startupScript?: string;
     model?: string;
     /** Per-session MCP servers. Merged into agent's .mcp.json (session overrides agent). */
     mcpServers?: Record<string, McpServerConfig>;
@@ -180,7 +181,6 @@ export class AshClient {
     const body: Record<string, unknown> = { agent };
     if (opts?.credentialId) body.credentialId = opts.credentialId;
     if (opts?.extraEnv) body.extraEnv = opts.extraEnv;
-    if (opts?.startupScript) body.startupScript = opts.startupScript;
     if (opts?.model) body.model = opts.model;
     if (opts?.mcpServers) body.mcpServers = opts.mcpServers;
     if (opts?.systemPrompt != null) body.systemPrompt = opts.systemPrompt;

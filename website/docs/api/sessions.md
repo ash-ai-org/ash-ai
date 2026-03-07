@@ -62,7 +62,6 @@ Creates a new session for the specified agent. The server allocates a sandbox, c
 | `systemPrompt` | string | No | System prompt override. Replaces the agent's `CLAUDE.md` for this session only. |
 | `credentialId` | string | No | Credential ID to inject into sandbox env. |
 | `extraEnv` | object | No | Extra env vars to inject into the sandbox (merged with credential env). |
-| `startupScript` | string | No | Shell script to run in workspace after install.sh but before the bridge starts. |
 
 ### Response
 
