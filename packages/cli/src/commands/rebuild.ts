@@ -1,4 +1,6 @@
 import { execSync } from 'node:child_process';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import { Command } from 'commander';
 import { DEFAULT_PORT } from '@ash-ai/shared';
 import {
@@ -8,8 +10,10 @@ import {
   startContainer,
   waitForHealthy,
   ensureDataDir,
+  ashDataDir,
   findRepoRoot,
 } from '../docker.js';
+import { loadConfig, saveConfig } from '../config.js';
 
 export function rebuildCommand(): Command {
   return new Command('rebuild')
@@ -63,6 +67,23 @@ export function rebuildCommand(): Command {
         console.error('Server failed to become healthy within 30 seconds.');
         console.error('Check logs with: ash-dev logs');
         process.exit(1);
+      }
+
+      // Check for auto-generated API key bootstrap file (same as `ash start`)
+      const bootstrapPath = join(ashDataDir(), 'initial-api-key');
+      if (existsSync(bootstrapPath)) {
+        const generatedKey = readFileSync(bootstrapPath, 'utf-8').trim();
+        if (generatedKey) {
+          const config = loadConfig();
+          config.api_key = generatedKey;
+          saveConfig(config);
+          unlinkSync(bootstrapPath);
+
+          console.log('');
+          console.log('API key auto-generated and saved to ~/.ash/config.json');
+          console.log(`  Key: ${generatedKey}`);
+          console.log('');
+        }
       }
 
       console.log('Ash server rebuilt and running.');

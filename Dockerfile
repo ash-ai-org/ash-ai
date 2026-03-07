@@ -4,9 +4,10 @@ LABEL org.opencontainers.image.source=https://github.com/ash-ai-org/ash-ai
 LABEL org.opencontainers.image.description="Ash server — deploy and orchestrate hosted AI agents"
 LABEL org.opencontainers.image.licenses=MIT
 
-# bubblewrap for sandbox isolation, procps for ps/kill utilities
+# bubblewrap for sandbox isolation, procps for ps/kill utilities,
+# python3 + pip for agents that need Python
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bubblewrap procps && \
+    apt-get install -y --no-install-recommends bubblewrap procps python3 python3-pip python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

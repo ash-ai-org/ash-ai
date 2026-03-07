@@ -53,6 +53,21 @@ const nameParam = {
   required: ['name'],
 } as const;
 
+/** Redact env values so API responses don't leak secrets. Returns key names with masked values. */
+function redactEnv(env: Record<string, string> | null | undefined): Record<string, string> | undefined {
+  if (!env || Object.keys(env).length === 0) return undefined;
+  const redacted: Record<string, string> = {};
+  for (const key of Object.keys(env)) {
+    redacted[key] = '***';
+  }
+  return redacted;
+}
+
+/** Return agent object with env values redacted. */
+function redactAgent<T extends { env?: Record<string, string> | null }>(agent: T): T {
+  return { ...agent, env: redactEnv(agent.env) };
+}
+
 export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: SandboxPool | null): void {
   // Deploy agent (provide local path to agent directory, or create managed agent from systemPrompt/files)
   app.post('/api/agents', {
@@ -152,15 +167,16 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       console.error(`[agents] Cloud sync failed for ${name}:`, err)
     );
 
-    // Trigger pre-warming if agent has preWarmCount configured
+    // Pre-warm sandboxes (defaults to 1 if not configured)
     const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;
-    if (pool && typeof preWarmCount === 'number' && preWarmCount > 0) {
-      pool.warmUp(agent.name, agent.path, preWarmCount).catch((err) =>
+    const warmCount = typeof preWarmCount === 'number' ? preWarmCount : 1;
+    if (pool && warmCount > 0) {
+      pool.warmUp(agent.name, agent.path, warmCount).catch((err) =>
         console.error(`[server] Pre-warm failed for ${agent.name}:`, err)
       );
     }
 
-    return reply.status(201).send({ agent });
+    return reply.status(201).send({ agent: redactAgent(agent) });
   });
 
   // List agents
@@ -179,7 +195,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     },
   }, async (req, reply) => {
     const agents = await listAgents(req.tenantId);
-    return reply.send({ agents });
+    return reply.send({ agents: agents.map(redactAgent) });
   });
 
   // Get agent
@@ -201,7 +217,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     if (!agent) {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
-    return reply.send({ agent });
+    return reply.send({ agent: redactAgent(agent) });
   });
 
   // Delete agent
@@ -255,7 +271,10 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     }
 
     const agent = await updateAgent(req.params.name, { env }, req.tenantId);
-    return reply.send({ agent });
+    if (!agent) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+    return reply.send({ agent: redactAgent(agent) });
   });
 
   // List files in agent directory

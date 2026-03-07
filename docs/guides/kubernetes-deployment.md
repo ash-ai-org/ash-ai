@@ -163,7 +163,7 @@ Ash will fall back to ulimit-based resource limits for sandboxes.
 
 The server auto-generates an API key on first start if none is configured. However, for Kubernetes deployments, you should provide the key explicitly so you can use it from outside the cluster. Three options:
 
-1. **Existing secret** (recommended): Create the secret externally (e.g., via external-secrets-operator or sealed-secrets), reference it with `auth.existingSecret`. Then use `ash connect <url> --api-key <key>` to configure your local CLI.
+1. **Existing secret** (recommended): Create the secret externally (e.g., via external-secrets-operator or sealed-secrets), reference it with `auth.existingSecret`. Then use `ash link <url> --api-key <key>` to configure your local CLI.
 
 2. **Inline** (development only): Set `auth.apiKey` and `auth.anthropicApiKey` directly in values. Not recommended for production since values files may be committed to source control.
 

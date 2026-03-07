@@ -354,6 +354,16 @@ export class DrizzleDb implements Db {
     return result.changes ?? result.rowCount ?? 0;
   }
 
+  async bulkPauseActiveSessions(): Promise<number> {
+    const { sessions } = this.schema;
+    const now = new Date().toISOString();
+    const result = await this.drizzle
+      .update(sessions)
+      .set({ status: 'paused', lastActiveAt: now })
+      .where(inArray(sessions.status, ['active', 'starting']));
+    return result.changes ?? result.rowCount ?? 0;
+  }
+
   async updateSessionConfig(id: string, model: string | null | undefined, config: SessionConfig | null): Promise<void> {
     const { sessions } = this.schema;
     const now = new Date().toISOString();

@@ -73,12 +73,31 @@ await client.createSession('my-agent', {
 #### CLI
 
 ```bash
-# Deploy with env
+# Deploy with env flags
 ash deploy ./my-agent -e API_ENDPOINT=https://api.example.com -e LOG_LEVEL=debug
 
 # Session with env override
 ash session create my-agent -e LOG_LEVEL=warn
 ```
+
+#### `.env` file
+
+The simplest way to supply env vars is to place a `.env` file in the agent folder:
+
+```
+# my-agent/.env
+GEMINI_API_KEY=AIza...
+API_ENDPOINT=https://api.example.com
+LOG_LEVEL=debug
+```
+
+When you run `ash deploy ./my-agent`, the CLI reads the env file and passes all variables to the server.
+
+**Precedence** (highest wins): `-e` flags > `.env.local` > `.env`
+
+Both `.env` and `.env.local` are supported. If both exist, `.env.local` values override `.env` — matching the Next.js convention. Use `.env` for shared defaults and `.env.local` for personal overrides (gitignored).
+
+Neither file is copied to the server — they stay local. Only the parsed key-value pairs are sent via the API.
 
 ### Security Considerations
 

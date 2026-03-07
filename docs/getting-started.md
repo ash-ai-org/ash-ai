@@ -202,7 +202,7 @@ This starts Ash with SQLite (fine for single-machine deployments). Data persists
 The server auto-generates an API key on first start. Check the server logs for the key, then connect your local CLI:
 
 ```bash
-ash connect http://your-server:4100 --api-key ash_<key-from-server-logs>
+ash link http://your-server:4100 --api-key ash_<key-from-server-logs>
 ash deploy ./my-agent --name my-agent
 ```
 
@@ -254,7 +254,7 @@ helm install ash ./charts/ash \
 Then connect your CLI:
 
 ```bash
-ash connect http://ash.your-cluster:4100 --api-key <the-key-you-generated>
+ash link http://ash.your-cluster:4100 --api-key <the-key-you-generated>
 ```
 
 See the full [Kubernetes Deployment Guide](guides/kubernetes-deployment.md) for production configuration, external database setup, and enterprise integration.

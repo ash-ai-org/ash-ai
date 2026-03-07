@@ -1,6 +1,7 @@
+import { execSync } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
 import { createInterface } from 'node:readline';
-import { writeFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { Command } from 'commander';
@@ -17,7 +18,6 @@ export interface AshCredentials {
 
 export function getCredentials(): AshCredentials | null {
   try {
-    const { readFileSync } = require('node:fs');
     const raw = readFileSync(CREDENTIALS_PATH, 'utf-8');
     return JSON.parse(raw) as AshCredentials;
   } catch {
@@ -99,6 +99,7 @@ export function loginCommand(): Command {
 
           console.log(`\nLogged in as ${email}`);
           console.log(`Credentials saved to ${CREDENTIALS_PATH}`);
+          console.log(`\nTo deploy to Ash Cloud, run: ash link`);
           server.close();
           process.exit(0);
         } else {
@@ -127,7 +128,7 @@ export function loginCommand(): Command {
 
         let browserOpened = false;
         try {
-          require('node:child_process').execSync(`${open} "${loginUrl}"`, { stdio: 'ignore' });
+          execSync(`${open} "${loginUrl}"`, { stdio: 'ignore' });
           browserOpened = true;
         } catch {
           // Browser failed to open — fall through to paste prompt immediately
@@ -160,7 +161,7 @@ export function logoutCommand(): Command {
     .description('Remove saved Ash Cloud credentials')
     .action(() => {
       try {
-        require('node:fs').unlinkSync(CREDENTIALS_PATH);
+        unlinkSync(CREDENTIALS_PATH);
         console.log('Logged out. Credentials removed.');
       } catch {
         console.log('No credentials found.');

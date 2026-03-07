@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/ash-ai-org/ash-ai/main/install.sh |
 
 This installs the `ash` command globally.
 
-**Server URL**: Resolved in this order: `ASH_SERVER_URL` env var > `~/.ash/config.json` (set via `ash connect`) > `http://localhost:4100`.
+**Server URL**: Resolved in this order: `ASH_SERVER_URL` env var > `~/.ash/config.json` (set via `ash link`) > `http://localhost:4100`.
 
 ---
 
@@ -80,34 +80,65 @@ ash logs -f     # Follow logs
 
 ---
 
-## Server Connection
+## Server Targeting
 
-### `ash connect <url>`
+By default, all CLI commands target `http://localhost:4100`. Use `ash link` to point at a different server.
 
-Connect to a remote Ash server. Saves the URL to `~/.ash/config.json` so all subsequent commands target this server.
+### `ash link [url]`
+
+Link the CLI to a remote Ash server. All subsequent commands will target this server.
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `<url>` | Yes | Server URL (e.g. `http://my-server:4100`) |
+| `[url]` | No | Server URL. Omit to use Ash Cloud (requires `ash login` first). |
+| `--api-key` | No | API key for the server |
 
 ```bash
-ash connect http://my-server:4100
-# Connected to http://my-server:4100
-# Saved to ~/.ash/config.json
+# Link to Ash Cloud (after `ash login`)
+ash link
+
+# Link to a self-hosted server
+ash link http://my-server:4100
+
+# Link with explicit API key
+ash link http://my-server:4100 --api-key ash_xxx
 ```
 
-Tests connectivity before saving. Override with `ASH_SERVER_URL` env var.
+Override per-command with `ASH_SERVER_URL` env var.
 
 ---
 
-### `ash disconnect`
+### `ash unlink`
 
-Reset to localhost. Removes the saved server URL from `~/.ash/config.json`.
+Reset to localhost. Removes the saved server URL and API key from `~/.ash/config.json`.
 
 ```bash
-ash disconnect
-# Disconnected from http://my-server:4100
+ash unlink
+# Unlinked from http://my-server:4100
 # CLI will now target http://localhost:4100
+```
+
+---
+
+### `ash login`
+
+Authenticate with Ash Cloud. Opens a browser for OAuth login, saves credentials to `~/.ash/credentials.json`. Does **not** change the deployment target — run `ash link` after login to deploy to cloud.
+
+```bash
+ash login
+# Opening browser to https://ash-cloud.ai...
+# Logged in as user@example.com
+# To deploy to Ash Cloud, run: ash link
+```
+
+---
+
+### `ash logout`
+
+Remove saved Ash Cloud credentials.
+
+```bash
+ash logout
 ```
 
 ---

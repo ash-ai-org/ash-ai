@@ -1,9 +1,45 @@
 import { Command } from 'commander';
-import { resolve, join } from 'node:path';
-import { existsSync, cpSync } from 'node:fs';
-import { ASH_AGENTS_SUBDIR } from '@ash-ai/shared';
-import { deployAgent } from '../client.js';
-import { ashAgentsDir, ensureDataDir } from '../docker.js';
+import { resolve, join, relative } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { parse as parseDotEnv } from 'dotenv';
+import { deployAgentWithFiles } from '../client.js';
+
+function printDeploySuccess(agent: { name: string; version: number; env?: Record<string, string> }) {
+  console.log(`Deployed agent "${agent.name}" (v${agent.version})`);
+  if (agent.env && Object.keys(agent.env).length > 0) {
+    console.log(`  env: ${Object.keys(agent.env).join(', ')}`);
+  }
+}
+
+const SKIP_NAMES = new Set([
+  'node_modules', '.git', '__pycache__', '.cache', '.npm',
+  '.pnpm-store', '.yarn', '.venv', 'venv', '.tmp', 'tmp',
+  '.DS_Store',
+]);
+
+const SKIP_EXTENSIONS = new Set(['.sock', '.lock', '.pid']);
+
+/** Recursively collect files from a directory, base64-encoded. */
+function collectFiles(dir: string, root: string): Array<{ path: string; content: string }> {
+  const files: Array<{ path: string; content: string }> = [];
+  for (const name of readdirSync(dir)) {
+    if (SKIP_NAMES.has(name)) continue;
+    if (name.endsWith('.env') || name.endsWith('.env.local')) continue;
+    const ext = name.slice(name.lastIndexOf('.'));
+    if (SKIP_EXTENSIONS.has(ext)) continue;
+    const fullPath = join(dir, name);
+    const st = statSync(fullPath);
+    if (st.isDirectory()) {
+      files.push(...collectFiles(fullPath, root));
+    } else if (st.isFile()) {
+      files.push({
+        path: relative(root, fullPath),
+        content: readFileSync(fullPath).toString('base64'),
+      });
+    }
+  }
+  return files;
+}
 
 /** Parse repeated -e KEY=VALUE options into a Record. */
 function parseEnvOpts(envPairs?: string[]): Record<string, string> | undefined {
@@ -28,32 +64,52 @@ export function deployCommand(): Command {
     .option('-e, --env <KEY=VALUE>', 'Default env var for sessions (repeatable)', (val: string, acc: string[]) => { acc.push(val); return acc; }, [])
     .action(async (agentPath: string, opts: { name?: string; env?: string[] }) => {
       const absPath = resolve(agentPath);
-      const name = opts.name || absPath.split('/').pop()!;
-      const env = parseEnvOpts(opts.env);
+      const rawName = opts.name || absPath.split('/').pop()!;
+      // Normalize: replace spaces/invalid chars with hyphens, collapse runs, trim edges
+      const name = rawName.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+      if (!name) {
+        console.error(`Invalid agent name: "${rawName}"`);
+        process.exit(1);
+      }
+      if (name !== rawName) {
+        console.log(`Normalized agent name: "${rawName}" → "${name}"`);
+      }
+      const flagEnv = parseEnvOpts(opts.env);
 
-      // If the path exists locally, copy to ~/.ash/agents/ and use relative path
-      // This enables Docker mode where ~/.ash is volume-mounted into the container
-      if (existsSync(join(absPath, 'CLAUDE.md'))) {
-        ensureDataDir();
-        const destDir = join(ashAgentsDir(), name);
-        cpSync(absPath, destDir, { recursive: true });
-        console.log(`Copied agent files to ${destDir}`);
-
-        const relativePath = `${ASH_AGENTS_SUBDIR}/${name}`;
-        try {
-          const agent = await deployAgent(name, relativePath, env);
-          console.log(`Deployed agent: ${JSON.stringify(agent, null, 2)}`);
-        } catch (err: unknown) {
-          console.error(`Deploy failed: ${err instanceof Error ? err.message : err}`);
-          process.exit(1);
-        }
-        return;
+      // Read env files from agent folder: .env.local > .env (local wins)
+      const envLocal = join(absPath, '.env.local');
+      const envBase = join(absPath, '.env');
+      let fileEnv: Record<string, string> = {};
+      let envSource: string | null = null;
+      if (existsSync(envBase)) {
+        fileEnv = parseDotEnv(readFileSync(envBase, 'utf-8'));
+        envSource = '.env';
+      }
+      if (existsSync(envLocal)) {
+        const localEnv = parseDotEnv(readFileSync(envLocal, 'utf-8'));
+        fileEnv = { ...fileEnv, ...localEnv };
+        envSource = envSource ? '.env + .env.local' : '.env.local';
+      }
+      let env: Record<string, string> | undefined;
+      if (Object.keys(fileEnv).length > 0) {
+        // -e flags override file values
+        env = { ...fileEnv, ...flagEnv };
+        console.log(`Loaded ${Object.keys(fileEnv).length} env var(s) from ${envSource}`);
+      } else {
+        env = flagEnv;
       }
 
-      // Path doesn't exist locally — assume it's a server-side path (backward compatible)
+      if (!existsSync(join(absPath, 'CLAUDE.md'))) {
+        console.error(`Agent directory must contain CLAUDE.md: ${absPath}`);
+        process.exit(1);
+      }
+
+      // Upload agent files to the server
+      const files = collectFiles(absPath, absPath);
+      console.log(`Uploading ${files.length} file(s)...`);
       try {
-        const agent = await deployAgent(name, absPath, env);
-        console.log(`Deployed agent: ${JSON.stringify(agent, null, 2)}`);
+        const agent = await deployAgentWithFiles(name, files, env) as { name: string; version: number; env?: Record<string, string> };
+        printDeploySuccess(agent);
       } catch (err: unknown) {
         console.error(`Deploy failed: ${err instanceof Error ? err.message : err}`);
         process.exit(1);
