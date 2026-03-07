@@ -1,5 +1,11 @@
 # @ash-ai/ui
 
+## 0.0.15 - 2026-03-06
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.14 - 2026-03-06
 
 ### Changed

@@ -1,5 +1,12 @@
 # @ash-ai/sandbox
 
+## 0.0.25 - 2026-03-06
+
+### Added
+
+- `SandboxPool.drainAll()` for graceful shutdown with session state persistence (#64)
+- Auto-replenish warm pool after claiming a pre-warmed sandbox (#64)
+
 ## 0.0.24 - 2026-03-06
 
 ### Removed
