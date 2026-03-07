@@ -28,9 +28,10 @@ export interface Db {
   deleteRunner(id: string): Promise<void>;
   listAllRunners(): Promise<RunnerRecord[]>;
   // Agents (tenant-scoped)
-  upsertAgent(name: string, path: string, tenantId?: string): Promise<Agent>;
+  upsertAgent(name: string, path: string, tenantId?: string, env?: Record<string, string>): Promise<Agent>;
   getAgent(name: string, tenantId?: string): Promise<Agent | null>;
   listAgents(tenantId?: string): Promise<Agent[]>;
+  updateAgent(name: string, updates: { env?: Record<string, string> }, tenantId?: string): Promise<Agent | null>;
   deleteAgent(name: string, tenantId?: string): Promise<boolean>;
   // Sessions (tenant-scoped)
   insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string, config?: SessionConfig | null): Promise<Session>;
@@ -159,8 +160,8 @@ export async function initDb(opts: { dataDir: string; databaseUrl?: string }): P
 // -- Async re-exports (preserve call-site compatibility) ----------------------
 // Optional tenantId defaults to 'default' for single-tenant/dev mode.
 
-export async function upsertAgent(name: string, path: string, tenantId?: string): Promise<Agent> {
-  return getDb().upsertAgent(name, path, tenantId);
+export async function upsertAgent(name: string, path: string, tenantId?: string, env?: Record<string, string>): Promise<Agent> {
+  return getDb().upsertAgent(name, path, tenantId, env);
 }
 
 export async function getAgent(name: string, tenantId?: string): Promise<Agent | null> {
@@ -169,6 +170,10 @@ export async function getAgent(name: string, tenantId?: string): Promise<Agent |
 
 export async function listAgents(tenantId?: string): Promise<Agent[]> {
   return getDb().listAgents(tenantId);
+}
+
+export async function updateAgent(name: string, updates: { env?: Record<string, string> }, tenantId?: string): Promise<Agent | null> {
+  return getDb().updateAgent(name, updates, tenantId);
 }
 
 export async function deleteAgent(name: string, tenantId?: string): Promise<boolean> {

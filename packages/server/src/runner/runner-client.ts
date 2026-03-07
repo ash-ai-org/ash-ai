@@ -36,7 +36,6 @@ export class RunnerClient {
     skipAgentCopy?: boolean;
     limits?: Record<string, number>;
     extraEnv?: Record<string, string>;
-    startupScript?: string;
     mcpServers?: Record<string, unknown>;
     systemPrompt?: string;
   }): Promise<{ sandboxId: string; workspaceDir: string }> {

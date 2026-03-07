@@ -23,7 +23,6 @@ export class LocalRunnerBackend implements RunnerBackend {
       limits: opts.limits,
       onOomKill: opts.onOomKill,
       extraEnv: opts.extraEnv,
-      startupScript: opts.startupScript,
       mcpServers: opts.mcpServers,
       systemPrompt: opts.systemPrompt,
     });

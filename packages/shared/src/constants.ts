@@ -12,9 +12,10 @@ export const BRIDGE_READY_TIMEOUT_MS = 10_000;
 // Agent setup
 export const INSTALL_SCRIPT_TIMEOUT_MS = 120_000; // 2 min
 
-// Resource limits
+// Resource limits (ASH_SANDBOX_MEMORY_MB overrides default memory limit)
+const envMemoryMb = parseInt(process.env.ASH_SANDBOX_MEMORY_MB || '', 10);
 export const DEFAULT_SANDBOX_LIMITS = {
-  memoryMb: 2048,
+  memoryMb: envMemoryMb > 0 ? envMemoryMb : 2048,
   cpuPercent: 100,
   diskMb: 1024,
   maxProcesses: 64,

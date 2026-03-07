@@ -75,6 +75,7 @@
 | [features/multi-runner.md](./features/multi-runner.md) | Multi-runner architecture: standalone vs coordinator mode, session routing |
 | [features/metrics.md](./features/metrics.md) | Prometheus `/metrics` endpoint, structured resume log lines, pool stats, cold resume source breakdown |
 | [features/multi-coordinator.md](./features/multi-coordinator.md) | Horizontal control plane: DB-backed runner registry, multi-coordinator with CRDB |
+| [features/agent-env.md](./features/agent-env.md) | Agent-level default environment variables for sessions |
 
 ## Diagrams
 

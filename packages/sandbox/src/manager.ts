@@ -37,8 +37,6 @@ export interface CreateSandboxOpts {
   onOomKill?: (sandboxId: string) => void;
   /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
   extraEnv?: Record<string, string>;
-  /** Shell script to run in workspace after install.sh but before the bridge starts. */
-  startupScript?: string;
   /** Per-session MCP servers. Merged into the agent's .mcp.json (session overrides agent). */
   mcpServers?: Record<string, McpServerConfig>;
   /** System prompt override. Replaces the agent's CLAUDE.md for this session. */
@@ -228,33 +226,34 @@ export class SandboxManager {
     }
     const installScriptMs = installTimer();
 
-    // Run startup script if provided (only on fresh creation, not resume)
+    // Run startup.sh if present in agent directory (only on fresh creation, not resume)
     const startupTimer = startTimer();
-    if (!opts.skipAgentCopy && opts.startupScript) {
-      const startupPath = join(workspaceDir, 'startup.sh');
-      writeFileSync(startupPath, opts.startupScript, 'utf-8');
-      chmodSync(startupPath, 0o755);
-      console.log(`[sandbox:${shortId}] Running startup.sh...`);
-      this.appendLog(id, 'system', 'Running startup.sh...');
-      try {
-        const startupOutput = execFileSync(startupPath, [], {
-          cwd: workspaceDir,
-          env,
-          timeout: INSTALL_SCRIPT_TIMEOUT_MS,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          ...(sandboxUid !== undefined && { uid: sandboxUid, gid: sandboxGid }),
-        });
-        if (startupOutput.length > 0) {
-          const text = startupOutput.toString().trimEnd();
-          console.log(`[sandbox:${shortId}:startup] ${text}`);
-          this.appendLog(id, 'system', text);
+    if (!opts.skipAgentCopy) {
+      const startupScript = join(workspaceDir, 'startup.sh');
+      if (existsSync(startupScript)) {
+        chmodSync(startupScript, 0o755);
+        console.log(`[sandbox:${shortId}] Running startup.sh...`);
+        this.appendLog(id, 'system', 'Running startup.sh...');
+        try {
+          const startupOutput = execFileSync(startupScript, [], {
+            cwd: workspaceDir,
+            env,
+            timeout: INSTALL_SCRIPT_TIMEOUT_MS,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            ...(sandboxUid !== undefined && { uid: sandboxUid, gid: sandboxGid }),
+          });
+          if (startupOutput.length > 0) {
+            const text = startupOutput.toString().trimEnd();
+            console.log(`[sandbox:${shortId}:startup] ${text}`);
+            this.appendLog(id, 'system', text);
+          }
+          console.log(`[sandbox:${shortId}] startup.sh completed`);
+          this.appendLog(id, 'system', 'startup.sh completed');
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.appendLog(id, 'system', `startup.sh failed: ${msg}`);
+          throw new Error(`startup.sh failed for sandbox ${shortId}: ${msg}`);
         }
-        console.log(`[sandbox:${shortId}] startup.sh completed`);
-        this.appendLog(id, 'system', 'startup.sh completed');
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.appendLog(id, 'system', `startup.sh failed: ${msg}`);
-        throw new Error(`startup.sh failed for sandbox ${shortId}: ${msg}`);
       }
     }
     const startupScriptMs = startupTimer();
@@ -333,8 +332,9 @@ export class SandboxManager {
     let client: BridgeClient;
     let bridgeConnectMs: number;
     try {
-      // Restrict socket permissions to owner only (prevents local user hijacking)
-      chmodSync(socketPath, 0o600);
+      // Restrict socket permissions to owner only (prevents local user hijacking).
+      // chmod on Unix sockets fails with EINVAL on Docker Desktop (macOS VirtioFS) — skip gracefully.
+      try { chmodSync(socketPath, 0o600); } catch {}
       client = new BridgeClient(socketPath);
       await client.connect();
       bridgeConnectMs = bridgeConnectTimer();

@@ -27,6 +27,8 @@ export interface Agent {
   status?: 'active' | 'inactive' | 'archived';
   /** Arbitrary config blob. */
   config?: Record<string, unknown>;
+  /** Default environment variables injected into every session's sandbox. */
+  env?: Record<string, string>;
 }
 
 /** Fields that can be updated on an existing agent via PATCH. */
@@ -39,6 +41,7 @@ export interface AgentUpdate {
   systemPrompt?: string | null;
   status?: 'active' | 'inactive' | 'archived';
   config?: Record<string, unknown>;
+  env?: Record<string, string>;
 }
 
 // -- Sessions -----------------------------------------------------------------
@@ -573,8 +576,6 @@ export interface CreateSessionRequest {
   credentialId?: string;
   /** Extra env vars to inject into the sandbox (merged with credential env). */
   extraEnv?: Record<string, string>;
-  /** Shell script to run in workspace after install.sh but before the bridge starts. */
-  startupScript?: string;
   /** Model override for this session. Overrides agent's .claude/settings.json default. */
   model?: string;
   /**

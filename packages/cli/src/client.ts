@@ -30,8 +30,10 @@ async function request(method: string, path: string, body?: unknown): Promise<Re
   return res;
 }
 
-export async function deployAgent(name: string, path: string) {
-  const res = await request('POST', '/api/agents', { name, path });
+export async function deployAgent(name: string, path: string, env?: Record<string, string>) {
+  const body: Record<string, unknown> = { name, path };
+  if (env) body.env = env;
+  const res = await request('POST', '/api/agents', body);
   return (await res.json() as { agent: unknown }).agent;
 }
 
@@ -45,8 +47,10 @@ export async function getAgentInfo(name: string) {
   return (await res.json() as { agent: unknown }).agent;
 }
 
-export async function createSession(agent: string) {
-  const res = await request('POST', '/api/sessions', { agent });
+export async function createSession(agent: string, extraEnv?: Record<string, string>) {
+  const body: Record<string, unknown> = { agent };
+  if (extraEnv) body.extraEnv = extraEnv;
+  const res = await request('POST', '/api/sessions', body);
   return (await res.json() as { session: unknown }).session;
 }
 

@@ -8,6 +8,7 @@ import {
   upsertAgent,
   getAgent,
   listAgents,
+  updateAgent,
   deleteAgent,
   insertSession,
   insertForkedSession,
@@ -82,6 +83,66 @@ describe('database', () => {
 
     it('returns false when deleting nonexistent agent', async () => {
       expect(await deleteAgent('ghost')).toBe(false);
+    });
+
+    it('creates agent with env', async () => {
+      const env = { API_KEY: 'secret', DEBUG: 'true' };
+      const agent = await upsertAgent('env-agent', '/tmp/env', undefined, env);
+      expect(agent.env).toEqual(env);
+    });
+
+    it('persists and retrieves env via getAgent', async () => {
+      const env = { FOO: 'bar', BAZ: 'qux' };
+      await upsertAgent('env-agent', '/tmp/env', undefined, env);
+      const agent = await getAgent('env-agent');
+      expect(agent!.env).toEqual(env);
+    });
+
+    it('env is undefined when not provided', async () => {
+      const agent = await upsertAgent('no-env', '/tmp/no-env');
+      expect(agent.env).toBeUndefined();
+
+      const fetched = await getAgent('no-env');
+      expect(fetched!.env).toBeUndefined();
+    });
+
+    it('listAgents returns env', async () => {
+      const env = { KEY: 'value' };
+      await upsertAgent('with-env', '/tmp/with', undefined, env);
+      await upsertAgent('without-env', '/tmp/without');
+      const agents = await listAgents();
+      const withEnv = agents.find(a => a.name === 'with-env')!;
+      const withoutEnv = agents.find(a => a.name === 'without-env')!;
+      expect(withEnv.env).toEqual(env);
+      expect(withoutEnv.env).toBeUndefined();
+    });
+
+    it('upsert updates env on re-deploy', async () => {
+      await upsertAgent('env-agent', '/tmp/v1', undefined, { OLD: 'val' });
+      await upsertAgent('env-agent', '/tmp/v2', undefined, { NEW: 'val' });
+      const agent = await getAgent('env-agent');
+      expect(agent!.env).toEqual({ NEW: 'val' });
+    });
+
+    it('updateAgent updates env', async () => {
+      await upsertAgent('env-agent', '/tmp/env');
+      const updated = await updateAgent('env-agent', { env: { KEY: 'value' } });
+      expect(updated!.env).toEqual({ KEY: 'value' });
+
+      const fetched = await getAgent('env-agent');
+      expect(fetched!.env).toEqual({ KEY: 'value' });
+    });
+
+    it('updateAgent clears env with empty object', async () => {
+      await upsertAgent('env-agent', '/tmp/env', undefined, { KEY: 'value' });
+      await updateAgent('env-agent', { env: {} });
+      const agent = await getAgent('env-agent');
+      expect(agent!.env).toBeUndefined();
+    });
+
+    it('updateAgent returns null for nonexistent agent', async () => {
+      const result = await updateAgent('ghost', { env: { KEY: 'val' } });
+      expect(result).toBeNull();
     });
   });
 

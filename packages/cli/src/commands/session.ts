@@ -54,9 +54,22 @@ export function sessionCommand(): Command {
     .command('create')
     .description('Create a new session')
     .argument('<agent>', 'Agent name')
-    .action(async (agent: string) => {
+    .option('-e, --env <KEY=VALUE>', 'Extra env var for this session (repeatable)', (val: string, acc: string[]) => { acc.push(val); return acc; }, [])
+    .action(async (agent: string, opts: { env?: string[] }) => {
       try {
-        const session = await createSession(agent);
+        let extraEnv: Record<string, string> | undefined;
+        if (opts.env && opts.env.length > 0) {
+          extraEnv = {};
+          for (const pair of opts.env) {
+            const idx = pair.indexOf('=');
+            if (idx === -1) {
+              console.error(`Invalid env format: "${pair}" — expected KEY=VALUE`);
+              process.exit(1);
+            }
+            extraEnv[pair.slice(0, idx)] = pair.slice(idx + 1);
+          }
+        }
+        const session = await createSession(agent, extraEnv);
         console.log(`Session created: ${JSON.stringify(session, null, 2)}`);
       } catch (err: unknown) {
         console.error(`Failed: ${err instanceof Error ? err.message : err}`);

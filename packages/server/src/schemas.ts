@@ -12,6 +12,7 @@ const AgentSchema = {
     tenantId: { type: 'string' },
     version: { type: 'integer' },
     path: { type: 'string' },
+    env: { type: 'object', additionalProperties: { type: 'string' } },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' },
   },

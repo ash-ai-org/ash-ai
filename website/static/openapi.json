@@ -869,9 +869,6 @@
                       "type": "string"
                     }
                   },
-                  "startupScript": {
-                    "type": "string"
-                  },
                   "model": {
                     "type": "string",
                     "description": "Model override for this session. Overrides agent .claude/settings.json default."

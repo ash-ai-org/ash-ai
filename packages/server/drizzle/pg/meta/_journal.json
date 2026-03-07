@@ -71,6 +71,13 @@
       "when": 1772315876730,
       "tag": "0009_white_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772851318205,
+      "tag": "0010_steep_masque",
+      "breakpoints": true
     }
   ]
 }

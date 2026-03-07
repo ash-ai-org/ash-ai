@@ -128,7 +128,6 @@ class AshClient:
         *,
         credential_id: str | None = None,
         extra_env: dict[str, str] | None = None,
-        startup_script: str | None = None,
         model: str | None = None,
         system_prompt: str | None = None,
         permission_mode: str | None = None,
@@ -145,7 +144,6 @@ class AshClient:
             agent: Name of the deployed agent.
             credential_id: API credential ID to inject.
             extra_env: Additional environment variables.
-            startup_script: Shell script to run after install.
             model: Model override (e.g. ``claude-sonnet-4-20250514``).
             system_prompt: System prompt override (replaces agent CLAUDE.md).
             permission_mode: Permission mode (``bypassPermissions``, ``permissionsByAgent``, ``default``).
@@ -164,8 +162,6 @@ class AshClient:
             body["credentialId"] = credential_id
         if extra_env is not None:
             body["extraEnv"] = extra_env
-        if startup_script is not None:
-            body["startupScript"] = startup_script
         if model is not None:
             body["model"] = model
         if system_prompt is not None:

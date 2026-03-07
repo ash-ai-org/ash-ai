@@ -11,8 +11,6 @@ export interface CreateSandboxRequest {
   onOomKill?: (sandboxId: string) => void;
   /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
   extraEnv?: Record<string, string>;
-  /** Shell script to run in workspace after install.sh but before the bridge starts. */
-  startupScript?: string;
   /** Per-session MCP servers. Merged into agent's .mcp.json (session overrides agent). */
   mcpServers?: Record<string, McpServerConfig>;
   /** System prompt override. Replaces agent's CLAUDE.md for this session. */

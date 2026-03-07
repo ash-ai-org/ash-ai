@@ -74,7 +74,6 @@ interface Agent {
 createSession(agent: string, opts?: {
   credentialId?: string;
   extraEnv?: Record<string, string>;
-  startupScript?: string;
 }): Promise<Session>
 
 listSessions(agent?: string): Promise<Session[]>

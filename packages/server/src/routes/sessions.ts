@@ -87,7 +87,6 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
           agent: { type: 'string', minLength: 1, maxLength: 255 },
           credentialId: { type: 'string', maxLength: 255 },
           extraEnv: { type: 'object', additionalProperties: { type: 'string' } },
-          startupScript: { type: 'string', maxLength: 100_000 },
           model: { type: 'string', maxLength: 100, description: 'Model override for this session. Overrides agent .claude/settings.json default.' },
           mcpServers: {
             type: 'object',
@@ -122,7 +121,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       },
     },
   }, async (req, reply) => {
-    const { agent, credentialId, extraEnv: bodyExtraEnv, startupScript, model, mcpServers, systemPrompt, permissionMode, allowedTools, disallowedTools, betas, subagents, initialAgent } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; startupScript?: string; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string; permissionMode?: string; allowedTools?: string[]; disallowedTools?: string[]; betas?: string[]; subagents?: Record<string, unknown>; initialAgent?: string };
+    const { agent, credentialId, extraEnv: bodyExtraEnv, model, mcpServers, systemPrompt, permissionMode, allowedTools, disallowedTools, betas, subagents, initialAgent } = req.body as { agent: string; credentialId?: string; extraEnv?: Record<string, string>; model?: string; mcpServers?: Record<string, { url?: string; command?: string; args?: string[]; env?: Record<string, string> }>; systemPrompt?: string; permissionMode?: string; allowedTools?: string[]; disallowedTools?: string[]; betas?: string[]; subagents?: Record<string, unknown>; initialAgent?: string };
 
     return tracer.startActiveSpan('ash.session.create', { attributes: { 'ash.agent.name': agent } }, async (span) => {
     try {
@@ -142,8 +141,15 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       console.log(`[sessions] Restored agent "${agent}" from cloud storage`);
     }
 
-    // Resolve credential to env vars if provided
+    // Build extraEnv with merge order: agent.env → credential env → session extraEnv → ASH_PERMISSION_MODE
     let extraEnv: Record<string, string> | undefined;
+
+    // 1. Agent-level default env (lowest priority)
+    if (agentRecord.env) {
+      extraEnv = { ...agentRecord.env };
+    }
+
+    // 2. Credential env overrides agent defaults
     if (credentialId) {
       const cred = await decryptCredential(credentialId, req.tenantId);
       if (!cred) {
@@ -151,16 +157,16 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         return reply.status(400).send({ error: 'Invalid or inaccessible credential', statusCode: 400 });
       }
       const envKey = cred.type === 'anthropic' ? 'ANTHROPIC_API_KEY' : cred.type === 'openai' ? 'OPENAI_API_KEY' : 'ASH_CUSTOM_API_KEY';
-      extraEnv = { [envKey]: cred.key };
+      extraEnv = { ...extraEnv, [envKey]: cred.key };
       touchCredentialUsed(credentialId).catch(() => {});
     }
 
-    // Merge body-level extraEnv (overrides credential env on conflict)
+    // 3. Session-level extraEnv overrides everything above
     if (bodyExtraEnv) {
       extraEnv = { ...extraEnv, ...bodyExtraEnv };
     }
 
-    // Inject permission mode into sandbox env (bridge reads ASH_PERMISSION_MODE)
+    // 4. Permission mode always wins (highest priority)
     if (permissionMode) {
       extraEnv = { ...extraEnv, ASH_PERMISSION_MODE: permissionMode };
     }
@@ -180,7 +186,6 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         agentName: agentRecord.name,
         sandboxId: sessionId,
         extraEnv,
-        startupScript,
         mcpServers,
         systemPrompt,
         onOomKill: () => {

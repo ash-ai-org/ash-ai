@@ -209,7 +209,7 @@ export class SandboxPool {
    * Pre-create sandboxes for an agent so first sessions skip install/startup latency.
    * Sandboxes are created with no sessionId and sit in 'warm' state until claimed.
    */
-  async warmUp(agentName: string, agentDir: string, count: number, opts?: { startupScript?: string; extraEnv?: Record<string, string> }): Promise<void> {
+  async warmUp(agentName: string, agentDir: string, count: number, opts?: { extraEnv?: Record<string, string> }): Promise<void> {
     let created = 0;
     for (let i = 0; i < count; i++) {
       // Respect capacity
@@ -223,7 +223,6 @@ export class SandboxPool {
         const sandbox = await this.manager.create({
           agentDir,
           sessionId: '', // placeholder — pre-warm sandboxes have no session
-          startupScript: opts?.startupScript,
           extraEnv: opts?.extraEnv,
         });
 
