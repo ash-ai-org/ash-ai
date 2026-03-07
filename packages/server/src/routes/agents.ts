@@ -171,7 +171,7 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;
     const warmCount = typeof preWarmCount === 'number' ? preWarmCount : 1;
     if (pool && warmCount > 0) {
-      pool.warmUp(agent.name, agent.path, warmCount).catch((err) =>
+      pool.warmUp(agent.name, agent.path, warmCount, agent.env ? { extraEnv: agent.env } : undefined).catch((err) =>
         console.error(`[server] Pre-warm failed for ${agent.name}:`, err)
       );
     }

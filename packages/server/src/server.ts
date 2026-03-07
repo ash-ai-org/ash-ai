@@ -116,7 +116,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
         const preWarmCount = (agent.config as Record<string, unknown> | undefined)?.preWarmCount;
         const warmCount = typeof preWarmCount === 'number' ? preWarmCount : 1;
         if (warmCount > 0 && agent.path) {
-          await pool!.warmUp(agent.name, agent.path, warmCount);
+          await pool!.warmUp(agent.name, agent.path, warmCount, agent.env ? { extraEnv: agent.env } : undefined);
         }
       }
     }).catch((err) => {

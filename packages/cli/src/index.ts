@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import { basename } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { deployCommand } from './commands/deploy.js';
 import { sessionCommand } from './commands/session.js';
@@ -24,7 +26,7 @@ export const isDevMode =
 const program = new Command()
   .name(isDevMode ? 'ash-dev' : 'ash')
   .description(isDevMode ? 'Agent orchestration CLI (dev mode — uses local Docker build)' : 'Agent orchestration CLI')
-  .version('0.1.0');
+  .version(JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8')).version);
 
 program.addCommand(startCommand());
 program.addCommand(stopCommand());

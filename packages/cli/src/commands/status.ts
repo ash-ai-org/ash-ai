@@ -29,7 +29,13 @@ export function statusCommand(): Command {
 
           const pool = h.pool as Record<string, number> | undefined;
           if (pool) {
-            console.log(`  Pool: ${pool.warm} warm, ${pool.warming} warming, ${pool.cold} cold, ${pool.running} running (max ${pool.maxCapacity})`);
+            const parts = [];
+            if (pool.running)  parts.push(`${pool.running} running`);
+            if (pool.waiting)  parts.push(`${pool.waiting} waiting`);
+            if (pool.warm)     parts.push(`${pool.warm} warm`);
+            if (pool.warming)  parts.push(`${pool.warming} warming`);
+            if (pool.cold)     parts.push(`${pool.cold} cold`);
+            console.log(`  Pool: ${parts.join(', ')} (max ${pool.maxCapacity})`);
           }
         } catch {
           console.log('  Health check failed (server may still be starting)');
