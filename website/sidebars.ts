@@ -58,6 +58,7 @@ const sidebars: SidebarsConfig = {
         'self-hosting/ec2',
         'self-hosting/ecs-fargate',
         'self-hosting/gce',
+        'self-hosting/telemetry',
         'self-hosting/configuration',
         'self-hosting/multi-machine',
       ],

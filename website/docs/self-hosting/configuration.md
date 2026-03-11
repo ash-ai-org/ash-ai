@@ -24,6 +24,19 @@ All Ash configuration is done via environment variables. There are no config fil
 | `ASH_DEBUG_TIMING` | `0` | Set to `1` to enable timing instrumentation on the hot path. Logs latency for sandbox creation, bridge connect, message round-trip, and SSE delivery. |
 | `ANTHROPIC_API_KEY` | (none) | **Required.** Passed into sandbox processes via the environment allowlist. The Claude Agent SDK uses this to authenticate with the Anthropic API. |
 
+## Telemetry Variables
+
+These variables enable optional telemetry. Both systems are zero-overhead when not configured. See [Streaming Telemetry](./telemetry.md) for setup guides and examples.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | gRPC endpoint for OpenTelemetry trace export (e.g. `http://jaeger:4317`). Tracing is completely disabled when not set. |
+| `OTEL_SERVICE_NAME` | `ash-coordinator` | Service name in OpenTelemetry traces. Bridge processes default to `ash-bridge`. |
+| `OTEL_TRACES_SAMPLER` | (none) | Optional OTEL sampling strategy (e.g. `parentbased_traceidratio`). |
+| `ASH_TELEMETRY_URL` | (none) | HTTP endpoint for streaming event telemetry (session lifecycle, messages, tool calls). When not set and `ASH_CLOUD_URL` is present, auto-configured to send to Ash Cloud. |
+| `ASH_TELEMETRY_KEY` | (none) | Optional bearer token for authenticating with the telemetry endpoint. When auto-configured for Ash Cloud, defaults to `ASH_API_KEY`. |
+| `ASH_CLOUD_URL` | (none) | Ash Cloud URL (set automatically by `ash login` + `ash start`). When present and `ASH_TELEMETRY_URL` is not set, the server auto-configures event telemetry to send to `<ASH_CLOUD_URL>/api/telemetry/ingest`. |
+
 ## Runner Variables
 
 These variables configure runner processes in [multi-machine mode](./multi-machine.md).
@@ -128,3 +141,8 @@ Here is every variable in one table for quick reference:
 | `ASH_RUNNER_HOST` | `0.0.0.0` | Runner |
 | `ASH_SERVER_URL` | (none) | Runner |
 | `ASH_RUNNER_ADVERTISE_HOST` | (bind host) | Runner |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | Server, Runner |
+| `OTEL_SERVICE_NAME` | `ash-coordinator` | Server, Runner |
+| `ASH_TELEMETRY_URL` | (none) | Server |
+| `ASH_TELEMETRY_KEY` | (none) | Server |
+| `ASH_CLOUD_URL` | (none) | Server |

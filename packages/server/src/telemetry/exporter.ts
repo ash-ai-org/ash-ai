@@ -110,8 +110,17 @@ class NoopExporter implements TelemetryExporter {
 }
 
 export function createTelemetryExporter(): TelemetryExporter {
-  const url = process.env.ASH_TELEMETRY_URL;
-  const key = process.env.ASH_TELEMETRY_KEY ?? '';
+  let url = process.env.ASH_TELEMETRY_URL;
+  let key = process.env.ASH_TELEMETRY_KEY ?? '';
+
+  // Auto-configure for Ash Cloud: when the user is logged in (ASH_CLOUD_URL set
+  // by `ash start`) and no explicit telemetry URL is configured, send events to
+  // the Cloud telemetry ingest endpoint using the Cloud API key.
+  if (!url && process.env.ASH_CLOUD_URL) {
+    url = `${process.env.ASH_CLOUD_URL.replace(/\/$/, '')}/api/telemetry/ingest`;
+    key = key || process.env.ASH_API_KEY || '';
+    console.log(`[telemetry] auto-configured for Ash Cloud → ${url}`);
+  }
 
   if (!url) return new NoopExporter();
 

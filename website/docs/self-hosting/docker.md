@@ -92,7 +92,7 @@ docker build -t ash-dev .
 ash start --image ash-dev --no-pull
 ```
 
-See the [Configuration Reference](./configuration.md) for all environment variables.
+See the [Configuration Reference](./configuration.md) for all environment variables and [Streaming Telemetry](./telemetry.md) for OpenTelemetry tracing and event collection setup.
 
 ## Volume Mount Layout
 
