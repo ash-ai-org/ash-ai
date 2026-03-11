@@ -33,8 +33,9 @@ These variables enable optional telemetry. Both systems are zero-overhead when n
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | (none) | gRPC endpoint for OpenTelemetry trace export (e.g. `http://jaeger:4317`). Tracing is completely disabled when not set. |
 | `OTEL_SERVICE_NAME` | `ash-coordinator` | Service name in OpenTelemetry traces. Bridge processes default to `ash-bridge`. |
 | `OTEL_TRACES_SAMPLER` | (none) | Optional OTEL sampling strategy (e.g. `parentbased_traceidratio`). |
-| `ASH_TELEMETRY_URL` | (none) | HTTP endpoint for streaming event telemetry (session lifecycle, messages, tool calls). |
-| `ASH_TELEMETRY_KEY` | (none) | Optional bearer token for authenticating with the telemetry endpoint. |
+| `ASH_TELEMETRY_URL` | (none) | HTTP endpoint for streaming event telemetry (session lifecycle, messages, tool calls). When not set and `ASH_CLOUD_URL` is present, auto-configured to send to Ash Cloud. |
+| `ASH_TELEMETRY_KEY` | (none) | Optional bearer token for authenticating with the telemetry endpoint. When auto-configured for Ash Cloud, defaults to `ASH_API_KEY`. |
+| `ASH_CLOUD_URL` | (none) | Ash Cloud URL (set automatically by `ash login` + `ash start`). When present and `ASH_TELEMETRY_URL` is not set, the server auto-configures event telemetry to send to `<ASH_CLOUD_URL>/api/telemetry/ingest`. |
 
 ## Runner Variables
 
@@ -144,3 +145,4 @@ Here is every variable in one table for quick reference:
 | `OTEL_SERVICE_NAME` | `ash-coordinator` | Server, Runner |
 | `ASH_TELEMETRY_URL` | (none) | Server |
 | `ASH_TELEMETRY_KEY` | (none) | Server |
+| `ASH_CLOUD_URL` | (none) | Server |

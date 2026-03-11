@@ -16,6 +16,43 @@ For Prometheus metrics and structured logging, see the [Monitoring guide](../gui
 
 ---
 
+## Ash Cloud Integration
+
+If you have an [Ash Cloud](https://ash-cloud.ai) account, your self-hosted instance can send telemetry directly to the Ash Cloud dashboard. No extra configuration is needed -- when you log in with `ash login` and start the server, event telemetry is automatically configured.
+
+### How It Works
+
+1. Run `ash login` to authenticate with Ash Cloud. This stores your API key and Cloud URL in `~/.ash/credentials.json`.
+2. Run `ash start`. The CLI passes `ASH_CLOUD_URL` and `ASH_API_KEY` to the server container.
+3. The server detects `ASH_CLOUD_URL` and auto-configures the event telemetry exporter to send events to `<ASH_CLOUD_URL>/api/telemetry/ingest`, authenticated with your API key.
+
+```bash
+# 1. Log in to Ash Cloud
+ash login
+
+# 2. Start the server — telemetry flows automatically
+ash start
+```
+
+You can verify telemetry is active by checking the server logs:
+
+```bash
+ash logs | grep telemetry
+# [telemetry] auto-configured for Ash Cloud → https://ash-cloud.ai/api/telemetry/ingest
+```
+
+Session events, tool calls, and lifecycle data will appear in your Ash Cloud dashboard.
+
+### Overriding the Default
+
+If you set `ASH_TELEMETRY_URL` explicitly, it takes precedence over the Ash Cloud auto-configuration. This lets you send telemetry to your own backend even when logged into Ash Cloud:
+
+```bash
+ash start -e ASH_TELEMETRY_URL=https://my-backend/events
+```
+
+---
+
 ## OpenTelemetry Tracing
 
 Ash instruments the full request path from HTTP request through sandbox bridge to the Claude API. When enabled, traces are exported via OTLP gRPC to any compatible collector (Jaeger, Grafana Tempo, Datadog, Honeycomb, etc.).
