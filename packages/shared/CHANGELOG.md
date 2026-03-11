@@ -1,5 +1,12 @@
 # @ash-ai/shared
 
+## 0.0.21 - 2026-03-10
+
+### Added
+
+- `bedrock` credential type (#72)
+- `CLAUDE_CODE_USE_BEDROCK` in sandbox env allowlist (#72)
+
 ## 0.0.20 - 2026-03-06
 
 ### Changed

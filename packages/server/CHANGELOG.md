@@ -1,5 +1,20 @@
 # @ash-ai/server
 
+## 0.0.32 - 2026-03-10
+
+### Added
+
+- Dashboard UI served at `/dashboard/` via `@fastify/static` with SPA fallback and dynamic `config.js` endpoint (#72)
+- Bedrock credential support: store AWS credentials as encrypted JSON, inject `CLAUDE_CODE_USE_BEDROCK` + AWS env vars into sandbox sessions (#72)
+- Public API key management routes: list, create, and revoke API keys (#72)
+- `CLAUDE_CODE_USE_BEDROCK` added to sandbox env allowlist (#72)
+
+### Changed
+
+- CORS defaults to allow all origins (self-hosted tool); restrict via `ALLOWED_ORIGINS` env (#72)
+- Dashboard routes (`/dashboard/*`) bypass API key authentication (#72)
+- Updated dependencies: @ash-ai/shared@0.0.21
+
 ## 0.0.31
 
 ### Patch Changes
