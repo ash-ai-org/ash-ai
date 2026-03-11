@@ -1,7 +1,16 @@
 {
   "name": "@ash-ai/dashboard",
   "version": "0.0.1",
-  "private": true,
+  "files": [
+    "out",
+    "app",
+    "components",
+    "lib",
+    "next.config.ts",
+    "postcss.config.mjs",
+    "tsconfig.json",
+    "package.json"
+  ],
   "scripts": {
     "dev": "next dev --port 4200",
     "build": "next build",
