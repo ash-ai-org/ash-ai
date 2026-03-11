@@ -156,8 +156,31 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         span.setStatus({ code: SpanStatusCode.ERROR, message: 'Invalid credential' });
         return reply.status(400).send({ error: 'Invalid or inaccessible credential', statusCode: 400 });
       }
-      const envKey = cred.type === 'anthropic' ? 'ANTHROPIC_API_KEY' : cred.type === 'openai' ? 'OPENAI_API_KEY' : 'ASH_CUSTOM_API_KEY';
-      extraEnv = { ...extraEnv, [envKey]: cred.key };
+      if (cred.type === 'bedrock') {
+        // Bedrock credentials are stored as JSON: { accessKeyId, secretAccessKey, region, sessionToken? }
+        let bedrock: { accessKeyId: string; secretAccessKey: string; region: string; sessionToken?: string };
+        try {
+          bedrock = JSON.parse(cred.key);
+        } catch {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: 'Invalid bedrock credential format' });
+          return reply.status(400).send({ error: 'Bedrock credential must be a JSON object with accessKeyId, secretAccessKey, and region', statusCode: 400 });
+        }
+        if (!bedrock.accessKeyId || !bedrock.secretAccessKey || !bedrock.region) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: 'Missing bedrock credential fields' });
+          return reply.status(400).send({ error: 'Bedrock credential requires accessKeyId, secretAccessKey, and region', statusCode: 400 });
+        }
+        extraEnv = {
+          ...extraEnv,
+          CLAUDE_CODE_USE_BEDROCK: '1',
+          AWS_ACCESS_KEY_ID: bedrock.accessKeyId,
+          AWS_SECRET_ACCESS_KEY: bedrock.secretAccessKey,
+          AWS_REGION: bedrock.region,
+          ...(bedrock.sessionToken && { AWS_SESSION_TOKEN: bedrock.sessionToken }),
+        };
+      } else {
+        const envKey = cred.type === 'anthropic' ? 'ANTHROPIC_API_KEY' : cred.type === 'openai' ? 'OPENAI_API_KEY' : 'ASH_CUSTOM_API_KEY';
+        extraEnv = { ...extraEnv, [envKey]: cred.key };
+      }
       touchCredentialUsed(credentialId).catch(() => {});
     }
 

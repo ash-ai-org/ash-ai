@@ -78,40 +78,46 @@ qa-bot:
 
 # Deploy the qa-bot agent to a running Ash server, then start the web UI
 deploy-qa-bot:
-	npx tsx packages/cli/src/index.ts deploy ./examples/qa-bot/agent --name qa-bot
+	npx tsx packages/cli/src/index.ts deploy ./examples/personal-assistant-demo/agent_folder --name personal-assistant-demo
 
-# Start Ash server in Docker, deploy qa-bot agent, then start QA Bot UI
+# Start Ash server in Docker, deploy qa-bot agent, then start QA Bot UI + Dashboard
 dev: docker-build
-	@echo "Starting Ash server (Docker) + QA Bot UI..."
+	@echo "Starting Ash server (Docker) + QA Bot UI + Dashboard..."
 	@echo ""
 	npx tsx packages/cli/src/index.ts start --image ash-dev --no-pull
 	@echo ""
 	@echo "Deploying qa-bot agent..."
-	npx tsx packages/cli/src/index.ts deploy ./examples/qa-bot/agent --name qa-bot
+	npx tsx packages/cli/src/index.ts deploy ./examples/personal-assistant-demo/agent_folder --name personal-assistant-demo
 	@echo ""
 	@echo "  Ash server  → http://localhost:4100 (Docker)"
+	@echo "  Dashboard   → http://localhost:4100/dashboard/ (served by Docker)"
+	@echo "  Dashboard   → http://localhost:4200/dashboard/ (Next.js dev, hot-reload)"
 	@echo "  QA Bot UI   → http://localhost:3100"
 	@echo ""
 	@trap 'npx tsx packages/cli/src/index.ts stop 2>/dev/null; kill 0' EXIT; \
+	pnpm --filter '@ash-ai/dashboard' dev & \
 	pnpm --filter qa-bot dev & \
 	wait
 
-# Start both server + qa-bot natively (no Docker, no sandbox)
+# Start server + qa-bot + dashboard natively (no Docker, no sandbox)
 dev-no-sandbox:
-	@echo "Starting Ash server + QA Bot UI (native, no sandbox)..."
+	@echo "Starting Ash server + QA Bot UI + Dashboard (native, no sandbox)..."
 	@echo "  Ash server  → http://localhost:4100"
+	@echo "  Dashboard   → http://localhost:4200/dashboard/ (Next.js dev, hot-reload)"
 	@echo "  QA Bot UI   → http://localhost:3100"
 	@echo ""
 	@trap 'kill 0' EXIT; \
 	ASH_REAL_SDK=1 pnpm --filter '@ash-ai/server' dev & \
+	pnpm --filter '@ash-ai/dashboard' dev & \
 	sleep 2 && pnpm --filter qa-bot dev & \
 	wait
 
-# Kill processes on dev ports (4100, 3100) and stop Docker container
+# Kill processes on dev ports (4100, 4200, 3100) and stop Docker container
 kill:
-	@echo "Killing processes on ports 4100 and 3100..."
+	@echo "Killing processes on ports 4100, 4200, and 3100..."
 	@-npx tsx packages/cli/src/index.ts stop 2>/dev/null; true
 	@-lsof -ti :4100 | xargs kill 2>/dev/null; true
+	@-lsof -ti :4200 | xargs kill 2>/dev/null; true
 	@-lsof -ti :3100 | xargs kill 2>/dev/null; true
 	@echo "Done."
 

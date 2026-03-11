@@ -37,18 +37,27 @@ function isHttpxAvailable(): boolean {
 }
 
 /**
- * Run a Python script inline, with PYTHONPATH set to include the SDK.
+ * Run a Python script via temp file, with PYTHONPATH set to include the SDK.
  * Returns stdout as a string.
+ *
+ * Using a temp file avoids shell escaping issues with `python3 -c`
+ * (JSON.stringify produces literal \n which the shell doesn't convert).
  */
 function runPython(script: string, env?: Record<string, string>): string {
-  return execSync(`python3 -c ${JSON.stringify(script)}`, {
-    env: {
-      ...process.env,
-      PYTHONPATH: sdkPythonPath,
-      ...env,
-    },
-    timeout: 30_000,
-  }).toString().trim();
+  const scriptPath = join(tmpdir(), `ash-pytest-${Date.now()}-${Math.random().toString(36).slice(2)}.py`);
+  writeFileSync(scriptPath, script);
+  try {
+    return execSync(`python3 ${scriptPath}`, {
+      env: {
+        ...process.env,
+        PYTHONPATH: sdkPythonPath,
+        ...env,
+      },
+      timeout: 30_000,
+    }).toString().trim();
+  } finally {
+    try { rmSync(scriptPath); } catch { /* best effort cleanup */ }
+  }
 }
 
 beforeAll(async () => {

@@ -5,6 +5,11 @@ import { SANDBOX_ENV_ALLOWLIST } from '@ash-ai/shared';
  * Security invariant: sandbox processes must NOT receive host secrets.
  * The allowlist is the enforcement mechanism — test that it doesn't
  * contain dangerous keys, and that the manager respects it.
+ *
+ * NOTE: AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN)
+ * are intentionally NOT in the allowlist. They are injected explicitly via extraEnv
+ * when a Bedrock credential is used. CLAUDE_CODE_USE_BEDROCK is in the allowlist
+ * because it's a feature flag (not a secret).
  */
 describe('sandbox environment isolation', () => {
   const DANGEROUS_KEYS = [
@@ -37,6 +42,7 @@ describe('sandbox environment isolation', () => {
     const expected = new Set([
       'PATH', 'NODE_PATH', 'HOME', 'LANG', 'TERM',
       'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_CUSTOM_HEADERS',
+      'CLAUDE_CODE_USE_BEDROCK',
       'ASH_DEBUG_TIMING', 'ASH_REAL_SDK', 'ASH_PERMISSION_MODE',
       'CLAUDE_CODE_EXECUTABLE',
       'OTEL_EXPORTER_OTLP_ENDPOINT', 'OTEL_SERVICE_NAME',

@@ -26,6 +26,8 @@ COPY packages/server/package.json packages/server/tsconfig.json packages/server/
 COPY packages/cli/package.json packages/cli/tsconfig.json packages/cli/
 COPY packages/runner/package.json packages/runner/tsconfig.json packages/runner/
 COPY packages/sdk/package.json packages/sdk/tsconfig.json packages/sdk/
+COPY packages/ui/package.json packages/ui/tsconfig.json packages/ui/tsup.config.ts packages/ui/
+COPY packages/dashboard/package.json packages/dashboard/tsconfig.json packages/dashboard/
 
 # Install dependencies (cached unless package.json or lockfile changes)
 RUN pnpm install --frozen-lockfile
@@ -39,6 +41,15 @@ COPY packages/server/drizzle/ packages/server/drizzle/
 COPY packages/cli/src/ packages/cli/src/
 COPY packages/runner/src/ packages/runner/src/
 COPY packages/sdk/src/ packages/sdk/src/
+
+COPY packages/ui/src/ packages/ui/src/
+COPY packages/ui/postcss.config.js packages/ui/tailwind.config.ts packages/ui/
+
+# Dashboard: copy source + config (Next.js static export)
+COPY packages/dashboard/app/ packages/dashboard/app/
+COPY packages/dashboard/components/ packages/dashboard/components/
+COPY packages/dashboard/lib/ packages/dashboard/lib/
+COPY packages/dashboard/next.config.ts packages/dashboard/postcss.config.mjs packages/dashboard/
 
 # Build
 RUN pnpm build

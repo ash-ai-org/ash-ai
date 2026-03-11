@@ -1,4 +1,4 @@
-export { AshClient } from './client.js';
+export { AshClient, AshApiError } from './client.js';
 export type { AshClientOptions, SendMessageOptions, ExecResult } from './client.js';
 export { parseSSEStream } from './sse.js';
 export { extractTextFromEvent, extractStreamDelta, extractDisplayItems } from '@ash-ai/shared';
@@ -11,6 +11,7 @@ export type {
   SessionEvent,
   SessionEventType,
   Credential,
+  CredentialType,
   Attachment,
   QueueItem,
   QueueItemStatus,

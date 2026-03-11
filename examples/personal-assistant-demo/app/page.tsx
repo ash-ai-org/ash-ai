@@ -382,8 +382,8 @@ export default function Chat() {
                 } disabled:opacity-50`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-zinc-400 truncate">
-                    {s.id.slice(0, 8)}
+                  <span className="text-xs font-mono text-zinc-400 break-all">
+                    {s.id}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${
@@ -424,7 +424,7 @@ export default function Chat() {
             <h1 className="text-lg font-semibold">Personal Assistant</h1>
             {sessionId && (
               <span className="text-xs font-mono text-zinc-500">
-                {sessionId.slice(0, 8)}
+                {sessionId}
               </span>
             )}
           </div>
