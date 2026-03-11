@@ -1,5 +1,11 @@
 # @ash-ai/server
 
+## 0.0.33 - 2026-03-10
+
+### Changed
+
+- Updated dependencies
+
 ## 0.0.32 - 2026-03-10
 
 ### Added
