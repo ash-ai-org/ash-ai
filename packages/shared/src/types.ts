@@ -450,7 +450,7 @@ export interface ListSessionsWithTotalResponse {
 
 // -- Credentials --------------------------------------------------------------
 
-export type CredentialType = 'anthropic' | 'openai' | 'custom';
+export type CredentialType = 'anthropic' | 'openai' | 'bedrock' | 'custom';
 
 export interface Credential {
   id: string;

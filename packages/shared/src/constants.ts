@@ -50,6 +50,9 @@ export const RUNNER_HEARTBEAT_INTERVAL_MS = 10_000;
 export const RUNNER_LIVENESS_TIMEOUT_MS = 30_000;
 
 // Env vars allowed into sandbox processes (allowlist — nothing else leaks)
+// NOTE: AWS secret keys (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN)
+// are intentionally NOT in this list — they must be injected explicitly via extraEnv
+// or the credential system, never leaked from the host environment.
 export const SANDBOX_ENV_ALLOWLIST = [
   'PATH',
   'NODE_PATH',
@@ -59,6 +62,7 @@ export const SANDBOX_ENV_ALLOWLIST = [
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_CUSTOM_HEADERS',
+  'CLAUDE_CODE_USE_BEDROCK',
   'ASH_DEBUG_TIMING',
   'ASH_REAL_SDK',
   'ASH_PERMISSION_MODE',

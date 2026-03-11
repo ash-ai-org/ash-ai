@@ -13,7 +13,7 @@ export function credentialRoutes(app: FastifyInstance): void {
       body: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['anthropic', 'openai', 'custom'] },
+          type: { type: 'string', enum: ['anthropic', 'openai', 'bedrock', 'custom'] },
           key: { type: 'string', minLength: 1 },
           label: { type: 'string' },
         },

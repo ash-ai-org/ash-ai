@@ -51,7 +51,7 @@ export function registerAuth(app: FastifyInstance, apiKey: string | undefined, d
 
   app.addHook('onRequest', async (request: FastifyRequest, reply) => {
     // Public endpoints — no auth required
-    if (request.url === '/health' || request.url.startsWith('/docs')) {
+    if (request.url === '/health' || request.url.startsWith('/docs') || request.url.startsWith('/dashboard')) {
       request.tenantId = 'default';
       return;
     }

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateApiKey, hashApiKey } from '../auth.js';
-import { insertApiKey } from '../db/index.js';
+import { insertApiKey, listApiKeysByTenant, deleteApiKey } from '../db/index.js';
 
 const internalSecret = process.env.ASH_INTERNAL_SECRET;
 
@@ -33,11 +33,12 @@ function validateInternalAuth(req: FastifyRequest, reply: FastifyReply): boolean
 }
 
 /**
- * Internal endpoint for provisioning per-tenant API keys.
- * Called by the platform to lazily create Ash API keys for each tenant.
- * Protected by ASH_INTERNAL_SECRET when set.
+ * API key management routes.
+ * - Internal endpoint for platform provisioning (protected by ASH_INTERNAL_SECRET)
+ * - Public endpoints for dashboard API key management (protected by normal auth)
  */
 export function apiKeyRoutes(app: FastifyInstance): void {
+  // Internal: platform provisioning
   app.post('/api/internal/api-keys', async (req, reply) => {
     if (!validateInternalAuth(req, reply)) return;
 
@@ -54,5 +55,43 @@ export function apiKeyRoutes(app: FastifyInstance): void {
     const record = await insertApiKey(id, tenantId, keyHash, label || `platform-${tenantId}`);
 
     return reply.send({ id: record.id, key: plainKey, tenantId: record.tenantId });
+  });
+
+  // Public: list API keys for current tenant (key hash hidden)
+  app.get('/api/api-keys', async (req, reply) => {
+    const tenantId = (req as any).tenantId || 'default';
+    const keys = await listApiKeysByTenant(tenantId);
+    return reply.send({
+      keys: keys.map((k) => ({
+        id: k.id,
+        label: k.label,
+        keyPrefix: k.keyHash?.slice(0, 12) ? '••••••••' : undefined,
+        createdAt: k.createdAt,
+      })),
+    });
+  });
+
+  // Public: create a new API key
+  app.post('/api/api-keys', async (req, reply) => {
+    const tenantId = (req as any).tenantId || 'default';
+    const { label } = (req.body || {}) as { label?: string };
+
+    const plainKey = generateApiKey();
+    const hmacSecret = process.env.ASH_CREDENTIAL_KEY;
+    const keyHash = hashApiKey(plainKey, hmacSecret);
+    const id = randomUUID();
+
+    const record = await insertApiKey(id, tenantId, keyHash, label || 'dashboard-key');
+    return reply.status(201).send({ id: record.id, key: plainKey });
+  });
+
+  // Public: revoke an API key
+  app.delete('/api/api-keys/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const deleted = await deleteApiKey(id);
+    if (!deleted) {
+      return reply.status(404).send({ error: 'API key not found' });
+    }
+    return reply.status(204).send();
   });
 }

@@ -3,8 +3,13 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import rateLimit from '@fastify/rate-limit';
 import cors from '@fastify/cors';
-import { join, resolve } from 'node:path';
+import fastifyStatic from '@fastify/static';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { existsSync, writeFileSync } from 'node:fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import { DEFAULT_PORT, DEFAULT_HOST, DEFAULT_DATA_DIR, DEFAULT_MAX_SANDBOXES, DEFAULT_IDLE_TIMEOUT_MS } from '@ash-ai/shared';
 import { initDb, closeDb, updateSessionStatus, getAgent, getSession, insertSession, updateSessionRunner, listAgents, listApiKeysByTenant, insertApiKey, bulkPauseActiveSessions } from './db/index.js';
 import { QueueProcessor } from './queue/processor.js';
@@ -133,10 +138,10 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
 
   const app = Fastify({ logger: true });
 
-  // CORS — reject cross-origin by default; allow origins from ALLOWED_ORIGINS env
+  // CORS — allow all origins by default (self-hosted tool); restrict via ALLOWED_ORIGINS env
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
   await app.register(cors, {
-    origin: allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : false,
+    origin: allowedOrigins && allowedOrigins.length > 0 ? allowedOrigins : true,
     credentials: true,
   });
 
@@ -226,6 +231,44 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   healthRoutes(app, coordinator, pool);
   runnerRoutes(app, coordinator);
   apiKeyRoutes(app);
+
+  // Dashboard config endpoint — always registered so the dev proxy can reach it.
+  // Includes serverUrl so the dashboard SDK client talks directly to the Ash server,
+  // bypassing the Next.js dev proxy (which breaks SSE streams).
+  app.get('/dashboard/config.js', (req, reply) => {
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${port}`;
+    const serverUrl = `${proto}://${host}`;
+    const config = JSON.stringify({
+      apiKey: opts.apiKey || null,
+      serverVersion: VERSION,
+      serverUrl,
+    });
+    reply.type('application/javascript').send(`window.__ASH_CONFIG__ = ${config};`);
+  });
+
+  // Dashboard static file serving
+  const dashboardEnabled = process.env.ASH_DASHBOARD_ENABLED !== 'false';
+  const dashboardPath = process.env.ASH_DASHBOARD_PATH
+    || join(__dirname, '..', '..', 'dashboard', 'out');
+
+  if (dashboardEnabled && existsSync(dashboardPath)) {
+    await app.register(fastifyStatic, {
+      root: dashboardPath,
+      prefix: '/dashboard/',
+    });
+
+    // SPA fallback: serve index.html for any unmatched /dashboard/* path
+    app.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith('/dashboard')) {
+        return reply.sendFile('index.html', dashboardPath);
+      }
+      return reply.code(404).send({ error: 'Not found' });
+    });
+
+    app.log.info(`Dashboard available at /dashboard/`);
+    app.log.warn('The dashboard has no authentication. If exposed to a network, place behind an authenticating reverse proxy.');
+  }
 
   coordinator.startLivenessSweep();
 

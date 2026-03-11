@@ -121,20 +121,21 @@ describe('full lifecycle', () => {
     const text = await msgRes.text();
 
     // Should contain SSE events
-    expect(text).toContain('event: message');
+    expect(text).toContain('event: session_start');
     expect(text).toContain('event: done');
 
     // Message data should contain SDK-shaped objects
     const dataLines = text.split('\n').filter((l) => l.startsWith('data: '));
     expect(dataLines.length).toBeGreaterThan(0);
 
-    // Parse first data line — should be an SDK assistant message
+    // Parse first data line — should be session_start envelope
     const firstData = JSON.parse(dataLines[0].slice(6));
-    expect(firstData.type).toBe('assistant');
+    expect(firstData.sessionId).toBeTruthy();
   }, 15_000);
 
   it('rejects message to nonexistent session', async () => {
-    const res = await fetch(`${server.url}/api/sessions/ghost/messages`, {
+    // Use a valid UUID format — Fastify schema validation rejects non-UUIDs with 400
+    const res = await fetch(`${server.url}/api/sessions/00000000-0000-0000-0000-000000000000/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...auth },
       body: JSON.stringify({ content: 'hello' }),

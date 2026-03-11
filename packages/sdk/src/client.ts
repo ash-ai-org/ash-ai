@@ -68,6 +68,16 @@ export interface ExecResult {
   stderr: string;
 }
 
+/** Error from Ash runtime API — preserves status code and message. */
+export class AshApiError extends Error {
+  public readonly statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = 'AshApiError';
+    this.statusCode = statusCode;
+  }
+}
+
 export class AshClient {
   private serverUrl: string;
   private apiKey?: string;
@@ -91,8 +101,9 @@ export class AshClient {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
-      throw new Error(err.error);
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      const msg = err.message || err.error || res.statusText;
+      throw new AshApiError(res.status, msg);
     }
     return await res.json() as T;
   }
@@ -243,8 +254,9 @@ export class AshClient {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
-      throw new Error(err.error);
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      const msg = err.message || err.error || res.statusText;
+      throw new AshApiError(res.status, msg);
     }
     return res;
   }
@@ -366,8 +378,9 @@ export class AshClient {
       headers: this.headers(),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
-      throw new Error(err.error);
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      const msg = err.message || err.error || res.statusText;
+      throw new AshApiError(res.status, msg);
     }
     return {
       buffer: Buffer.from(await res.arrayBuffer()),
@@ -382,8 +395,9 @@ export class AshClient {
       headers: this.headers(),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
-      throw new Error(err.error);
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      const msg = err.message || err.error || res.statusText;
+      throw new AshApiError(res.status, msg);
     }
     return res;
   }
@@ -414,6 +428,27 @@ export class AshClient {
     if (label) body.label = label;
     const res = await this.request<{ credential: Credential }>('POST', '/api/credentials', body);
     return res.credential;
+  }
+
+  /**
+   * Store an Amazon Bedrock credential. The credential is encrypted at rest and
+   * expanded into AWS env vars (CLAUDE_CODE_USE_BEDROCK, AWS_ACCESS_KEY_ID, etc.)
+   * when used in a session.
+   */
+  async storeBedrockCredential(opts: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    region: string;
+    sessionToken?: string;
+    label?: string;
+  }): Promise<Credential> {
+    const key = JSON.stringify({
+      accessKeyId: opts.accessKeyId,
+      secretAccessKey: opts.secretAccessKey,
+      region: opts.region,
+      ...(opts.sessionToken && { sessionToken: opts.sessionToken }),
+    });
+    return this.storeCredential('bedrock', key, opts.label);
   }
 
   async listCredentials(): Promise<Credential[]> {
@@ -448,8 +483,9 @@ export class AshClient {
       headers: this.headers(),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
-      throw new Error(err.error);
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      const msg = err.message || err.error || res.statusText;
+      throw new AshApiError(res.status, msg);
     }
     return Buffer.from(await res.arrayBuffer());
   }
@@ -466,8 +502,9 @@ export class AshClient {
       headers: this.headers(),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText })) as { error: string };
-      throw new Error(err.error);
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string };
+      const msg = err.message || err.error || res.statusText;
+      throw new AshApiError(res.status, msg);
     }
     return Buffer.from(await res.arrayBuffer());
   }

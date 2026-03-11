@@ -93,7 +93,7 @@ describe('CLI developer workflow', () => {
   });
 
   it('ash session send — sends a message and gets a response', () => {
-    const out = ash(['session', 'send', sessionId, 'what is 2+2? answer in one word'], { timeout: 60_000 });
+    const out = ash(['session', 'send', '--raw', sessionId, 'what is 2+2? answer in one word'], { timeout: 60_000 });
     expect(out).toContain('[message]');
     expect(out).toContain('[done]');
   }, 60_000);
