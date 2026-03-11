@@ -1,5 +1,17 @@
 # @ash-ai/sdk
 
+## 0.0.21 - 2026-03-10
+
+### Added
+
+- `AshApiError` class preserving HTTP status codes on API errors (#72)
+- `storeBedrockCredential()` convenience method for storing AWS Bedrock credentials (#72)
+- Export `CredentialType` from `@ash-ai/shared` (#72)
+
+### Changed
+
+- Updated dependencies: @ash-ai/shared@0.0.21
+
 ## 0.0.20 - 2026-03-06
 
 ### Changed
