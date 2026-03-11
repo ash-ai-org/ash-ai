@@ -31,6 +31,7 @@ class HttpTelemetryExporter implements TelemetryExporter {
   private sequences = new Map<string, number>();
   private timer: ReturnType<typeof setInterval>;
   private instanceId = hostname();
+  private warnedStatuses = new Set<number>();
 
   constructor(
     private url: string,
@@ -88,8 +89,9 @@ class HttpTelemetryExporter implements TelemetryExporter {
         signal: AbortSignal.timeout(10_000),
       });
 
-      if (!res.ok) {
-        console.warn(`[telemetry] POST ${this.url} returned ${res.status}`);
+      if (!res.ok && !this.warnedStatuses.has(res.status)) {
+        this.warnedStatuses.add(res.status);
+        console.warn(`[telemetry] POST ${this.url} returned ${res.status} (suppressing further warnings for this status)`);
       }
     } catch (err) {
       console.warn(`[telemetry] POST failed: ${err}`);

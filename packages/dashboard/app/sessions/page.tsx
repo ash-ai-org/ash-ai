@@ -361,6 +361,24 @@ function MessageBlock({ message }: { message: Message }) {
         .join('\n')
     } else if (typeof parsed === 'string') {
       displayContent = parsed
+    } else if (parsed && typeof parsed === 'object') {
+      // SDK result/assistant messages: extract text from content array or result field
+      const obj = parsed as Record<string, unknown>
+      if (Array.isArray(obj.content)) {
+        const textBlocks = (obj.content as Record<string, unknown>[]).filter(
+          (b) => b.type === 'text'
+        )
+        toolCalls = (obj.content as Record<string, unknown>[]).filter(
+          (b) => b.type === 'tool_use'
+        ) as typeof toolCalls
+        displayContent = textBlocks
+          .map((b) => String(b.text || ''))
+          .join('\n')
+      } else if (typeof obj.result === 'string') {
+        displayContent = obj.result
+      } else if (typeof obj.text === 'string') {
+        displayContent = obj.text
+      }
     } else {
       displayContent = message.content
     }

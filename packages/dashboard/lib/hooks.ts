@@ -20,15 +20,28 @@ function useInterval(callback: () => void, delay: number | null) {
 
 // ─── useAgents ───
 
+function getCached<T>(key: string): T | null {
+  try {
+    const cached = sessionStorage.getItem(key)
+    return cached ? JSON.parse(cached) : null
+  } catch { return null }
+}
+
+function setCache(key: string, data: unknown): void {
+  try { sessionStorage.setItem(key, JSON.stringify(data)) } catch {}
+}
+
 export function useAgents() {
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [loading, setLoading] = useState(true)
+  const cached = getCached<Agent[]>('ash:agents')
+  const [agents, setAgents] = useState<Agent[]>(cached ?? [])
+  const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<Error | null>(null)
 
   const refetch = useCallback(async () => {
     try {
       const result = await getClient().listAgents()
       setAgents(result)
+      setCache('ash:agents', result)
       setError(null)
     } catch (e) {
       setError(e as Error)
@@ -51,21 +64,24 @@ export function useSessions(opts?: {
   limit?: number
   autoRefresh?: boolean
 }) {
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `ash:sessions:${opts?.agent ?? 'all'}`
+  const cached = getCached<Session[]>(cacheKey)
+  const [sessions, setSessions] = useState<Session[]>(cached ?? [])
+  const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<Error | null>(null)
 
   const refetch = useCallback(async () => {
     try {
       const result = await getClient().listSessions(opts?.agent)
       setSessions(result)
+      setCache(cacheKey, result)
       setError(null)
     } catch (e) {
       setError(e as Error)
     } finally {
       setLoading(false)
     }
-  }, [opts?.agent])
+  }, [opts?.agent, cacheKey])
 
   useEffect(() => {
     refetch()
@@ -89,14 +105,16 @@ export interface HealthData {
 }
 
 export function useHealth() {
-  const [health, setHealth] = useState<HealthData | null>(null)
+  const [health, setHealth] = useState<HealthData | null>(() => getCached('ash:health'))
   const [error, setError] = useState<Error | null>(null)
 
   const refetch = useCallback(async () => {
     try {
       const result = await getClient().health()
-      setHealth(result as HealthData)
+      const data = result as HealthData
+      setHealth(data)
       setError(null)
+      setCache('ash:health', data)
     } catch (e) {
       setError(e as Error)
     }
