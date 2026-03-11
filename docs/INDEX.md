@@ -87,7 +87,7 @@
 
 | Doc | Description |
 |-----|-------------|
-| [future_tasks/otel-tracing.md](./future_tasks/otel-tracing.md) | OpenTelemetry distributed tracing: coordinator auto-instrumentation + bridge-level spans |
+| [future_tasks/otel-tracing.md](./future_tasks/otel-tracing.md) | OpenTelemetry distributed tracing: coordinator auto-instrumentation + bridge-level spans (Status: Implemented) |
 | [future_tasks/unprivileged-sandboxes.md](./future_tasks/unprivileged-sandboxes.md) | Running Ash without `--privileged`: user namespaces, K8s-native isolation |
 | [future_tasks/memory-as-mcp.md](./future_tasks/memory-as-mcp.md) | Memory system as MCP server in agent definitions (zero Ash changes) |
 | [future_tasks/pluggable-sandbox-providers.md](./future_tasks/pluggable-sandbox-providers.md) | SandboxProvider interface for E2B, Docker, and cloud sandbox backends |
