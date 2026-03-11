@@ -1,5 +1,12 @@
 # @ash-ai/dashboard
 
+## 0.0.2 - 2026-03-10
+
+### Changed
+
+- Package is now public (removed `private: true`) (#74)
+- Added `files` field for npm publishing (#74)
+
 ## 0.0.1 - 2026-03-10
 
 ### Added
