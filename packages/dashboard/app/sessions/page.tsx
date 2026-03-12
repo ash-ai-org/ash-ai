@@ -141,7 +141,7 @@ function SessionsPageInner() {
       {/* Right: Detail */}
       <div className="flex-1 min-w-0">
         {selectedSession ? (
-          <SessionDetail session={selectedSession} />
+          <SessionDetail key={selectedSession.id} session={selectedSession} />
         ) : (
           <EmptyState
             icon={<Activity className="h-12 w-12" />}
@@ -162,41 +162,47 @@ function SessionDetail({ session }: { session: Session }) {
   const [events, setEvents] = useState<SessionEvent[]>([])
   const [logs, setLogs] = useState<string[]>([])
   const [loadingData, setLoadingData] = useState(true)
+  const fetchingRef = useRef(false)
+  const sessionId = session.id
+  const sessionStatus = session.status
 
   const fetchData = useCallback(async () => {
-    setLoadingData(true)
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     try {
       const client = getClient()
       const [msgs, evts] = await Promise.all([
-        client.listMessages(session.id).catch(() => []),
-        client.listSessionEvents(session.id).catch(() => []),
+        client.listMessages(sessionId).catch(() => []),
+        client.listSessionEvents(sessionId).catch(() => []),
       ])
       setMessages(msgs)
       setEvents(evts)
     } catch {
       // Silently handle errors
     } finally {
+      fetchingRef.current = false
       setLoadingData(false)
     }
-  }, [session.id])
+  }, [sessionId])
 
+  // Initial fetch only
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  // Auto-refresh for active sessions
+  // Auto-refresh for active sessions only
   useEffect(() => {
-    if (session.status !== 'active') return
+    if (sessionStatus !== 'active') return
     const interval = setInterval(fetchData, 5000)
     return () => clearInterval(interval)
-  }, [session.status, fetchData])
+  }, [sessionStatus, fetchData])
 
   // Fetch logs when terminal tab is selected
   useEffect(() => {
     if (tab !== 'terminal') return
     const fetchLogs = async () => {
       try {
-        const result = await getClient().getSessionLogs(session.id)
+        const result = await getClient().getSessionLogs(sessionId)
         if (result?.logs) {
           setLogs(result.logs.map((l) => l.text))
         }
@@ -205,19 +211,19 @@ function SessionDetail({ session }: { session: Session }) {
       }
     }
     fetchLogs()
-    if (session.status === 'active') {
+    if (sessionStatus === 'active') {
       const interval = setInterval(fetchLogs, 2000)
       return () => clearInterval(interval)
     }
-  }, [tab, session.id, session.status])
+  }, [tab, sessionId, sessionStatus])
 
   async function handleAction(action: 'pause' | 'resume' | 'stop' | 'end') {
     const client = getClient()
     try {
-      if (action === 'pause') await client.pauseSession(session.id)
-      else if (action === 'resume') await client.resumeSession(session.id)
-      else if (action === 'stop') await client.stopSession(session.id)
-      else if (action === 'end') await client.endSession(session.id)
+      if (action === 'pause') await client.pauseSession(sessionId)
+      else if (action === 'resume') await client.resumeSession(sessionId)
+      else if (action === 'stop') await client.stopSession(sessionId)
+      else if (action === 'end') await client.endSession(sessionId)
     } catch (e) {
       console.error(`Failed to ${action} session:`, e)
     }
