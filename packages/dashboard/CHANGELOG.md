@@ -1,5 +1,14 @@
 # @ash-ai/dashboard
 
+## 0.0.4
+
+### Patch Changes
+
+- df89205: Fix empty user messages and add expandable raw JSON view in session detail.
+
+  - Fix user messages appearing empty — user message content stored as `{type: "user", content: "..."}` was not being extracted
+  - Add "Raw JSON" toggle to every message for debugging — shows the full JSON payload, system prompt, and metadata
+
 ## 0.0.3
 
 ### Patch Changes
