@@ -37,7 +37,7 @@ function validateInternalAuth(req: FastifyRequest, reply: FastifyReply): boolean
  * - Internal endpoint for platform provisioning (protected by ASH_INTERNAL_SECRET)
  * - Public endpoints for dashboard API key management (protected by normal auth)
  */
-export function apiKeyRoutes(app: FastifyInstance): void {
+export function apiKeyRoutes(app: FastifyInstance, envApiKey?: string): void {
   // Internal: platform provisioning
   app.post('/api/internal/api-keys', async (req, reply) => {
     if (!validateInternalAuth(req, reply)) return;
@@ -61,14 +61,25 @@ export function apiKeyRoutes(app: FastifyInstance): void {
   app.get('/api/api-keys', async (req, reply) => {
     const tenantId = (req as any).tenantId || 'default';
     const keys = await listApiKeysByTenant(tenantId);
-    return reply.send({
-      keys: keys.map((k) => ({
-        id: k.id,
-        label: k.label,
-        keyPrefix: k.keyHash?.slice(0, 12) ? '••••••••' : undefined,
-        createdAt: k.createdAt,
-      })),
-    });
+    const result = keys.map((k) => ({
+      id: k.id,
+      label: k.label,
+      keyPrefix: k.keyHash?.slice(0, 12) ? '••••••••' : undefined,
+      createdAt: k.createdAt,
+    }));
+
+    // Include the ASH_API_KEY env var as a synthetic entry so the dashboard
+    // shows that an environment-configured key exists (issue #82).
+    if (envApiKey && tenantId === 'default') {
+      result.unshift({
+        id: 'env',
+        label: 'ASH_API_KEY (environment variable)',
+        keyPrefix: envApiKey.slice(0, 8) + '••••',
+        createdAt: '',
+      });
+    }
+
+    return reply.send({ keys: result });
   });
 
   // Public: create a new API key

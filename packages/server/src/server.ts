@@ -230,7 +230,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   workspaceRoutes(app, coordinator, dataDir);
   healthRoutes(app, coordinator, pool);
   runnerRoutes(app, coordinator);
-  apiKeyRoutes(app);
+  apiKeyRoutes(app, opts.apiKey);
 
   // Dashboard config endpoint — always registered so the dev proxy can reach it.
   // Includes serverUrl so the dashboard SDK client talks directly to the Ash server,
