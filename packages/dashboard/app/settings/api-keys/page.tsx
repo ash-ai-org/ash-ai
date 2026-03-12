@@ -193,22 +193,29 @@ export default function ApiKeysPage() {
               <tbody className="divide-y divide-white/5">
                 {keys.map((key) => (
                   <tr key={key.id} className="hover:bg-white/[0.02]">
-                    <td className="px-6 py-3 text-white/80 font-medium">{key.label}</td>
+                    <td className="px-6 py-3 text-white/80 font-medium">
+                      {key.label}
+                      {key.id === 'env' && (
+                        <span className="ml-2 text-xs text-amber-400/60">env</span>
+                      )}
+                    </td>
                     <td className="px-6 py-3 text-white/40 font-mono text-xs">
                       {key.keyPrefix || '••••••••'}
                     </td>
                     <td className="px-6 py-3 text-white/40">
-                      {formatRelativeTime(key.createdAt)}
+                      {key.createdAt ? formatRelativeTime(key.createdAt) : '—'}
                     </td>
                     <td className="px-6 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRevoke(key.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {key.id !== 'env' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRevoke(key.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

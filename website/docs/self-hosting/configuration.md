@@ -93,7 +93,7 @@ Ash supports two authentication modes:
 
 ### Auto-Generated Key (Default)
 
-When `ASH_API_KEY` is not set, the server auto-generates a secure API key on first start. The key is stored (hashed) in the database and the plaintext is written to `{ASH_DATA_DIR}/initial-api-key`. The CLI automatically picks up this key via `ash start`.
+When `ASH_API_KEY` is not set, the server auto-generates a secure API key on first start. The key is stored (hashed) in the database and the plaintext is written to `{ASH_DATA_DIR}/initial-api-key`. The CLI automatically picks up this key via `ash start`. This key appears in the dashboard's **API Keys** page and can be revoked there.
 
 ### Explicit API Key
 
@@ -109,7 +109,13 @@ All API requests must then include:
 Authorization: Bearer my-secret-key
 ```
 
-For multi-tenant authentication, create API keys via the database. Each key is associated with a `tenant_id`, and requests authenticated with that key are scoped to that tenant's agents, sessions, and data.
+The environment variable key is shown in the dashboard's **API Keys** page with an `env` badge. To change or remove it, update the environment variable and restart the server.
+
+### Dashboard-Created Keys
+
+You can also create additional API keys directly from the dashboard's **API Keys** page. These keys are stored in the database and can be revoked from the dashboard. Both environment-variable and dashboard-created keys work simultaneously.
+
+For multi-tenant authentication, create API keys via the internal API. Each key is associated with a `tenant_id`, and requests authenticated with that key are scoped to that tenant's agents, sessions, and data.
 
 ### Public Endpoints
 
