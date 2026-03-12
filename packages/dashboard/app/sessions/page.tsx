@@ -374,6 +374,8 @@ function MessageBlock({ message }: { message: Message }) {
         displayContent = textBlocks
           .map((b) => String(b.text || ''))
           .join('\n')
+      } else if (typeof obj.content === 'string') {
+        displayContent = obj.content
       } else if (typeof obj.result === 'string') {
         displayContent = obj.result
       } else if (typeof obj.text === 'string') {
@@ -407,6 +409,20 @@ function MessageBlock({ message }: { message: Message }) {
             <ToolCallDisplay key={tc.id || idx} toolCall={tc} />
           ))}
         </div>
+      )}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="mt-2 text-xs text-white/30 hover:text-white/50 transition-colors flex items-center gap-1"
+      >
+        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        Raw JSON
+      </button>
+      {expanded && (
+        <pre className="mt-2 text-xs text-white/40 overflow-auto max-h-64 bg-black/30 rounded p-3 font-mono">
+          {(() => {
+            try { return JSON.stringify(JSON.parse(message.content), null, 2) } catch { return message.content }
+          })()}
+        </pre>
       )}
     </div>
   )
