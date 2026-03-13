@@ -20,11 +20,30 @@ export const agents = pgTable('agents', {
   version: integer('version').notNull().default(1),
   path: text('path').notNull(),
   env: text('env'),  // JSON blob of default env vars for sessions
+  activeVersionId: text('active_version_id'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 }, (table) => [
   uniqueIndex('idx_agents_tenant_name').on(table.tenantId, table.name),
   index('idx_agents_tenant').on(table.tenantId),
+]);
+
+export const agentVersions = pgTable('agent_versions', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().default('default'),
+  agentName: text('agent_name').notNull(),
+  versionNumber: integer('version_number').notNull(),
+  name: text('name').notNull().default(''),
+  systemPrompt: text('system_prompt'),
+  releaseNotes: text('release_notes'),
+  isActive: integer('is_active').notNull().default(0),
+  knowledgeFiles: text('knowledge_files'),  // JSON array of file paths
+  createdBy: text('created_by'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('idx_agent_versions_unique').on(table.tenantId, table.agentName, table.versionNumber),
+  index('idx_agent_versions_active').on(table.tenantId, table.agentName, table.isActive),
 ]);
 
 export const sessions = pgTable('sessions', {
@@ -161,4 +180,62 @@ export const queueItems = pgTable('queue_items', {
 }, (table) => [
   index('idx_queue_tenant').on(table.tenantId),
   index('idx_queue_status').on(table.status, table.priority),
+]);
+
+export const evalCases = pgTable('eval_cases', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().default('default'),
+  agentName: text('agent_name').notNull(),
+  question: text('question').notNull(),
+  expectedTopics: text('expected_topics'),      // JSON array
+  expectedNotTopics: text('expected_not_topics'), // JSON array
+  referenceAnswer: text('reference_answer'),
+  category: text('category'),
+  tags: text('tags'),                            // JSON array
+  chatHistory: text('chat_history'),             // JSON array of {role, content}
+  isActive: integer('is_active').notNull().default(1),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('idx_eval_cases_agent').on(table.tenantId, table.agentName),
+  index('idx_eval_cases_category').on(table.category),
+]);
+
+export const evalRuns = pgTable('eval_runs', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().default('default'),
+  agentName: text('agent_name').notNull(),
+  versionNumber: integer('version_number'),
+  status: text('status').notNull().default('pending'),
+  totalCases: integer('total_cases').notNull().default(0),
+  completedCases: integer('completed_cases').notNull().default(0),
+  summary: text('summary'),     // JSON blob of EvalRunSummary
+  filters: text('filters'),     // JSON blob of run filters
+  createdAt: text('created_at').notNull(),
+  startedAt: text('started_at'),
+  completedAt: text('completed_at'),
+}, (table) => [
+  index('idx_eval_runs_agent').on(table.tenantId, table.agentName),
+  index('idx_eval_runs_status').on(table.status),
+]);
+
+export const evalResults = pgTable('eval_results', {
+  id: text('id').primaryKey(),
+  tenantId: text('tenant_id').notNull().default('default'),
+  evalRunId: text('eval_run_id').notNull(),
+  evalCaseId: text('eval_case_id').notNull(),
+  agentResponse: text('agent_response'),
+  topicScore: real('topic_score'),
+  safetyScore: real('safety_score'),
+  llmJudgeScore: real('llm_judge_score'),
+  latencyMs: integer('latency_ms'),
+  status: text('status').notNull().default('pending'),
+  error: text('error'),
+  humanScore: real('human_score'),
+  humanNotes: text('human_notes'),
+  createdAt: text('created_at').notNull(),
+  completedAt: text('completed_at'),
+}, (table) => [
+  index('idx_eval_results_run').on(table.evalRunId),
+  index('idx_eval_results_case').on(table.evalCaseId),
 ]);

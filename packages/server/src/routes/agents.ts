@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { existsSync, readdirSync, statSync, readFileSync, createReadStream, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, readFileSync, createReadStream, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, isAbsolute, relative, basename, extname, dirname, resolve, sep } from 'node:path';
 import { upsertAgent, getAgent, listAgents, updateAgent, deleteAgent } from '../db/index.js';
 import type { FileEntry } from '@ash-ai/shared';
@@ -391,5 +391,69 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       .header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`)
       .header('Content-Length', st.size);
     return reply.send(createReadStream(fullPath));
+  });
+
+  // Upload/write files to agent directory
+  app.post<{ Params: { name: string }; Body: { files: Array<{ path: string; content: string }> } }>('/api/agents/:name/files', {
+    schema: {
+      tags: ['agents'],
+      params: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+      body: {
+        type: 'object',
+        properties: {
+          files: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { path: { type: 'string' }, content: { type: 'string' } },
+              required: ['path', 'content'],
+            },
+          },
+        },
+        required: ['files'],
+      },
+      response: { 200: { type: 'object', properties: { written: { type: 'integer' } } } },
+    },
+  }, async (req, reply) => {
+    const agent = await getAgent(req.params.name, req.tenantId);
+    if (!agent) return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+
+    const { files } = req.body;
+    let written = 0;
+    for (const file of files) {
+      const targetPath = join(agent.path, file.path);
+      // Security: ensure the resolved path is within the agent directory
+      const resolved = resolve(targetPath);
+      if (!resolved.startsWith(resolve(agent.path))) {
+        return reply.status(400).send({ error: `Path "${file.path}" escapes agent directory`, statusCode: 400 });
+      }
+      mkdirSync(dirname(resolved), { recursive: true });
+      writeFileSync(resolved, Buffer.from(file.content, 'base64'));
+      written++;
+    }
+    return reply.send({ written });
+  });
+
+  // Delete a file from agent directory
+  app.delete<{ Params: { name: string; '*': string } }>('/api/agents/:name/files/*', {
+    schema: {
+      tags: ['agents'],
+      params: { type: 'object', properties: { name: { type: 'string' }, '*': { type: 'string' } }, required: ['name', '*'] },
+      response: { 200: { type: 'object', properties: { deleted: { type: 'boolean' } } } },
+    },
+  }, async (req, reply) => {
+    const agent = await getAgent(req.params.name, req.tenantId);
+    if (!agent) return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+
+    const filePath = req.params['*'];
+    const targetPath = resolve(join(agent.path, filePath));
+    if (!targetPath.startsWith(resolve(agent.path))) {
+      return reply.status(400).send({ error: 'Path escapes agent directory', statusCode: 400 });
+    }
+    if (!existsSync(targetPath)) {
+      return reply.status(404).send({ error: 'File not found', statusCode: 404 });
+    }
+    unlinkSync(targetPath);
+    return reply.send({ deleted: true });
   });
 }

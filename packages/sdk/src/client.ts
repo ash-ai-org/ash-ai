@@ -1,6 +1,10 @@
 import type {
   Agent,
   AgentUpdate,
+  AgentVersion,
+  CreateAgentVersionRequest,
+  UpdateAgentVersionRequest,
+  ListAgentVersionsResponse,
   Session,
   SessionStatus,
   Message,
@@ -37,6 +41,15 @@ import type {
   WriteSessionFilesResponse,
   DeleteSessionFileResponse,
   McpServerConfig,
+  EvalCase,
+  CreateEvalCaseRequest,
+  EvalRun,
+  CreateEvalRunRequest,
+  EvalResult,
+  ListEvalCasesResponse,
+  ListEvalRunsResponse,
+  ListEvalResultsResponse,
+  EvalRunComparison,
 } from '@ash-ai/shared';
 import { parseSSEStream } from './sse.js';
 
@@ -601,5 +614,102 @@ export class AshClient {
 
   async health(): Promise<HealthResponse> {
     return this.request<HealthResponse>('GET', '/health');
+  }
+
+  // -- Agent Versions -----------------------------------------------------------
+
+  async listAgentVersions(agentName: string): Promise<AgentVersion[]> {
+    const res = await this.request<ListAgentVersionsResponse>('GET', `/api/agents/${encodeURIComponent(agentName)}/versions`);
+    return res.versions;
+  }
+
+  async createAgentVersion(agentName: string, opts: CreateAgentVersionRequest = {}): Promise<AgentVersion> {
+    return this.request<AgentVersion>('POST', `/api/agents/${encodeURIComponent(agentName)}/versions`, opts);
+  }
+
+  async getAgentVersion(agentName: string, versionNumber: number): Promise<AgentVersion> {
+    return this.request<AgentVersion>('GET', `/api/agents/${encodeURIComponent(agentName)}/versions/${versionNumber}`);
+  }
+
+  async updateAgentVersion(agentName: string, versionNumber: number, updates: UpdateAgentVersionRequest): Promise<AgentVersion> {
+    return this.request<AgentVersion>('PATCH', `/api/agents/${encodeURIComponent(agentName)}/versions/${versionNumber}`, updates);
+  }
+
+  async deleteAgentVersion(agentName: string, versionNumber: number): Promise<void> {
+    await this.request('DELETE', `/api/agents/${encodeURIComponent(agentName)}/versions/${versionNumber}`);
+  }
+
+  async activateAgentVersion(agentName: string, versionNumber: number): Promise<void> {
+    await this.request('POST', `/api/agents/${encodeURIComponent(agentName)}/versions/${versionNumber}/activate`);
+  }
+
+  // -- Agent Files (Knowledge Base) ---------------------------------------------
+
+  async uploadAgentFiles(agentName: string, files: Array<{ path: string; content: string }>): Promise<{ written: number }> {
+    return this.request<{ written: number }>('POST', `/api/agents/${encodeURIComponent(agentName)}/files`, { files });
+  }
+
+  async deleteAgentFile(agentName: string, filePath: string): Promise<{ deleted: boolean }> {
+    return this.request<{ deleted: boolean }>('DELETE', `/api/agents/${encodeURIComponent(agentName)}/files/${filePath}`);
+  }
+
+  // -- Eval Cases ---------------------------------------------------------------
+
+  async listEvalCases(agentName: string, opts?: { category?: string; isActive?: boolean }): Promise<EvalCase[]> {
+    const params = new URLSearchParams();
+    if (opts?.category) params.set('category', opts.category);
+    if (opts?.isActive !== undefined) params.set('isActive', String(opts.isActive));
+    const qs = params.toString();
+    const res = await this.request<ListEvalCasesResponse>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-cases${qs ? '?' + qs : ''}`);
+    return res.cases;
+  }
+
+  async createEvalCase(agentName: string, data: CreateEvalCaseRequest): Promise<EvalCase> {
+    return this.request<EvalCase>('POST', `/api/agents/${encodeURIComponent(agentName)}/eval-cases`, data);
+  }
+
+  async getEvalCase(agentName: string, caseId: string): Promise<EvalCase> {
+    return this.request<EvalCase>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-cases/${caseId}`);
+  }
+
+  async updateEvalCase(agentName: string, caseId: string, data: Partial<CreateEvalCaseRequest>): Promise<EvalCase> {
+    return this.request<EvalCase>('PATCH', `/api/agents/${encodeURIComponent(agentName)}/eval-cases/${caseId}`, data);
+  }
+
+  async deleteEvalCase(agentName: string, caseId: string): Promise<void> {
+    await this.request('DELETE', `/api/agents/${encodeURIComponent(agentName)}/eval-cases/${caseId}`);
+  }
+
+  async importEvalCases(agentName: string, cases: CreateEvalCaseRequest[]): Promise<{ imported: number }> {
+    return this.request<{ imported: number }>('POST', `/api/agents/${encodeURIComponent(agentName)}/eval-cases/import`, { cases });
+  }
+
+  async exportEvalCases(agentName: string): Promise<EvalCase[]> {
+    const res = await this.request<ListEvalCasesResponse>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-cases/export`);
+    return res.cases;
+  }
+
+  // -- Eval Runs ----------------------------------------------------------------
+
+  async startEvalRun(agentName: string, opts?: CreateEvalRunRequest): Promise<EvalRun> {
+    return this.request<EvalRun>('POST', `/api/agents/${encodeURIComponent(agentName)}/eval-runs`, opts || {});
+  }
+
+  async listEvalRuns(agentName: string): Promise<EvalRun[]> {
+    const res = await this.request<ListEvalRunsResponse>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-runs`);
+    return res.runs;
+  }
+
+  async getEvalRun(agentName: string, runId: string): Promise<EvalRun> {
+    return this.request<EvalRun>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-runs/${runId}`);
+  }
+
+  async getEvalRunResults(agentName: string, runId: string): Promise<EvalResult[]> {
+    const res = await this.request<ListEvalResultsResponse>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-runs/${runId}/results`);
+    return res.results;
+  }
+
+  async compareEvalRuns(agentName: string, runAId: string, runBId: string): Promise<EvalRunComparison> {
+    return this.request<EvalRunComparison>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-runs/compare?runA=${runAId}&runB=${runBId}`);
   }
 }

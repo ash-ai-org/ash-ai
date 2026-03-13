@@ -544,6 +544,151 @@ export interface ListQueueResponse {
   items: QueueItem[];
 }
 
+// -- Agent Versions -----------------------------------------------------------
+
+export interface AgentVersion {
+  id: string;
+  tenantId?: string;
+  agentName: string;
+  versionNumber: number;
+  name: string;
+  systemPrompt: string | null;
+  releaseNotes: string | null;
+  isActive: boolean;
+  knowledgeFiles: string[] | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAgentVersionRequest {
+  /** Human-readable version name (e.g. "v2 - improved grounding"). */
+  name?: string;
+  /** System prompt snapshot for this version. */
+  systemPrompt?: string;
+  /** What changed in this version. */
+  releaseNotes?: string;
+  /** List of knowledge base file paths included in this version. */
+  knowledgeFiles?: string[];
+  /** Version number to clone from (copies systemPrompt and knowledgeFiles). */
+  cloneFrom?: number;
+}
+
+export interface UpdateAgentVersionRequest {
+  name?: string;
+  systemPrompt?: string;
+  releaseNotes?: string;
+  knowledgeFiles?: string[];
+}
+
+export interface ListAgentVersionsResponse {
+  versions: AgentVersion[];
+}
+
+// -- Eval Framework -----------------------------------------------------------
+
+export type EvalCaseCategory = 'accuracy' | 'groundedness' | 'safety' | 'edge_case' | 'multi_turn' | string;
+
+export interface EvalCase {
+  id: string;
+  tenantId?: string;
+  agentName: string;
+  question: string;
+  expectedTopics: string[] | null;
+  expectedNotTopics: string[] | null;
+  referenceAnswer: string | null;
+  category: EvalCaseCategory | null;
+  tags: string[] | null;
+  chatHistory: Array<{ role: string; content: string }> | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type EvalRunStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface EvalRunSummary {
+  avgTopicScore: number;
+  avgSafetyScore: number;
+  avgLlmJudgeScore: number | null;
+  avgLatencyMs: number;
+  passRate: number;
+}
+
+export interface EvalRun {
+  id: string;
+  tenantId?: string;
+  agentName: string;
+  versionNumber: number | null;
+  status: EvalRunStatus;
+  totalCases: number;
+  completedCases: number;
+  summary: EvalRunSummary | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export type EvalResultStatus = 'pending' | 'running' | 'completed' | 'error';
+
+export interface EvalResult {
+  id: string;
+  tenantId?: string;
+  evalRunId: string;
+  evalCaseId: string;
+  agentResponse: string | null;
+  topicScore: number | null;
+  safetyScore: number | null;
+  llmJudgeScore: number | null;
+  latencyMs: number | null;
+  status: EvalResultStatus;
+  error: string | null;
+  humanScore: number | null;
+  humanNotes: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface CreateEvalCaseRequest {
+  question: string;
+  expectedTopics?: string[];
+  expectedNotTopics?: string[];
+  referenceAnswer?: string;
+  category?: EvalCaseCategory;
+  tags?: string[];
+  chatHistory?: Array<{ role: string; content: string }>;
+  isActive?: boolean;
+}
+
+export interface CreateEvalRunRequest {
+  versionNumber?: number;
+  categories?: string[];
+  tags?: string[];
+}
+
+export interface ListEvalCasesResponse {
+  cases: EvalCase[];
+}
+
+export interface ListEvalRunsResponse {
+  runs: EvalRun[];
+}
+
+export interface ListEvalResultsResponse {
+  results: EvalResult[];
+}
+
+export interface EvalRunComparison {
+  runA: EvalRun;
+  runB: EvalRun;
+  results: Array<{
+    caseId: string;
+    question: string;
+    resultA: EvalResult | null;
+    resultB: EvalResult | null;
+  }>;
+}
+
 // -- API request/response -----------------------------------------------------
 
 /** MCP server configuration for .mcp.json entries. */

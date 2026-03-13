@@ -30,6 +30,9 @@ import { attachmentRoutes } from './routes/attachments.js';
 import { usageRoutes } from './routes/usage.js';
 import { workspaceRoutes } from './routes/workspace.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
+import { agentVersionRoutes } from './routes/agent-versions.js';
+import { evalRoutes } from './routes/evals.js';
+import { EvalRunner } from './eval/runner.js';
 import { createTelemetryExporter } from './telemetry/exporter.js';
 import { VERSION } from './version.js';
 
@@ -168,6 +171,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
         { name: 'attachments', description: 'File attachments for sessions' },
         { name: 'queue', description: 'Async message queue' },
         { name: 'usage', description: 'Usage tracking and analytics' },
+        { name: 'evals', description: 'Evaluation framework' },
       ],
     },
   });
@@ -231,6 +235,8 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   healthRoutes(app, coordinator, pool);
   runnerRoutes(app, coordinator);
   apiKeyRoutes(app, opts.apiKey);
+  agentVersionRoutes(app);
+  evalRoutes(app, coordinator, dataDir, telemetry);
 
   // Dashboard config endpoint — always registered so the dev proxy can reach it.
   // Includes serverUrl so the dashboard SDK client talks directly to the Ash server,
@@ -325,10 +331,14 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   });
   queueProcessor.start();
 
+  const evalRunner = new EvalRunner(coordinator, dataDir);
+  evalRunner.start();
+
   // Shutdown handler
   async function shutdown() {
     app.log.info('Shutting down...');
     queueProcessor.stop();
+    evalRunner.stop();
     await telemetry.shutdown();
     coordinator.stopLivenessSweep();
     if (pool) {

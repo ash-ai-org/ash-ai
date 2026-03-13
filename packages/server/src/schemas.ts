@@ -191,6 +191,85 @@ const UsageStatsSchema = {
   required: ['totalInputTokens', 'totalOutputTokens', 'totalCacheCreationTokens', 'totalCacheReadTokens', 'totalToolCalls', 'totalMessages', 'totalComputeSeconds'],
 } as const;
 
+const AgentVersionSchema = {
+  $id: 'AgentVersion',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    agentName: { type: 'string' },
+    versionNumber: { type: 'integer' },
+    name: { type: 'string' },
+    systemPrompt: { type: 'string', nullable: true },
+    releaseNotes: { type: 'string', nullable: true },
+    isActive: { type: 'boolean' },
+    knowledgeFiles: { type: 'array', items: { type: 'string' }, nullable: true },
+    createdBy: { type: 'string', nullable: true },
+    createdAt: { type: 'string' },
+    updatedAt: { type: 'string' },
+  },
+} as const;
+
+const EvalCaseSchema = {
+  $id: 'EvalCase',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    agentName: { type: 'string' },
+    question: { type: 'string' },
+    expectedTopics: { type: 'array', items: { type: 'string' }, nullable: true },
+    expectedNotTopics: { type: 'array', items: { type: 'string' }, nullable: true },
+    referenceAnswer: { type: 'string', nullable: true },
+    category: { type: 'string', nullable: true },
+    tags: { type: 'array', items: { type: 'string' }, nullable: true },
+    chatHistory: { type: 'array', items: { type: 'object' }, nullable: true },
+    isActive: { type: 'boolean' },
+    createdAt: { type: 'string' },
+    updatedAt: { type: 'string' },
+  },
+} as const;
+
+const EvalRunSchema = {
+  $id: 'EvalRun',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    agentName: { type: 'string' },
+    versionNumber: { type: 'integer', nullable: true },
+    status: { type: 'string', enum: ['pending', 'running', 'completed', 'failed'] },
+    totalCases: { type: 'integer' },
+    completedCases: { type: 'integer' },
+    summary: { type: 'object', nullable: true },
+    createdAt: { type: 'string' },
+    startedAt: { type: 'string', nullable: true },
+    completedAt: { type: 'string', nullable: true },
+  },
+} as const;
+
+const EvalResultSchema = {
+  $id: 'EvalResult',
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    tenantId: { type: 'string' },
+    evalRunId: { type: 'string', format: 'uuid' },
+    evalCaseId: { type: 'string', format: 'uuid' },
+    agentResponse: { type: 'string', nullable: true },
+    topicScore: { type: 'number', nullable: true },
+    safetyScore: { type: 'number', nullable: true },
+    llmJudgeScore: { type: 'number', nullable: true },
+    latencyMs: { type: 'integer', nullable: true },
+    status: { type: 'string', enum: ['pending', 'running', 'completed', 'error'] },
+    error: { type: 'string', nullable: true },
+    humanScore: { type: 'number', nullable: true },
+    humanNotes: { type: 'string', nullable: true },
+    createdAt: { type: 'string' },
+    completedAt: { type: 'string', nullable: true },
+  },
+} as const;
+
 export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(AgentSchema);
   app.addSchema(SessionSchema);
@@ -204,4 +283,8 @@ export function registerSchemas(app: FastifyInstance): void {
   app.addSchema(CredentialSchema);
   app.addSchema(UsageEventSchema);
   app.addSchema(UsageStatsSchema);
+  app.addSchema(AgentVersionSchema);
+  app.addSchema(EvalCaseSchema);
+  app.addSchema(EvalRunSchema);
+  app.addSchema(EvalResultSchema);
 }
