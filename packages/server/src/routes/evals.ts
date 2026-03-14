@@ -12,7 +12,9 @@ import {
   listEvalRuns,
   updateEvalRun,
   insertEvalResult,
+  getEvalResult,
   listEvalResults,
+  updateEvalResult,
   listAgentVersions,
   getAgentVersionByNumber,
 } from '../db/index.js';
@@ -598,5 +600,53 @@ export function evalRoutes(
 
     const results = await listEvalResults(req.params.id);
     return reply.send({ results });
+  });
+
+  // ── Human Scoring ─────────────────────────────────────────────────────
+
+  // Update eval result with human score/notes
+  app.patch<{ Params: { name: string; id: string } }>('/api/agents/:name/eval-results/:id', {
+    schema: {
+      tags: ['evals'],
+      params: nameAndIdParams,
+      body: {
+        type: 'object',
+        properties: {
+          humanScore: { type: 'number', minimum: 1, maximum: 5 },
+          humanNotes: { type: 'string', maxLength: 10_000 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: { result: { type: 'object' } },
+          required: ['result'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const agent = await getAgent(req.params.name, req.tenantId);
+    if (!agent) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+
+    const existing = await getEvalResult(req.params.id);
+    if (!existing) {
+      return reply.status(404).send({ error: 'Eval result not found', statusCode: 404 });
+    }
+
+    const body = req.body as { humanScore?: number; humanNotes?: string } | undefined;
+    if (!body || (body.humanScore === undefined && body.humanNotes === undefined)) {
+      return reply.status(400).send({ error: 'Provide humanScore and/or humanNotes', statusCode: 400 });
+    }
+
+    await updateEvalResult(req.params.id, {
+      humanScore: body.humanScore,
+      humanNotes: body.humanNotes,
+    });
+
+    const updated = await getEvalResult(req.params.id);
+    return reply.send({ result: updated });
   });
 }

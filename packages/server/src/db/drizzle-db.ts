@@ -252,6 +252,17 @@ export class DrizzleDb implements Db {
     return { id, name, tenantId, version, path, createdAt: now, updatedAt: now, ...(env && { env }) };
   }
 
+  private mapAgent(r: any): Agent {
+    const env = parseEnv(r.env);
+    const config = r.config ? JSON.parse(r.config) : undefined;
+    return {
+      id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path,
+      createdAt: r.createdAt, updatedAt: r.updatedAt,
+      ...(env && { env }),
+      ...(config && { config }),
+    };
+  }
+
   async getAgent(name: string, tenantId: string = 'default'): Promise<Agent | null> {
     const { agents } = this.schema;
     const rows = await this.drizzle
@@ -260,9 +271,7 @@ export class DrizzleDb implements Db {
       .where(and(eq(agents.tenantId, tenantId), eq(agents.name, name)))
       .limit(1);
     if (rows.length === 0) return null;
-    const r = rows[0];
-    const env = parseEnv(r.env);
-    return { id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path, createdAt: r.createdAt, updatedAt: r.updatedAt, ...(env && { env }) };
+    return this.mapAgent(rows[0]);
   }
 
   async listAgents(tenantId: string = 'default'): Promise<Agent[]> {
@@ -272,18 +281,18 @@ export class DrizzleDb implements Db {
       .from(agents)
       .where(eq(agents.tenantId, tenantId))
       .orderBy(asc(agents.name));
-    return rows.map((r: any) => {
-      const env = parseEnv(r.env);
-      return { id: r.id, name: r.name, tenantId: r.tenantId, version: r.version, path: r.path, createdAt: r.createdAt, updatedAt: r.updatedAt, ...(env && { env }) };
-    });
+    return rows.map((r: any) => this.mapAgent(r));
   }
 
-  async updateAgent(name: string, updates: { env?: Record<string, string> }, tenantId: string = 'default'): Promise<Agent | null> {
+  async updateAgent(name: string, updates: { env?: Record<string, string>; config?: Record<string, unknown> }, tenantId: string = 'default'): Promise<Agent | null> {
     const { agents } = this.schema;
     const now = new Date().toISOString();
     const set: Record<string, unknown> = { updatedAt: now };
     if (updates.env !== undefined) {
       set.env = Object.keys(updates.env).length > 0 ? JSON.stringify(updates.env) : null;
+    }
+    if (updates.config !== undefined) {
+      set.config = Object.keys(updates.config).length > 0 ? JSON.stringify(updates.config) : null;
     }
 
     await this.drizzle

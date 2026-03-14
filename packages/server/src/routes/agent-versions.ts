@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
+import type { AgentVersion } from '@ash-ai/shared';
 import {
   getAgent,
   insertAgentVersion,
@@ -27,6 +28,24 @@ const nameAndVersionParams = {
   },
   required: ['name', 'versionNumber'],
 } as const;
+
+/**
+ * Resolve a version from either a version number (integer) or a UUID.
+ * The create endpoint returns a UUID `id`, so callers often pass that
+ * instead of the sequential version number. Accept both.
+ */
+async function resolveVersion(agentName: string, param: string, tenantId: string): Promise<AgentVersion | null> {
+  const asNumber = parseInt(param, 10);
+  if (!isNaN(asNumber) && String(asNumber) === param) {
+    return getAgentVersionByNumber(agentName, asNumber, tenantId);
+  }
+  // Treat as UUID
+  const version = await getAgentVersion(param);
+  if (version && version.agentName === agentName && version.tenantId === tenantId) {
+    return version;
+  }
+  return null;
+}
 
 const agentVersionObject = {
   type: 'object',
@@ -166,12 +185,7 @@ export function agentVersionRoutes(app: FastifyInstance): void {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
 
-    const versionNumber = parseInt(req.params.versionNumber, 10);
-    if (isNaN(versionNumber)) {
-      return reply.status(400).send({ error: 'Invalid version number', statusCode: 400 });
-    }
-
-    const version = await getAgentVersionByNumber(req.params.name, versionNumber, req.tenantId);
+    const version = await resolveVersion(req.params.name, req.params.versionNumber, req.tenantId);
     if (!version) {
       return reply.status(404).send({ error: 'Version not found', statusCode: 404 });
     }
@@ -211,12 +225,7 @@ export function agentVersionRoutes(app: FastifyInstance): void {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
 
-    const versionNumber = parseInt(req.params.versionNumber, 10);
-    if (isNaN(versionNumber)) {
-      return reply.status(400).send({ error: 'Invalid version number', statusCode: 400 });
-    }
-
-    const existing = await getAgentVersionByNumber(req.params.name, versionNumber, req.tenantId);
+    const existing = await resolveVersion(req.params.name, req.params.versionNumber, req.tenantId);
     if (!existing) {
       return reply.status(404).send({ error: 'Version not found', statusCode: 404 });
     }
@@ -258,12 +267,7 @@ export function agentVersionRoutes(app: FastifyInstance): void {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
 
-    const versionNumber = parseInt(req.params.versionNumber, 10);
-    if (isNaN(versionNumber)) {
-      return reply.status(400).send({ error: 'Invalid version number', statusCode: 400 });
-    }
-
-    const existing = await getAgentVersionByNumber(req.params.name, versionNumber, req.tenantId);
+    const existing = await resolveVersion(req.params.name, req.params.versionNumber, req.tenantId);
     if (!existing) {
       return reply.status(404).send({ error: 'Version not found', statusCode: 404 });
     }
@@ -299,17 +303,12 @@ export function agentVersionRoutes(app: FastifyInstance): void {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
 
-    const versionNumber = parseInt(req.params.versionNumber, 10);
-    if (isNaN(versionNumber)) {
-      return reply.status(400).send({ error: 'Invalid version number', statusCode: 400 });
-    }
-
-    const version = await getAgentVersionByNumber(req.params.name, versionNumber, req.tenantId);
+    const version = await resolveVersion(req.params.name, req.params.versionNumber, req.tenantId);
     if (!version) {
       return reply.status(404).send({ error: 'Version not found', statusCode: 404 });
     }
 
     await activateAgentVersion(version.id, req.params.name, req.tenantId);
-    return reply.send({ activated: true, versionNumber });
+    return reply.send({ activated: true, versionNumber: version.versionNumber });
   });
 }

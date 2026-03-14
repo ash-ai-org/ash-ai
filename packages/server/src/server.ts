@@ -32,6 +32,7 @@ import { workspaceRoutes } from './routes/workspace.js';
 import { apiKeyRoutes } from './routes/api-keys.js';
 import { agentVersionRoutes } from './routes/agent-versions.js';
 import { evalRoutes } from './routes/evals.js';
+import { analyticsRoutes } from './routes/analytics.js';
 import { EvalRunner } from './eval/runner.js';
 import { createTelemetryExporter } from './telemetry/exporter.js';
 import { VERSION } from './version.js';
@@ -237,6 +238,7 @@ export async function createAshServer(opts: AshServerOptions = {}): Promise<AshS
   apiKeyRoutes(app, opts.apiKey);
   agentVersionRoutes(app);
   evalRoutes(app, coordinator, dataDir, telemetry);
+  analyticsRoutes(app);
 
   // Dashboard config endpoint — always registered so the dev proxy can reach it.
   // Includes serverUrl so the dashboard SDK client talks directly to the Ash server,

@@ -20,6 +20,7 @@ export const agents = sqliteTable('agents', {
   version: integer('version').notNull().default(1),
   path: text('path').notNull(),
   env: text('env'),  // JSON blob of default env vars for sessions
+  config: text('config'),  // JSON blob of agent config (model, description, max_turns, etc.)
   activeVersionId: text('active_version_id'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

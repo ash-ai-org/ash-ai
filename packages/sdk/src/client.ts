@@ -712,4 +712,32 @@ export class AshClient {
   async compareEvalRuns(agentName: string, runAId: string, runBId: string): Promise<EvalRunComparison> {
     return this.request<EvalRunComparison>('GET', `/api/agents/${encodeURIComponent(agentName)}/eval-runs/compare?runA=${runAId}&runB=${runBId}`);
   }
+
+  // -- Human Scoring ------------------------------------------------------------
+
+  async scoreEvalResult(agentName: string, resultId: string, opts: { humanScore?: number; humanNotes?: string }): Promise<EvalResult> {
+    const res = await this.request<{ result: EvalResult }>('PATCH', `/api/agents/${encodeURIComponent(agentName)}/eval-results/${resultId}`, opts);
+    return res.result;
+  }
+
+  // -- Agent Config -------------------------------------------------------------
+
+  async getAgentConfig(agentName: string): Promise<Record<string, unknown>> {
+    const res = await this.request<{ config: Record<string, unknown> }>('GET', `/api/agents/${encodeURIComponent(agentName)}/config`);
+    return res.config;
+  }
+
+  async updateAgentConfig(agentName: string, config: Record<string, unknown>): Promise<Agent> {
+    return this.updateAgent(agentName, { config });
+  }
+
+  // -- Analytics ----------------------------------------------------------------
+
+  async getAnalytics(opts?: { after?: string; before?: string }): Promise<Record<string, unknown>> {
+    const params = new URLSearchParams();
+    if (opts?.after) params.set('after', opts.after);
+    if (opts?.before) params.set('before', opts.before);
+    const qs = params.toString();
+    return this.request<Record<string, unknown>>('GET', `/api/analytics${qs ? '?' + qs : ''}`);
+  }
 }
