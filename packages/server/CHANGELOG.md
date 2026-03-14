@@ -1,5 +1,11 @@
 # @ash-ai/server
 
+## 0.1.1
+
+### Patch Changes
+
+- 21c56d0: Fix API gaps: version routes accept UUID or number, add human scoring endpoint, agent config CRUD, and analytics endpoint.
+
 ## 0.1.0
 
 ### Minor Changes

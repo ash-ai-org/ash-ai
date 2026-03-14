@@ -1,5 +1,13 @@
 # @ash-ai/dashboard
 
+## 0.0.8
+
+### Patch Changes
+
+- Updated dependencies [21c56d0]
+  - @ash-ai/sdk@0.1.1
+  - @ash-ai/ui@1.0.1
+
 ## 0.0.7
 
 ### Patch Changes
