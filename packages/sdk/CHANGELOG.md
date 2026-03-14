@@ -1,5 +1,16 @@
 # @ash-ai/sdk
 
+## 0.1.0
+
+### Minor Changes
+
+- d5093df: Add agent versioning, eval framework, and knowledge base file management.
+
+### Patch Changes
+
+- Updated dependencies [d5093df]
+  - @ash-ai/shared@0.1.0
+
 ## 0.0.22 - 2026-03-10
 
 ### Changed

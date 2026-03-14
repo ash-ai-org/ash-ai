@@ -1,5 +1,12 @@
 # @ash-ai/ui
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [d5093df]
+  - @ash-ai/sdk@0.1.0
+
 ## 0.0.17 - 2026-03-10
 
 ### Changed
