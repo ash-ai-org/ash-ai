@@ -1,7 +1,7 @@
 import { join, resolve, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { Agent, Session, SessionStatus, SessionConfig, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
+import type { Agent, Session, SessionStatus, SessionConfig, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats, AgentVersion, EvalCase, EvalRun, EvalRunStatus, EvalResult, EvalResultStatus, EvalRunSummary } from '@ash-ai/shared';
 
 /** Resolve the package root from the current file — works from both src/ (tsx) and dist/ (compiled). */
 function pkgRoot(): string {
@@ -98,6 +98,57 @@ export interface Db {
   insertUsageEvents(events: Array<{ id: string; tenantId: string; sessionId: string; agentName: string; eventType: UsageEventType; value: number }>): Promise<void>;
   listUsageEvents(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string; limit?: number }): Promise<UsageEvent[]>;
   getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats>;
+  // Agent Versions (tenant-scoped)
+  insertAgentVersion(id: string, tenantId: string, agentName: string, versionNumber: number, opts: {
+    name?: string;
+    systemPrompt?: string | null;
+    releaseNotes?: string | null;
+    knowledgeFiles?: string[] | null;
+    createdBy?: string | null;
+  }): Promise<AgentVersion>;
+  getAgentVersion(id: string): Promise<AgentVersion | null>;
+  getAgentVersionByNumber(agentName: string, versionNumber: number, tenantId?: string): Promise<AgentVersion | null>;
+  getActiveAgentVersion(agentName: string, tenantId?: string): Promise<AgentVersion | null>;
+  listAgentVersions(agentName: string, tenantId?: string): Promise<AgentVersion[]>;
+  activateAgentVersion(id: string, agentName: string, tenantId?: string): Promise<void>;
+  getNextVersionNumber(agentName: string, tenantId?: string): Promise<number>;
+  updateAgentVersion(id: string, updates: { name?: string; systemPrompt?: string | null; releaseNotes?: string | null; knowledgeFiles?: string[] | null }): Promise<AgentVersion | null>;
+  deleteAgentVersion(id: string): Promise<boolean>;
+  // Eval Cases (tenant-scoped)
+  insertEvalCase(id: string, tenantId: string, agentName: string, data: {
+    question: string;
+    expectedTopics?: string[] | null;
+    expectedNotTopics?: string[] | null;
+    referenceAnswer?: string | null;
+    category?: string | null;
+    tags?: string[] | null;
+    chatHistory?: Array<{ role: string; content: string }> | null;
+    isActive?: boolean;
+  }): Promise<EvalCase>;
+  getEvalCase(id: string): Promise<EvalCase | null>;
+  listEvalCases(tenantId: string, agentName: string, opts?: { category?: string; isActive?: boolean }): Promise<EvalCase[]>;
+  updateEvalCase(id: string, data: Partial<{
+    question: string;
+    expectedTopics: string[] | null;
+    expectedNotTopics: string[] | null;
+    referenceAnswer: string | null;
+    category: string | null;
+    tags: string[] | null;
+    chatHistory: Array<{ role: string; content: string }> | null;
+    isActive: boolean;
+  }>): Promise<EvalCase | null>;
+  deleteEvalCase(id: string): Promise<boolean>;
+  // Eval Runs (tenant-scoped)
+  insertEvalRun(id: string, tenantId: string, agentName: string, opts?: { versionNumber?: number; filters?: Record<string, unknown> }): Promise<EvalRun>;
+  getEvalRun(id: string): Promise<EvalRun | null>;
+  listEvalRuns(tenantId: string, agentName: string): Promise<EvalRun[]>;
+  listPendingEvalRuns(): Promise<EvalRun[]>;
+  updateEvalRun(id: string, updates: Partial<{ status: EvalRunStatus; totalCases: number; completedCases: number; summary: EvalRunSummary | null; startedAt: string; completedAt: string }>): Promise<void>;
+  // Eval Results (tenant-scoped)
+  insertEvalResult(id: string, tenantId: string, evalRunId: string, evalCaseId: string): Promise<EvalResult>;
+  getEvalResult(id: string): Promise<EvalResult | null>;
+  listEvalResults(evalRunId: string): Promise<EvalResult[]>;
+  updateEvalResult(id: string, updates: Partial<{ agentResponse: string; topicScore: number; safetyScore: number; llmJudgeScore: number; latencyMs: number; status: EvalResultStatus; error: string; humanScore: number; humanNotes: string; completedAt: string }>): Promise<void>;
   // Lifecycle
   close(): Promise<void>;
 }
@@ -447,6 +498,130 @@ export async function listUsageEvents(tenantId: string, opts?: { sessionId?: str
 
 export async function getUsageStats(tenantId: string, opts?: { sessionId?: string; agentName?: string; after?: string; before?: string }): Promise<UsageStats> {
   return getDb().getUsageStats(tenantId, opts);
+}
+
+// -- Agent Versions -----------------------------------------------------------
+
+export async function insertAgentVersion(id: string, tenantId: string, agentName: string, versionNumber: number, opts: {
+  name?: string;
+  systemPrompt?: string | null;
+  releaseNotes?: string | null;
+  knowledgeFiles?: string[] | null;
+  createdBy?: string | null;
+}): Promise<AgentVersion> {
+  return getDb().insertAgentVersion(id, tenantId, agentName, versionNumber, opts);
+}
+
+export async function getAgentVersion(id: string): Promise<AgentVersion | null> {
+  return getDb().getAgentVersion(id);
+}
+
+export async function getAgentVersionByNumber(agentName: string, versionNumber: number, tenantId?: string): Promise<AgentVersion | null> {
+  return getDb().getAgentVersionByNumber(agentName, versionNumber, tenantId);
+}
+
+export async function getActiveAgentVersion(agentName: string, tenantId?: string): Promise<AgentVersion | null> {
+  return getDb().getActiveAgentVersion(agentName, tenantId);
+}
+
+export async function listAgentVersions(agentName: string, tenantId?: string): Promise<AgentVersion[]> {
+  return getDb().listAgentVersions(agentName, tenantId);
+}
+
+export async function activateAgentVersion(id: string, agentName: string, tenantId?: string): Promise<void> {
+  return getDb().activateAgentVersion(id, agentName, tenantId);
+}
+
+export async function getNextVersionNumber(agentName: string, tenantId?: string): Promise<number> {
+  return getDb().getNextVersionNumber(agentName, tenantId);
+}
+
+export async function updateAgentVersion(id: string, updates: { name?: string; systemPrompt?: string | null; releaseNotes?: string | null; knowledgeFiles?: string[] | null }): Promise<AgentVersion | null> {
+  return getDb().updateAgentVersion(id, updates);
+}
+
+export async function deleteAgentVersion(id: string): Promise<boolean> {
+  return getDb().deleteAgentVersion(id);
+}
+
+// -- Eval Cases ---------------------------------------------------------------
+
+export async function insertEvalCase(id: string, tenantId: string, agentName: string, data: {
+  question: string;
+  expectedTopics?: string[] | null;
+  expectedNotTopics?: string[] | null;
+  referenceAnswer?: string | null;
+  category?: string | null;
+  tags?: string[] | null;
+  chatHistory?: Array<{ role: string; content: string }> | null;
+  isActive?: boolean;
+}): Promise<EvalCase> {
+  return getDb().insertEvalCase(id, tenantId, agentName, data);
+}
+
+export async function getEvalCase(id: string): Promise<EvalCase | null> {
+  return getDb().getEvalCase(id);
+}
+
+export async function listEvalCases(tenantId: string, agentName: string, opts?: { category?: string; isActive?: boolean }): Promise<EvalCase[]> {
+  return getDb().listEvalCases(tenantId, agentName, opts);
+}
+
+export async function updateEvalCase(id: string, data: Partial<{
+  question: string;
+  expectedTopics: string[] | null;
+  expectedNotTopics: string[] | null;
+  referenceAnswer: string | null;
+  category: string | null;
+  tags: string[] | null;
+  chatHistory: Array<{ role: string; content: string }> | null;
+  isActive: boolean;
+}>): Promise<EvalCase | null> {
+  return getDb().updateEvalCase(id, data);
+}
+
+export async function deleteEvalCase(id: string): Promise<boolean> {
+  return getDb().deleteEvalCase(id);
+}
+
+// -- Eval Runs ----------------------------------------------------------------
+
+export async function insertEvalRun(id: string, tenantId: string, agentName: string, opts?: { versionNumber?: number; filters?: Record<string, unknown> }): Promise<EvalRun> {
+  return getDb().insertEvalRun(id, tenantId, agentName, opts);
+}
+
+export async function getEvalRun(id: string): Promise<EvalRun | null> {
+  return getDb().getEvalRun(id);
+}
+
+export async function listEvalRuns(tenantId: string, agentName: string): Promise<EvalRun[]> {
+  return getDb().listEvalRuns(tenantId, agentName);
+}
+
+export async function listPendingEvalRuns(): Promise<EvalRun[]> {
+  return getDb().listPendingEvalRuns();
+}
+
+export async function updateEvalRun(id: string, updates: Partial<{ status: EvalRunStatus; totalCases: number; completedCases: number; summary: EvalRunSummary | null; startedAt: string; completedAt: string }>): Promise<void> {
+  return getDb().updateEvalRun(id, updates);
+}
+
+// -- Eval Results -------------------------------------------------------------
+
+export async function insertEvalResult(id: string, tenantId: string, evalRunId: string, evalCaseId: string): Promise<EvalResult> {
+  return getDb().insertEvalResult(id, tenantId, evalRunId, evalCaseId);
+}
+
+export async function getEvalResult(id: string): Promise<EvalResult | null> {
+  return getDb().getEvalResult(id);
+}
+
+export async function listEvalResults(evalRunId: string): Promise<EvalResult[]> {
+  return getDb().listEvalResults(evalRunId);
+}
+
+export async function updateEvalResult(id: string, updates: Partial<{ agentResponse: string; topicScore: number; safetyScore: number; llmJudgeScore: number; latencyMs: number; status: EvalResultStatus; error: string; humanScore: number; humanNotes: string; completedAt: string }>): Promise<void> {
+  return getDb().updateEvalResult(id, updates);
 }
 
 export async function closeDb(): Promise<void> {

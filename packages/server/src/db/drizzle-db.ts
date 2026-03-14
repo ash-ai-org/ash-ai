@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { eq, and, sql, gt, lt, ne, asc, desc, inArray } from 'drizzle-orm';
-import type { Agent, Session, SessionStatus, SessionConfig, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats } from '@ash-ai/shared';
+import { eq, and, sql, gt, lt, gte, ne, asc, desc, inArray } from 'drizzle-orm';
+import type { Agent, Session, SessionStatus, SessionConfig, SandboxRecord, SandboxState, ApiKey, Message, SessionEvent, SessionEventType, RunnerRecord, Credential, QueueItem, QueueItemStatus, QueueStats, Attachment, UsageEvent, UsageEventType, UsageStats, AgentVersion, EvalCase, EvalRun, EvalRunStatus, EvalResult, EvalResultStatus, EvalRunSummary } from '@ash-ai/shared';
 import type { Db } from './index.js';
 
 import type * as sqliteSchema from './schema.sqlite.js';
@@ -19,6 +19,92 @@ function parseConfig(raw: string | null | undefined): SessionConfig | null {
 function parseEnv(raw: string | null | undefined): Record<string, string> | undefined {
   if (!raw) return undefined;
   try { return JSON.parse(raw); } catch { return undefined; }
+}
+
+/** Parse JSON array column. Returns null on null/invalid. */
+function parseJsonArray<T = unknown>(raw: string | null | undefined): T[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
+/** Parse JSON object column. Returns null on null/invalid. */
+function parseJsonObject<T = unknown>(raw: string | null | undefined): T | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function mapAgentVersion(r: any): AgentVersion {
+  return {
+    id: r.id,
+    tenantId: r.tenantId,
+    agentName: r.agentName,
+    versionNumber: r.versionNumber,
+    name: r.name,
+    systemPrompt: r.systemPrompt ?? null,
+    releaseNotes: r.releaseNotes ?? null,
+    isActive: r.isActive === 1,
+    knowledgeFiles: parseJsonArray<string>(r.knowledgeFiles),
+    createdBy: r.createdBy ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function mapEvalCase(r: any): EvalCase {
+  return {
+    id: r.id,
+    tenantId: r.tenantId,
+    agentName: r.agentName,
+    question: r.question,
+    expectedTopics: parseJsonArray<string>(r.expectedTopics),
+    expectedNotTopics: parseJsonArray<string>(r.expectedNotTopics),
+    referenceAnswer: r.referenceAnswer ?? null,
+    category: r.category ?? null,
+    tags: parseJsonArray<string>(r.tags),
+    chatHistory: parseJsonArray<{ role: string; content: string }>(r.chatHistory),
+    isActive: r.isActive === 1,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function mapEvalRun(r: any): EvalRun {
+  return {
+    id: r.id,
+    tenantId: r.tenantId,
+    agentName: r.agentName,
+    versionNumber: r.versionNumber ?? null,
+    status: r.status as EvalRunStatus,
+    totalCases: r.totalCases,
+    completedCases: r.completedCases,
+    summary: parseJsonObject<EvalRunSummary>(r.summary),
+    createdAt: r.createdAt,
+    startedAt: r.startedAt ?? null,
+    completedAt: r.completedAt ?? null,
+  };
+}
+
+function mapEvalResult(r: any): EvalResult {
+  return {
+    id: r.id,
+    tenantId: r.tenantId,
+    evalRunId: r.evalRunId,
+    evalCaseId: r.evalCaseId,
+    agentResponse: r.agentResponse ?? null,
+    topicScore: r.topicScore ?? null,
+    safetyScore: r.safetyScore ?? null,
+    llmJudgeScore: r.llmJudgeScore ?? null,
+    latencyMs: r.latencyMs ?? null,
+    status: r.status as EvalResultStatus,
+    error: r.error ?? null,
+    humanScore: r.humanScore ?? null,
+    humanNotes: r.humanNotes ?? null,
+    createdAt: r.createdAt,
+    completedAt: r.completedAt ?? null,
+  };
 }
 
 /**
@@ -957,6 +1043,383 @@ export class DrizzleDb implements Db {
       if (key) stats[key] = Number(r.total);
     }
     return stats;
+  }
+
+  // -- Agent Versions ---------------------------------------------------------
+
+  async insertAgentVersion(id: string, tenantId: string, agentName: string, versionNumber: number, opts: {
+    name?: string;
+    systemPrompt?: string | null;
+    releaseNotes?: string | null;
+    knowledgeFiles?: string[] | null;
+    createdBy?: string | null;
+  }): Promise<AgentVersion> {
+    const { agentVersions } = this.schema;
+    const now = new Date().toISOString();
+    const row = {
+      id,
+      tenantId,
+      agentName,
+      versionNumber,
+      name: opts.name ?? '',
+      systemPrompt: opts.systemPrompt ?? null,
+      releaseNotes: opts.releaseNotes ?? null,
+      isActive: 0,
+      knowledgeFiles: opts.knowledgeFiles ? JSON.stringify(opts.knowledgeFiles) : null,
+      createdBy: opts.createdBy ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.drizzle.insert(agentVersions).values(row);
+    return mapAgentVersion(row);
+  }
+
+  async getAgentVersion(id: string): Promise<AgentVersion | null> {
+    const { agentVersions } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(agentVersions)
+      .where(eq(agentVersions.id, id))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return mapAgentVersion(rows[0]);
+  }
+
+  async getAgentVersionByNumber(agentName: string, versionNumber: number, tenantId: string = 'default'): Promise<AgentVersion | null> {
+    const { agentVersions } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(agentVersions)
+      .where(and(
+        eq(agentVersions.tenantId, tenantId),
+        eq(agentVersions.agentName, agentName),
+        eq(agentVersions.versionNumber, versionNumber),
+      ))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return mapAgentVersion(rows[0]);
+  }
+
+  async getActiveAgentVersion(agentName: string, tenantId: string = 'default'): Promise<AgentVersion | null> {
+    const { agentVersions } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(agentVersions)
+      .where(and(
+        eq(agentVersions.tenantId, tenantId),
+        eq(agentVersions.agentName, agentName),
+        eq(agentVersions.isActive, 1),
+      ))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return mapAgentVersion(rows[0]);
+  }
+
+  async listAgentVersions(agentName: string, tenantId: string = 'default'): Promise<AgentVersion[]> {
+    const { agentVersions } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(agentVersions)
+      .where(and(
+        eq(agentVersions.tenantId, tenantId),
+        eq(agentVersions.agentName, agentName),
+      ))
+      .orderBy(desc(agentVersions.versionNumber));
+    return rows.map(mapAgentVersion);
+  }
+
+  async activateAgentVersion(id: string, agentName: string, tenantId: string = 'default'): Promise<void> {
+    const { agentVersions, agents } = this.schema;
+    await this.drizzle.transaction(async (tx: any) => {
+      // Deactivate all versions for this agent
+      await tx.update(agentVersions)
+        .set({ isActive: 0, updatedAt: new Date().toISOString() })
+        .where(and(eq(agentVersions.tenantId, tenantId), eq(agentVersions.agentName, agentName)));
+      // Activate the target version
+      await tx.update(agentVersions)
+        .set({ isActive: 1, updatedAt: new Date().toISOString() })
+        .where(eq(agentVersions.id, id));
+      // Update agents table
+      await tx.update(agents)
+        .set({ activeVersionId: id, updatedAt: new Date().toISOString() })
+        .where(and(eq(agents.tenantId, tenantId), eq(agents.name, agentName)));
+    });
+  }
+
+  async getNextVersionNumber(agentName: string, tenantId: string = 'default'): Promise<number> {
+    const { agentVersions } = this.schema;
+    const rows = await this.drizzle
+      .select({ maxVersion: sql<number>`COALESCE(MAX(${agentVersions.versionNumber}), 0)` })
+      .from(agentVersions)
+      .where(and(eq(agentVersions.tenantId, tenantId), eq(agentVersions.agentName, agentName)));
+    return (rows[0]?.maxVersion ?? 0) + 1;
+  }
+
+  async updateAgentVersion(id: string, updates: { name?: string; systemPrompt?: string | null; releaseNotes?: string | null; knowledgeFiles?: string[] | null }): Promise<AgentVersion | null> {
+    const { agentVersions } = this.schema;
+    const now = new Date().toISOString();
+    const set: Record<string, unknown> = { updatedAt: now };
+    if (updates.name !== undefined) set.name = updates.name;
+    if (updates.systemPrompt !== undefined) set.systemPrompt = updates.systemPrompt;
+    if (updates.releaseNotes !== undefined) set.releaseNotes = updates.releaseNotes;
+    if (updates.knowledgeFiles !== undefined) set.knowledgeFiles = updates.knowledgeFiles ? JSON.stringify(updates.knowledgeFiles) : null;
+
+    await this.drizzle
+      .update(agentVersions)
+      .set(set)
+      .where(eq(agentVersions.id, id));
+
+    return this.getAgentVersion(id);
+  }
+
+  async deleteAgentVersion(id: string): Promise<boolean> {
+    const { agentVersions } = this.schema;
+    const result = await this.drizzle
+      .delete(agentVersions)
+      .where(eq(agentVersions.id, id));
+    return (result.changes ?? result.rowCount ?? 0) > 0;
+  }
+
+  // -- Eval Cases -------------------------------------------------------------
+
+  async insertEvalCase(id: string, tenantId: string, agentName: string, data: {
+    question: string;
+    expectedTopics?: string[] | null;
+    expectedNotTopics?: string[] | null;
+    referenceAnswer?: string | null;
+    category?: string | null;
+    tags?: string[] | null;
+    chatHistory?: Array<{ role: string; content: string }> | null;
+    isActive?: boolean;
+  }): Promise<EvalCase> {
+    const { evalCases } = this.schema;
+    const now = new Date().toISOString();
+    const row = {
+      id,
+      tenantId,
+      agentName,
+      question: data.question,
+      expectedTopics: data.expectedTopics ? JSON.stringify(data.expectedTopics) : null,
+      expectedNotTopics: data.expectedNotTopics ? JSON.stringify(data.expectedNotTopics) : null,
+      referenceAnswer: data.referenceAnswer ?? null,
+      category: data.category ?? null,
+      tags: data.tags ? JSON.stringify(data.tags) : null,
+      chatHistory: data.chatHistory ? JSON.stringify(data.chatHistory) : null,
+      isActive: data.isActive === false ? 0 : 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.drizzle.insert(evalCases).values(row);
+    return mapEvalCase(row);
+  }
+
+  async getEvalCase(id: string): Promise<EvalCase | null> {
+    const { evalCases } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(evalCases)
+      .where(eq(evalCases.id, id))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return mapEvalCase(rows[0]);
+  }
+
+  async listEvalCases(tenantId: string, agentName: string, opts?: { category?: string; isActive?: boolean }): Promise<EvalCase[]> {
+    const { evalCases } = this.schema;
+    const conditions: any[] = [
+      eq(evalCases.tenantId, tenantId),
+      eq(evalCases.agentName, agentName),
+    ];
+    if (opts?.category) {
+      conditions.push(eq(evalCases.category, opts.category));
+    }
+    if (opts?.isActive !== undefined) {
+      conditions.push(eq(evalCases.isActive, opts.isActive ? 1 : 0));
+    }
+    const rows = await this.drizzle
+      .select()
+      .from(evalCases)
+      .where(and(...conditions))
+      .orderBy(asc(evalCases.createdAt));
+    return rows.map(mapEvalCase);
+  }
+
+  async updateEvalCase(id: string, data: Partial<{
+    question: string;
+    expectedTopics: string[] | null;
+    expectedNotTopics: string[] | null;
+    referenceAnswer: string | null;
+    category: string | null;
+    tags: string[] | null;
+    chatHistory: Array<{ role: string; content: string }> | null;
+    isActive: boolean;
+  }>): Promise<EvalCase | null> {
+    const { evalCases } = this.schema;
+    const now = new Date().toISOString();
+    const set: Record<string, unknown> = { updatedAt: now };
+    if (data.question !== undefined) set.question = data.question;
+    if (data.expectedTopics !== undefined) set.expectedTopics = data.expectedTopics ? JSON.stringify(data.expectedTopics) : null;
+    if (data.expectedNotTopics !== undefined) set.expectedNotTopics = data.expectedNotTopics ? JSON.stringify(data.expectedNotTopics) : null;
+    if (data.referenceAnswer !== undefined) set.referenceAnswer = data.referenceAnswer;
+    if (data.category !== undefined) set.category = data.category;
+    if (data.tags !== undefined) set.tags = data.tags ? JSON.stringify(data.tags) : null;
+    if (data.chatHistory !== undefined) set.chatHistory = data.chatHistory ? JSON.stringify(data.chatHistory) : null;
+    if (data.isActive !== undefined) set.isActive = data.isActive ? 1 : 0;
+
+    await this.drizzle
+      .update(evalCases)
+      .set(set)
+      .where(eq(evalCases.id, id));
+
+    return this.getEvalCase(id);
+  }
+
+  async deleteEvalCase(id: string): Promise<boolean> {
+    const { evalCases } = this.schema;
+    const result = await this.drizzle
+      .delete(evalCases)
+      .where(eq(evalCases.id, id));
+    return (result.changes ?? result.rowCount ?? 0) > 0;
+  }
+
+  // -- Eval Runs --------------------------------------------------------------
+
+  async insertEvalRun(id: string, tenantId: string, agentName: string, opts?: { versionNumber?: number; filters?: Record<string, unknown> }): Promise<EvalRun> {
+    const { evalRuns } = this.schema;
+    const now = new Date().toISOString();
+    const row = {
+      id,
+      tenantId,
+      agentName,
+      versionNumber: opts?.versionNumber ?? null,
+      status: 'pending',
+      totalCases: 0,
+      completedCases: 0,
+      summary: null,
+      filters: opts?.filters ? JSON.stringify(opts.filters) : null,
+      createdAt: now,
+      startedAt: null,
+      completedAt: null,
+    };
+    await this.drizzle.insert(evalRuns).values(row);
+    return mapEvalRun(row);
+  }
+
+  async getEvalRun(id: string): Promise<EvalRun | null> {
+    const { evalRuns } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(evalRuns)
+      .where(eq(evalRuns.id, id))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return mapEvalRun(rows[0]);
+  }
+
+  async listEvalRuns(tenantId: string, agentName: string): Promise<EvalRun[]> {
+    const { evalRuns } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(evalRuns)
+      .where(and(
+        eq(evalRuns.tenantId, tenantId),
+        eq(evalRuns.agentName, agentName),
+      ))
+      .orderBy(desc(evalRuns.createdAt));
+    return rows.map(mapEvalRun);
+  }
+
+  async listPendingEvalRuns(): Promise<EvalRun[]> {
+    const { evalRuns } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(evalRuns)
+      .where(eq(evalRuns.status, 'pending'))
+      .orderBy(evalRuns.createdAt);
+    return rows.map(mapEvalRun);
+  }
+
+  async updateEvalRun(id: string, updates: Partial<{ status: EvalRunStatus; totalCases: number; completedCases: number; summary: EvalRunSummary | null; startedAt: string; completedAt: string }>): Promise<void> {
+    const { evalRuns } = this.schema;
+    const set: Record<string, unknown> = {};
+    if (updates.status !== undefined) set.status = updates.status;
+    if (updates.totalCases !== undefined) set.totalCases = updates.totalCases;
+    if (updates.completedCases !== undefined) set.completedCases = updates.completedCases;
+    if (updates.summary !== undefined) set.summary = updates.summary ? JSON.stringify(updates.summary) : null;
+    if (updates.startedAt !== undefined) set.startedAt = updates.startedAt;
+    if (updates.completedAt !== undefined) set.completedAt = updates.completedAt;
+
+    await this.drizzle
+      .update(evalRuns)
+      .set(set)
+      .where(eq(evalRuns.id, id));
+  }
+
+  // -- Eval Results -----------------------------------------------------------
+
+  async insertEvalResult(id: string, tenantId: string, evalRunId: string, evalCaseId: string): Promise<EvalResult> {
+    const { evalResults } = this.schema;
+    const now = new Date().toISOString();
+    const row = {
+      id,
+      tenantId,
+      evalRunId,
+      evalCaseId,
+      agentResponse: null,
+      topicScore: null,
+      safetyScore: null,
+      llmJudgeScore: null,
+      latencyMs: null,
+      status: 'pending',
+      error: null,
+      humanScore: null,
+      humanNotes: null,
+      createdAt: now,
+      completedAt: null,
+    };
+    await this.drizzle.insert(evalResults).values(row);
+    return mapEvalResult(row);
+  }
+
+  async getEvalResult(id: string): Promise<EvalResult | null> {
+    const { evalResults } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(evalResults)
+      .where(eq(evalResults.id, id))
+      .limit(1);
+    if (rows.length === 0) return null;
+    return mapEvalResult(rows[0]);
+  }
+
+  async listEvalResults(evalRunId: string): Promise<EvalResult[]> {
+    const { evalResults } = this.schema;
+    const rows = await this.drizzle
+      .select()
+      .from(evalResults)
+      .where(eq(evalResults.evalRunId, evalRunId))
+      .orderBy(asc(evalResults.createdAt));
+    return rows.map(mapEvalResult);
+  }
+
+  async updateEvalResult(id: string, updates: Partial<{ agentResponse: string; topicScore: number; safetyScore: number; llmJudgeScore: number; latencyMs: number; status: EvalResultStatus; error: string; humanScore: number; humanNotes: string; completedAt: string }>): Promise<void> {
+    const { evalResults } = this.schema;
+    const set: Record<string, unknown> = {};
+    if (updates.agentResponse !== undefined) set.agentResponse = updates.agentResponse;
+    if (updates.topicScore !== undefined) set.topicScore = updates.topicScore;
+    if (updates.safetyScore !== undefined) set.safetyScore = updates.safetyScore;
+    if (updates.llmJudgeScore !== undefined) set.llmJudgeScore = updates.llmJudgeScore;
+    if (updates.latencyMs !== undefined) set.latencyMs = updates.latencyMs;
+    if (updates.status !== undefined) set.status = updates.status;
+    if (updates.error !== undefined) set.error = updates.error;
+    if (updates.humanScore !== undefined) set.humanScore = updates.humanScore;
+    if (updates.humanNotes !== undefined) set.humanNotes = updates.humanNotes;
+    if (updates.completedAt !== undefined) set.completedAt = updates.completedAt;
+
+    await this.drizzle
+      .update(evalResults)
+      .set(set)
+      .where(eq(evalResults.id, id));
   }
 
   // -- Lifecycle --------------------------------------------------------------

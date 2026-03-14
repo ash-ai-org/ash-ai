@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { SSE_WRITE_TIMEOUT_MS, timingEnabled, startTimer, logTiming, type SessionConfig } from '@ash-ai/shared';
-import { getAgent, insertSession, insertForkedSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, updateSessionConfig, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
+import { getAgent, getActiveAgentVersion, insertSession, insertForkedSession, getSession, listSessions, updateSessionStatus, updateSessionSandbox, updateSessionConfig, touchSession, updateSessionRunner, insertMessage, listMessages, insertSessionEvent, insertSessionEvents, listSessionEvents } from '../db/index.js';
 import { classifyBridgeMessage, classifyToStreamEvents } from '@ash-ai/shared';
 import { VERSION } from '../version.js';
 import type { RunnerCoordinator } from '../runner/coordinator.js';
@@ -141,6 +141,15 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       console.log(`[sessions] Restored agent "${agent}" from cloud storage`);
     }
 
+    // Resolve system prompt: request override > active version > on-disk CLAUDE.md
+    let effectiveSystemPrompt = systemPrompt; // from request body
+    if (!effectiveSystemPrompt) {
+      const activeVersion = await getActiveAgentVersion(agentRecord.name, req.tenantId);
+      if (activeVersion?.systemPrompt) {
+        effectiveSystemPrompt = activeVersion.systemPrompt;
+      }
+    }
+
     // Build extraEnv with merge order: agent.env → credential env → session extraEnv → ASH_PERMISSION_MODE
     let extraEnv: Record<string, string> | undefined;
 
@@ -210,7 +219,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
         sandboxId: sessionId,
         extraEnv,
         mcpServers,
-        systemPrompt,
+        systemPrompt: effectiveSystemPrompt,
         onOomKill: () => {
           updateSessionStatus(sessionId, 'paused').catch((err) =>
             console.error(`Failed to update session status on OOM: ${err}`)

@@ -147,9 +147,11 @@ function AgentCard({
       <CardContent>
         <div className="flex items-start justify-between">
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-white truncate">
-              {agent.name}
-            </h3>
+            <Link href={`/agents/detail?name=${encodeURIComponent(agent.name)}`}>
+              <h3 className="text-sm font-semibold text-white truncate hover:text-indigo-400 transition-colors cursor-pointer">
+                {agent.name}
+              </h3>
+            </Link>
             {agent.description && (
               <p className="text-xs text-white/40 mt-1 line-clamp-2">
                 {agent.description}

@@ -185,3 +185,123 @@ export function useUsageStats(opts?: {
 
   return { stats, loading, error, refetch }
 }
+
+// ─── useAgentVersions ───
+
+export function useAgentVersions(agentName: string | null) {
+  const [versions, setVersions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    if (!agentName) return
+    try {
+      setLoading(true)
+      const data = await getClient().listAgentVersions(agentName)
+      setVersions(data)
+    } catch (err) {
+      console.error('Failed to fetch versions:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [agentName])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return { versions, loading, refresh }
+}
+
+// ─── useAgentFiles ───
+
+export function useAgentFiles(agentName: string | null) {
+  const [files, setFiles] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    if (!agentName) return
+    try {
+      setLoading(true)
+      const data = await getClient().listAgentFiles(agentName)
+      setFiles(data.files)
+    } catch (err) {
+      console.error('Failed to fetch files:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [agentName])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return { files, loading, refresh }
+}
+
+// ─── useEvalCases ───
+
+export function useEvalCases(agentName: string | null) {
+  const [cases, setCases] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    if (!agentName) return
+    try {
+      setLoading(true)
+      const data = await getClient().listEvalCases(agentName)
+      setCases(data)
+    } catch (err) {
+      console.error('Failed to fetch eval cases:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [agentName])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return { cases, loading, refresh }
+}
+
+// ─── useEvalRuns ───
+
+export function useEvalRuns(agentName: string | null) {
+  const [runs, setRuns] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    if (!agentName) return
+    try {
+      setLoading(true)
+      const data = await getClient().listEvalRuns(agentName)
+      setRuns(data)
+    } catch (err) {
+      console.error('Failed to fetch eval runs:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [agentName])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return { runs, loading, refresh }
+}
+
+// ─── useEvalRunResults ───
+
+export function useEvalRunResults(agentName: string | null, runId: string | null) {
+  const [results, setResults] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    if (!agentName || !runId) return
+    try {
+      setLoading(true)
+      const data = await getClient().getEvalRunResults(agentName, runId)
+      setResults(data)
+    } catch (err) {
+      console.error('Failed to fetch eval results:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [agentName, runId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return { results, loading, refresh }
+}
