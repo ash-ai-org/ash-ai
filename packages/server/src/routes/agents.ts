@@ -251,6 +251,11 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
         type: 'object',
         properties: {
           env: { type: 'object', additionalProperties: { type: 'string' }, description: 'Default environment variables injected into every session sandbox' },
+          config: {
+            type: 'object',
+            description: 'Agent configuration (model, description, max_turns, permission_mode, mcp_servers, etc.)',
+            additionalProperties: true,
+          },
         },
       },
       response: {
@@ -263,18 +268,47 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
       },
     },
   }, async (req, reply) => {
-    const { env } = req.body as { env?: Record<string, string> };
+    const { env, config } = req.body as { env?: Record<string, string>; config?: Record<string, unknown> };
 
     const existing = await getAgent(req.params.name, req.tenantId);
     if (!existing) {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
 
-    const agent = await updateAgent(req.params.name, { env }, req.tenantId);
+    // Merge config with existing config (shallow merge)
+    const mergedConfig = config !== undefined
+      ? { ...(existing.config ?? {}), ...config }
+      : undefined;
+
+    const agent = await updateAgent(req.params.name, { env, config: mergedConfig }, req.tenantId);
     if (!agent) {
       return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
     }
     return reply.send({ agent: redactAgent(agent) });
+  });
+
+  // Get agent config
+  app.get<{ Params: { name: string } }>('/api/agents/:name/config', {
+    schema: {
+      tags: ['agents'],
+      params: nameParam,
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            config: { type: 'object', additionalProperties: true },
+          },
+          required: ['config'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const agent = await getAgent(req.params.name, req.tenantId);
+    if (!agent) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+    return reply.send({ config: agent.config ?? {} });
   });
 
   // List files in agent directory

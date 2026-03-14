@@ -31,7 +31,7 @@ export interface Db {
   upsertAgent(name: string, path: string, tenantId?: string, env?: Record<string, string>): Promise<Agent>;
   getAgent(name: string, tenantId?: string): Promise<Agent | null>;
   listAgents(tenantId?: string): Promise<Agent[]>;
-  updateAgent(name: string, updates: { env?: Record<string, string> }, tenantId?: string): Promise<Agent | null>;
+  updateAgent(name: string, updates: { env?: Record<string, string>; config?: Record<string, unknown> }, tenantId?: string): Promise<Agent | null>;
   deleteAgent(name: string, tenantId?: string): Promise<boolean>;
   // Sessions (tenant-scoped)
   insertSession(id: string, agentName: string, sandboxId: string, tenantId?: string, parentSessionId?: string, model?: string, config?: SessionConfig | null): Promise<Session>;
@@ -225,7 +225,7 @@ export async function listAgents(tenantId?: string): Promise<Agent[]> {
   return getDb().listAgents(tenantId);
 }
 
-export async function updateAgent(name: string, updates: { env?: Record<string, string> }, tenantId?: string): Promise<Agent | null> {
+export async function updateAgent(name: string, updates: { env?: Record<string, string>; config?: Record<string, unknown> }, tenantId?: string): Promise<Agent | null> {
   return getDb().updateAgent(name, updates, tenantId);
 }
 

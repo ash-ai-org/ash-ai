@@ -85,6 +85,13 @@
       "when": 1773445135653,
       "tag": "0011_typical_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773460977505,
+      "tag": "0012_tough_riptide",
+      "breakpoints": true
     }
   ]
 }

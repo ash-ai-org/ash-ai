@@ -85,6 +85,13 @@
       "when": 1773445126854,
       "tag": "0011_yielding_morlun",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1773460975763,
+      "tag": "0012_classy_vermin",
+      "breakpoints": true
     }
   ]
 }
