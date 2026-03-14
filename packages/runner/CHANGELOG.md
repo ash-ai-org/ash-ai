@@ -1,5 +1,13 @@
 # @ash-ai/runner
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [d5093df]
+  - @ash-ai/shared@0.1.0
+  - @ash-ai/sandbox@0.0.28
+
 ## 0.0.21 - 2026-03-10
 
 ### Changed
