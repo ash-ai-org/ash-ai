@@ -206,7 +206,7 @@ export function evalRoutes(
       response: {
         201: {
           type: 'object',
-          properties: { case: { type: 'object' } },
+          properties: { case: { type: 'object', additionalProperties: true } },
           required: ['case'],
         },
         404: { $ref: 'ApiError#' },
@@ -251,7 +251,7 @@ export function evalRoutes(
       response: {
         200: {
           type: 'object',
-          properties: { case: { type: 'object' } },
+          properties: { case: { type: 'object', additionalProperties: true } },
           required: ['case'],
         },
         404: { $ref: 'ApiError#' },
@@ -283,7 +283,7 @@ export function evalRoutes(
       response: {
         200: {
           type: 'object',
-          properties: { case: { type: 'object' } },
+          properties: { case: { type: 'object', additionalProperties: true } },
           required: ['case'],
         },
         404: { $ref: 'ApiError#' },
@@ -365,9 +365,10 @@ export function evalRoutes(
           properties: {
             comparison: {
               type: 'object',
+              additionalProperties: true,
               properties: {
-                runA: { type: 'object' },
-                runB: { type: 'object' },
+                runA: { type: 'object', additionalProperties: true },
+                runB: { type: 'object', additionalProperties: true },
                 results: { type: 'array' },
               },
               required: ['runA', 'runB', 'results'],
@@ -449,7 +450,7 @@ export function evalRoutes(
       response: {
         201: {
           type: 'object',
-          properties: { run: { type: 'object' } },
+          properties: { run: { type: 'object', additionalProperties: true } },
           required: ['run'],
         },
         404: { $ref: 'ApiError#' },
@@ -551,7 +552,7 @@ export function evalRoutes(
       response: {
         200: {
           type: 'object',
-          properties: { run: { type: 'object' } },
+          properties: { run: { type: 'object', additionalProperties: true } },
           required: ['run'],
         },
         404: { $ref: 'ApiError#' },
@@ -619,7 +620,7 @@ export function evalRoutes(
       response: {
         200: {
           type: 'object',
-          properties: { result: { type: 'object' } },
+          properties: { result: { type: 'object', additionalProperties: true } },
           required: ['result'],
         },
         404: { $ref: 'ApiError#' },

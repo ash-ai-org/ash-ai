@@ -1139,20 +1139,37 @@ export class DrizzleDb implements Db {
 
   async activateAgentVersion(id: string, agentName: string, tenantId: string = 'default'): Promise<void> {
     const { agentVersions, agents } = this.schema;
-    await this.drizzle.transaction(async (tx: any) => {
-      // Deactivate all versions for this agent
-      await tx.update(agentVersions)
-        .set({ isActive: 0, updatedAt: new Date().toISOString() })
-        .where(and(eq(agentVersions.tenantId, tenantId), eq(agentVersions.agentName, agentName)));
-      // Activate the target version
-      await tx.update(agentVersions)
-        .set({ isActive: 1, updatedAt: new Date().toISOString() })
-        .where(eq(agentVersions.id, id));
-      // Update agents table
-      await tx.update(agents)
-        .set({ activeVersionId: id, updatedAt: new Date().toISOString() })
-        .where(and(eq(agents.tenantId, tenantId), eq(agents.name, agentName)));
-    });
+    const now = new Date().toISOString();
+
+    if (this.dialect === 'pg') {
+      await this.drizzle.transaction(async (tx: any) => {
+        await tx.update(agentVersions)
+          .set({ isActive: 0, updatedAt: now })
+          .where(and(eq(agentVersions.tenantId, tenantId), eq(agentVersions.agentName, agentName)));
+        await tx.update(agentVersions)
+          .set({ isActive: 1, updatedAt: now })
+          .where(eq(agentVersions.id, id));
+        await tx.update(agents)
+          .set({ activeVersionId: id, updatedAt: now })
+          .where(and(eq(agents.tenantId, tenantId), eq(agents.name, agentName)));
+      });
+    } else {
+      // SQLite: better-sqlite3 transactions are synchronous
+      this.drizzle.transaction((tx: any) => {
+        tx.update(agentVersions)
+          .set({ isActive: 0, updatedAt: now })
+          .where(and(eq(agentVersions.tenantId, tenantId), eq(agentVersions.agentName, agentName)))
+          .run();
+        tx.update(agentVersions)
+          .set({ isActive: 1, updatedAt: now })
+          .where(eq(agentVersions.id, id))
+          .run();
+        tx.update(agents)
+          .set({ activeVersionId: id, updatedAt: now })
+          .where(and(eq(agents.tenantId, tenantId), eq(agents.name, agentName)))
+          .run();
+      });
+    }
   }
 
   async getNextVersionNumber(agentName: string, tenantId: string = 'default'): Promise<number> {
