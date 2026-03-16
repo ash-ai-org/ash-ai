@@ -12,10 +12,14 @@ import { ShimmerBlock } from '@/components/ui/shimmer'
 import { formatRelativeTime } from '@/lib/utils'
 import {
   Bot,
+  BookOpen,
   Code2,
   Copy,
+  FlaskConical,
+  GitBranch,
   MoreVertical,
   Plus,
+  Settings,
   Terminal,
   Trash2,
   Upload,
@@ -168,7 +172,36 @@ function AgentCard({
             {showMenu && (
               <>
                 <div className="fixed inset-0" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 mt-1 w-40 rounded-lg border border-white/10 bg-[#1c2129] shadow-xl z-10 py-1">
+                <div className="absolute right-0 mt-1 w-44 rounded-lg border border-white/10 bg-[#1c2129] shadow-xl z-10 py-1">
+                  <Link
+                    href={`/agents/config?name=${encodeURIComponent(agent.name)}`}
+                    onClick={() => setShowMenu(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-white/70 hover:bg-white/5"
+                  >
+                    <Settings className="h-3.5 w-3.5" /> Config
+                  </Link>
+                  <Link
+                    href={`/agents/versions?name=${encodeURIComponent(agent.name)}`}
+                    onClick={() => setShowMenu(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-white/70 hover:bg-white/5"
+                  >
+                    <GitBranch className="h-3.5 w-3.5" /> Versions
+                  </Link>
+                  <Link
+                    href={`/agents/knowledge?name=${encodeURIComponent(agent.name)}`}
+                    onClick={() => setShowMenu(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-white/70 hover:bg-white/5"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" /> Knowledge
+                  </Link>
+                  <Link
+                    href={`/agents/evals?name=${encodeURIComponent(agent.name)}`}
+                    onClick={() => setShowMenu(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-white/70 hover:bg-white/5"
+                  >
+                    <FlaskConical className="h-3.5 w-3.5" /> Evals
+                  </Link>
+                  <div className="my-1 border-t border-white/5" />
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(agent.name)
