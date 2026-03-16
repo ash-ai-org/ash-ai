@@ -720,6 +720,11 @@ export class AshClient {
     return res.result;
   }
 
+  /** Score results within an eval run. Pass resultId to score a single result, or omit to score all. */
+  async scoreEvalRun(agentName: string, runId: string, opts: { resultId?: string; humanScore?: number; humanNotes?: string }): Promise<{ scored: number; results: EvalResult[] }> {
+    return this.request<{ scored: number; results: EvalResult[] }>('POST', `/api/agents/${encodeURIComponent(agentName)}/eval-runs/${runId}/score`, opts);
+  }
+
   // -- Agent Config -------------------------------------------------------------
 
   async getAgentConfig(agentName: string): Promise<Record<string, unknown>> {
@@ -727,8 +732,10 @@ export class AshClient {
     return res.config;
   }
 
-  async updateAgentConfig(agentName: string, config: Record<string, unknown>): Promise<Agent> {
-    return this.updateAgent(agentName, { config });
+  /** Update agent config via dedicated PATCH /api/agents/:name/config endpoint */
+  async updateAgentConfig(agentName: string, config: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const res = await this.request<{ config: Record<string, unknown> }>('PATCH', `/api/agents/${encodeURIComponent(agentName)}/config`, config);
+    return res.config;
   }
 
   // -- Analytics ----------------------------------------------------------------

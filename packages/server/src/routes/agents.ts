@@ -287,6 +287,46 @@ export function agentRoutes(app: FastifyInstance, dataDir: string, pool?: Sandbo
     return reply.send({ agent: redactAgent(agent) });
   });
 
+  // Update agent config (dedicated endpoint)
+  app.patch<{ Params: { name: string } }>('/api/agents/:name/config', {
+    schema: {
+      tags: ['agents'],
+      params: nameParam,
+      body: {
+        type: 'object',
+        description: 'Agent configuration fields to merge with existing config',
+        additionalProperties: true,
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            config: { type: 'object', additionalProperties: true },
+          },
+          required: ['config'],
+        },
+        404: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const existing = await getAgent(req.params.name, req.tenantId);
+    if (!existing) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+
+    const config = req.body as Record<string, unknown> | undefined;
+    if (!config || Object.keys(config).length === 0) {
+      return reply.send({ config: existing.config ?? {} });
+    }
+
+    const mergedConfig = { ...(existing.config ?? {}), ...config };
+    const agent = await updateAgent(req.params.name, { config: mergedConfig }, req.tenantId);
+    if (!agent) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+    return reply.send({ config: agent.config ?? {} });
+  });
+
   // Get agent config
   app.get<{ Params: { name: string } }>('/api/agents/:name/config', {
     schema: {
