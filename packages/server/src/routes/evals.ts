@@ -605,6 +605,72 @@ export function evalRoutes(
 
   // ── Human Scoring ─────────────────────────────────────────────────────
 
+  // Score results within an eval run (convenience endpoint)
+  app.post<{ Params: { name: string; id: string } }>('/api/agents/:name/eval-runs/:id/score', {
+    schema: {
+      tags: ['evals'],
+      params: nameAndIdParams,
+      body: {
+        type: 'object',
+        properties: {
+          resultId: { type: 'string', format: 'uuid', description: 'Specific result to score. If omitted, scores are applied to all results.' },
+          humanScore: { type: 'number', minimum: 1, maximum: 5 },
+          humanNotes: { type: 'string', maxLength: 10_000 },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            scored: { type: 'integer' },
+            results: { type: 'array' },
+          },
+          required: ['scored'],
+        },
+        404: { $ref: 'ApiError#' },
+        400: { $ref: 'ApiError#' },
+      },
+    },
+  }, async (req, reply) => {
+    const agent = await getAgent(req.params.name, req.tenantId);
+    if (!agent) {
+      return reply.status(404).send({ error: 'Agent not found', statusCode: 404 });
+    }
+
+    const run = await getEvalRun(req.params.id);
+    if (!run || run.agentName !== agent.name) {
+      return reply.status(404).send({ error: 'Eval run not found', statusCode: 404 });
+    }
+
+    const body = req.body as { resultId?: string; humanScore?: number; humanNotes?: string } | undefined;
+    if (!body || (body.humanScore === undefined && body.humanNotes === undefined)) {
+      return reply.status(400).send({ error: 'Provide humanScore and/or humanNotes', statusCode: 400 });
+    }
+
+    const updates: { humanScore?: number; humanNotes?: string } = {};
+    if (body.humanScore !== undefined) updates.humanScore = body.humanScore;
+    if (body.humanNotes !== undefined) updates.humanNotes = body.humanNotes;
+
+    if (body.resultId) {
+      // Score a specific result
+      const existing = await getEvalResult(body.resultId);
+      if (!existing || existing.evalRunId !== run.id) {
+        return reply.status(404).send({ error: 'Eval result not found in this run', statusCode: 404 });
+      }
+      await updateEvalResult(body.resultId, updates);
+      const updated = await getEvalResult(body.resultId);
+      return reply.send({ scored: 1, results: [updated] });
+    }
+
+    // Score all results in the run
+    const results = await listEvalResults(run.id);
+    for (const r of results) {
+      await updateEvalResult(r.id, updates);
+    }
+    const updatedResults = await listEvalResults(run.id);
+    return reply.send({ scored: results.length, results: updatedResults });
+  });
+
   // Update eval result with human score/notes
   app.patch<{ Params: { name: string; id: string } }>('/api/agents/:name/eval-results/:id', {
     schema: {

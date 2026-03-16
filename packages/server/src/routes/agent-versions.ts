@@ -111,7 +111,7 @@ export function agentVersionRoutes(app: FastifyInstance): void {
             type: 'array',
             items: { type: 'string' },
           },
-          cloneFrom: { type: 'integer', minimum: 1 },
+          cloneFrom: { type: ['integer', 'string'], description: 'Version number (integer) or version UUID to clone from' },
         },
       },
       response: {
@@ -135,15 +135,16 @@ export function agentVersionRoutes(app: FastifyInstance): void {
       systemPrompt?: string;
       releaseNotes?: string;
       knowledgeFiles?: string[];
-      cloneFrom?: number;
+      cloneFrom?: number | string;
     } | undefined;
 
     let systemPrompt = body?.systemPrompt ?? null;
     let knowledgeFiles = body?.knowledgeFiles ?? null;
 
     // If cloneFrom is specified, copy systemPrompt and knowledgeFiles from that version
+    // Accepts both version number (integer) and version UUID (string)
     if (body?.cloneFrom != null) {
-      const sourceVersion = await getAgentVersionByNumber(req.params.name, body.cloneFrom, req.tenantId);
+      const sourceVersion = await resolveVersion(req.params.name, String(body.cloneFrom), req.tenantId);
       if (!sourceVersion) {
         return reply.status(400).send({ error: `Source version ${body.cloneFrom} not found`, statusCode: 400 });
       }
