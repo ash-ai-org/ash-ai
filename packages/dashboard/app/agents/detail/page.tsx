@@ -16,6 +16,7 @@ import {
   FlaskConical,
   FolderOpen,
   Clock,
+  Settings,
 } from 'lucide-react'
 import type { Agent } from '@ash-ai/shared'
 
@@ -86,6 +87,12 @@ function AgentDetailContent() {
 
   const tabs = [
     {
+      label: 'Config',
+      href: `/agents/config?name=${encodeURIComponent(agent.name)}`,
+      icon: Settings,
+      description: 'View and edit agent configuration',
+    },
+    {
       label: 'Versions',
       href: `/agents/versions?name=${encodeURIComponent(agent.name)}`,
       icon: GitBranch,
@@ -154,7 +161,7 @@ function AgentDetailContent() {
       </Card>
 
       {/* Tab cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {tabs.map((tab) => (
           <Link key={tab.label} href={tab.href}>
             <Card className="hover:border-white/20 hover:bg-white/[0.02] transition-all cursor-pointer h-full">
