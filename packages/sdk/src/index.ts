@@ -51,4 +51,11 @@ export type {
   ListFilesResponse,
   GetFileResponse,
   McpServerConfig,
+  AgentVersion,
+  CreateAgentVersionRequest,
+  UpdateAgentVersionRequest,
+  ListAgentVersionsResponse,
+  EvalCase,
+  EvalRun,
+  EvalResult,
 } from '@ash-ai/shared';
