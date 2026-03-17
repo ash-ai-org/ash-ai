@@ -37,6 +37,18 @@ export type { PlaygroundHeaderProps } from './components/PlaygroundHeader.js';
 export { BottomPanels } from './components/BottomPanels.js';
 export type { BottomPanelsProps } from './components/BottomPanels.js';
 
+export { AgentConfigEditor } from './components/AgentConfigEditor.js';
+export type { AgentConfigEditorProps } from './components/AgentConfigEditor.js';
+
+export { AgentVersionManager } from './components/AgentVersionManager.js';
+export type { AgentVersionManagerProps } from './components/AgentVersionManager.js';
+
+export { AgentKnowledgeBase } from './components/AgentKnowledgeBase.js';
+export type { AgentKnowledgeBaseProps } from './components/AgentKnowledgeBase.js';
+
+export { AgentEvalRunner } from './components/AgentEvalRunner.js';
+export type { AgentEvalRunnerProps } from './components/AgentEvalRunner.js';
+
 // Context
 export { PlaygroundProvider, usePlaygroundContext } from './context/PlaygroundContext.js';
 export type { PlaygroundContextValue, PlaygroundProviderProps } from './context/PlaygroundContext.js';
