@@ -225,6 +225,9 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
             console.error(`Failed to update session status on OOM: ${err}`)
           );
         },
+        onStderrError: (_sandboxId: string, text: string) => {
+          insertSessionEvent(sessionId, 'mcp_status', JSON.stringify({ action: 'error', error: text }), req.tenantId).catch((err) => console.error(`Failed to persist mcp_status error event: ${err}`));
+        },
       });
       span.addEvent('createSandbox.end');
 
@@ -233,8 +236,8 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       if (effectiveModel) span.setAttribute('ash.model', effectiveModel);
 
       // Build session-level SDK config (persisted on session, injected into every query)
-      const sessionConfig: SessionConfig | null = (allowedTools || disallowedTools || betas || subagents || initialAgent)
-        ? { allowedTools, disallowedTools, betas, subagents, initialAgent }
+      const sessionConfig: SessionConfig | null = (allowedTools || disallowedTools || betas || subagents || initialAgent || mcpServers)
+        ? { allowedTools, disallowedTools, betas, subagents, initialAgent, mcpServers }
         : null;
 
       const session = await insertSession(sessionId, agentRecord.name, handle.sandboxId, req.tenantId, undefined, effectiveModel, sessionConfig);
@@ -245,6 +248,17 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       // Record lifecycle event
       insertSessionEvent(sessionId, 'lifecycle', JSON.stringify({ action: 'created', agentName: agentRecord.name, model: effectiveModel }), req.tenantId).catch((err) => console.error(`Failed to persist lifecycle event: ${err}`));
       telemetry.emit({ sessionId, agentName: agentRecord.name, type: 'lifecycle', data: { status: 'active', action: 'created' } });
+
+      // Record MCP configuration event so dashboard shows which MCP servers were configured
+      if (mcpServers && Object.keys(mcpServers).length > 0) {
+        const mcpSummary = Object.entries(mcpServers).map(([name, cfg]) => ({
+          name,
+          transport: cfg.url ? 'sse' : 'stdio',
+          ...(cfg.url && { url: cfg.url }),
+          ...(cfg.command && { command: cfg.command }),
+        }));
+        insertSessionEvent(sessionId, 'mcp_status', JSON.stringify({ action: 'configured', servers: mcpSummary }), req.tenantId).catch((err) => console.error(`Failed to persist mcp_status event: ${err}`));
+      }
 
       return reply.status(201).send({ session: { ...session, status: 'active', runnerId: effectiveRunnerId } });
     } catch (err: unknown) {

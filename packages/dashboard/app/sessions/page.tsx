@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Pause,
   Play,
+  Plug,
   Square,
   Terminal,
 } from 'lucide-react'
@@ -244,6 +245,7 @@ function SessionDetail({ session }: { session: Session }) {
               {formatRelativeTime(session.createdAt)}
             </span>
             {session.model && <Badge variant="info">{session.model}</Badge>}
+            <McpStatusBadge events={events} config={session.config} />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -478,6 +480,7 @@ function EventsTab({ events }: { events: SessionEvent[] }) {
     error: 'text-red-400',
     turn_complete: 'text-green-400',
     lifecycle: 'text-zinc-400',
+    mcp_status: 'text-cyan-400',
   }
 
   return (
@@ -505,7 +508,11 @@ function EventRow({
       typeof event.data === 'string' ? JSON.parse(event.data) : event.data
     if (data && typeof data === 'object') {
       const d = data as Record<string, unknown>
-      if (typeof d.text === 'string') summary = d.text.slice(0, 100)
+      if (typeof d.action === 'string' && d.action === 'configured' && Array.isArray(d.servers)) {
+        summary = `${d.servers.length} server(s): ${(d.servers as Array<{name?: string}>).map(s => s.name).join(', ')}`
+      } else if (typeof d.action === 'string' && d.action === 'error' && typeof d.error === 'string') {
+        summary = `MCP error: ${d.error.slice(0, 80)}`
+      } else if (typeof d.text === 'string') summary = d.text.slice(0, 100)
       else if (typeof d.name === 'string') summary = d.name
       else if (typeof d.error === 'string') summary = d.error.slice(0, 100)
     }
@@ -536,6 +543,49 @@ function EventRow({
         </div>
       )}
     </div>
+  )
+}
+
+// ─── MCP Status Badge ───
+
+function McpStatusBadge({ events, config }: { events: SessionEvent[]; config?: { mcpServers?: Record<string, unknown> } | null }) {
+  const mcpEvents = events.filter(e => e.type === 'mcp_status')
+  const mcpServers = config?.mcpServers
+
+  // No MCP configured at all
+  if (!mcpServers && mcpEvents.length === 0) return null
+
+  const hasError = mcpEvents.some(e => {
+    try {
+      const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+      return d?.action === 'error'
+    } catch { return false }
+  })
+
+  const serverCount = mcpServers ? Object.keys(mcpServers).length : 0
+  const configuredEvent = mcpEvents.find(e => {
+    try {
+      const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+      return d?.action === 'configured'
+    } catch { return false }
+  })
+  const configuredCount = configuredEvent ? (() => {
+    try {
+      const d = typeof configuredEvent.data === 'string' ? JSON.parse(configuredEvent.data) : configuredEvent.data
+      return d?.servers?.length ?? 0
+    } catch { return 0 }
+  })() : serverCount
+
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium',
+      hasError
+        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+        : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+    )}>
+      <Plug className="h-3 w-3" />
+      {hasError ? `MCP Error` : `MCP: ${configuredCount} server${configuredCount !== 1 ? 's' : ''}`}
+    </span>
   )
 }
 

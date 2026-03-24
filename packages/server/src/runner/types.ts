@@ -9,6 +9,8 @@ export interface CreateSandboxRequest {
   skipAgentCopy?: boolean;
   limits?: Partial<SandboxLimits>;
   onOomKill?: (sandboxId: string) => void;
+  /** Called when bridge stderr contains significant errors (e.g. MCP connection failures). */
+  onStderrError?: (sandboxId: string, text: string) => void;
   /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
   extraEnv?: Record<string, string>;
   /** Per-session MCP servers. Merged into agent's .mcp.json (session overrides agent). */
