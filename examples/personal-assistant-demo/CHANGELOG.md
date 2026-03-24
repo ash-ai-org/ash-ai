@@ -1,5 +1,13 @@
 # personal-assistant-demo
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [daae6a1]
+  - @ash-ai/shared@0.2.0
+  - @ash-ai/sdk@0.1.2
+
 ## 0.1.3
 
 ### Patch Changes
