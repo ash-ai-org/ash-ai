@@ -212,7 +212,8 @@ export type SessionEventType =
   | 'reasoning'      // Extended thinking / chain-of-thought
   | 'error'          // Error during execution
   | 'turn_complete'  // Agent turn finished (result message)
-  | 'lifecycle';     // Session state change (created, paused, resumed, ended)
+  | 'lifecycle'      // Session state change (created, paused, resumed, ended)
+  | 'mcp_status';    // MCP server connection status (configured, connected, error)
 
 export interface SessionEvent {
   id: string;
@@ -761,6 +762,7 @@ export interface SessionConfig {
   betas?: string[];
   subagents?: Record<string, unknown>;
   initialAgent?: string;
+  mcpServers?: Record<string, McpServerConfig>;
 }
 
 /** Request body for PATCH /api/sessions/:id/config — update session config mid-session. */

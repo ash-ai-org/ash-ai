@@ -22,6 +22,7 @@ export class LocalRunnerBackend implements RunnerBackend {
       skipAgentCopy: opts.skipAgentCopy,
       limits: opts.limits,
       onOomKill: opts.onOomKill,
+      onStderrError: opts.onStderrError,
       extraEnv: opts.extraEnv,
       mcpServers: opts.mcpServers,
       systemPrompt: opts.systemPrompt,

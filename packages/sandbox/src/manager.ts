@@ -35,6 +35,8 @@ export interface CreateSandboxOpts {
   skipAgentCopy?: boolean;
   limits?: Partial<SandboxLimits>;
   onOomKill?: (sandboxId: string) => void;
+  /** Called when bridge stderr contains significant errors (e.g. MCP connection failures). */
+  onStderrError?: (sandboxId: string, text: string) => void;
   /** Extra env vars to inject into the sandbox (e.g. decrypted credentials). */
   extraEnv?: Record<string, string>;
   /** Per-session MCP servers. Merged into the agent's .mcp.json (session overrides agent). */
@@ -277,6 +279,11 @@ export class SandboxManager {
       const text = chunk.toString().trimEnd();
       console.error(`[sandbox:${shortId}:err] ${text}`);
       this.appendLog(id, 'stderr', text);
+      // Surface significant errors (MCP failures, connection errors) to the caller
+      const lc = text.toLowerCase();
+      if (lc.includes('mcp') || lc.includes('econnrefused') || lc.includes('connection refused') || lc.includes('disallowedhost') || lc.includes('failed to connect')) {
+        opts.onStderrError?.(id, text);
+      }
     });
 
     // OOM detection
