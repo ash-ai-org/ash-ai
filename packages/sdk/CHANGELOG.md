@@ -1,5 +1,12 @@
 # @ash-ai/sdk
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [daae6a1]
+  - @ash-ai/shared@0.2.0
+
 ## 0.1.1
 
 ### Patch Changes
