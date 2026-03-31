@@ -437,13 +437,30 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
 
   // Send message — routes to the correct runner for the session
   app.post<{ Params: { id: string } }>('/api/sessions/:id/messages', {
+    bodyLimit: 50 * 1024 * 1024, // 50MB for document/image attachments
     schema: {
       tags: ['sessions'],
       params: idParam,
       body: {
         type: 'object',
         properties: {
-          content: { type: 'string', maxLength: 100_000 },
+          content: {
+            oneOf: [
+              { type: 'string', maxLength: 500_000 },
+              {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    type: { type: 'string', enum: ['text', 'image', 'document'] },
+                  },
+                  required: ['type'],
+                  additionalProperties: true,
+                },
+                maxItems: 20,
+              },
+            ],
+          },
           includePartialMessages: { type: 'boolean' },
           model: { type: 'string', maxLength: 100, description: 'Model override for this query. Overrides session and agent defaults.' },
           maxTurns: { type: 'integer', minimum: 1, description: 'Maximum agentic turns for this query.' },
@@ -476,7 +493,7 @@ export function sessionRoutes(app: FastifyInstance, coordinator: RunnerCoordinat
       return reply.status(400).send({ error: `Session is ${session.status}`, statusCode: 400 });
     }
 
-    const { content, includePartialMessages, model: messageModel, maxTurns, maxBudgetUsd, effort, thinking, outputFormat } = req.body as { content: string; includePartialMessages?: boolean; model?: string; maxTurns?: number; maxBudgetUsd?: number; effort?: 'low' | 'medium' | 'high' | 'max'; thinking?: { type: string; budgetTokens?: number }; outputFormat?: { type: string; schema: Record<string, unknown> } };
+    const { content, includePartialMessages, model: messageModel, maxTurns, maxBudgetUsd, effort, thinking, outputFormat } = req.body as { content: string | Array<{ type: string; [key: string]: unknown }>; includePartialMessages?: boolean; model?: string; maxTurns?: number; maxBudgetUsd?: number; effort?: 'low' | 'medium' | 'high' | 'max'; thinking?: { type: string; budgetTokens?: number }; outputFormat?: { type: string; schema: Record<string, unknown> } };
 
     const messageSpan = tracer.startSpan('ash.session.message', {
       attributes: {

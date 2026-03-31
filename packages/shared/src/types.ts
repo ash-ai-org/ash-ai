@@ -779,8 +779,36 @@ export interface CreateSessionResponse {
   session: Session;
 }
 
+// -- Content blocks for multimodal messages (matches Claude API format) --------
+
+export interface TextContentBlock {
+  type: 'text';
+  text: string;
+}
+
+export interface ImageContentBlock {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+    data: string;
+  };
+}
+
+export interface DocumentContentBlock {
+  type: 'document';
+  source: {
+    type: 'base64';
+    media_type: 'application/pdf';
+    data: string;
+  };
+}
+
+export type InputContentBlock = TextContentBlock | ImageContentBlock | DocumentContentBlock;
+
 export interface SendMessageRequest {
-  content: string;
+  /** Message content — plain text string or array of content blocks (text, image, document). */
+  content: string | InputContentBlock[];
   /** Enable partial message streaming. When true, yields incremental StreamEvent messages with raw API deltas in addition to complete messages. */
   includePartialMessages?: boolean;
   /** Model override for this query. Overrides session and agent defaults. */

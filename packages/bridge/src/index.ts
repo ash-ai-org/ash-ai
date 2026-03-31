@@ -48,7 +48,7 @@ async function send(conn: net.Socket, event: BridgeEvent): Promise<void> {
   }
 }
 
-async function runAndStream(conn: net.Socket, prompt: string, sessionId: string, resume: boolean, sdkOpts?: {
+async function runAndStream(conn: net.Socket, prompt: string | Array<{ type: string; [key: string]: unknown }>, sessionId: string, resume: boolean, sdkOpts?: {
   includePartialMessages?: boolean;
   model?: string;
   maxTurns?: number;
@@ -230,8 +230,8 @@ async function handleCommand(conn: net.Socket, cmd: BridgeCommand): Promise<void
   }
 }
 
-// Maximum buffer size to prevent memory exhaustion from a single giant message (10MB)
-const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+// Maximum buffer size to prevent memory exhaustion from a single giant message (50MB for document attachments)
+const MAX_BUFFER_SIZE = 50 * 1024 * 1024;
 
 /**
  * Sanitize an error message for sending over the socket.
