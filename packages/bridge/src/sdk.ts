@@ -6,7 +6,8 @@
 // =============================================================================
 
 export interface QueryOptions {
-  prompt: string;
+  /** Plain text prompt or array of content blocks for multimodal input. */
+  prompt: string | Array<{ type: string; [key: string]: unknown }>;
   sessionId: string;
   /** The SDK's own session ID to resume from (captured from a previous result message). */
   resumeSessionId?: string;
@@ -57,8 +58,20 @@ async function* runRealQuery(opts: QueryOptions): AsyncGenerator<unknown> {
   const permMode = process.env.ASH_PERMISSION_MODE || 'bypassPermissions';
   const isBypass = permMode === 'bypassPermissions';
 
+  // When prompt is structured content blocks, wrap as SDKUserMessage async iterable
+  const promptValue: string | AsyncIterable<any> = Array.isArray(opts.prompt)
+    ? (async function*() {
+        yield {
+          type: 'user' as const,
+          message: { role: 'user' as const, content: opts.prompt },
+          parent_tool_use_id: null,
+          session_id: opts.sessionId,
+        };
+      })()
+    : opts.prompt;
+
   const q = query({
-    prompt: opts.prompt,
+    prompt: promptValue,
     options: {
       cwd: opts.workspaceDir,
       systemPrompt: opts.claudeMd || undefined,
@@ -113,7 +126,11 @@ async function* runMockQuery(opts: QueryOptions): AsyncGenerator<unknown> {
     mockSessionHistory.set(opts.sessionId, []);
   }
   const history = mockSessionHistory.get(opts.sessionId)!;
-  history.push(opts.prompt);
+  // Extract text from structured prompt for mock tracking
+  const promptText = Array.isArray(opts.prompt)
+    ? opts.prompt.filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ') || '[multimodal content]'
+    : opts.prompt;
+  history.push(promptText);
 
   const responseText = opts.resume
     ? '[Resumed session]'
@@ -190,7 +207,7 @@ async function* runMockQuery(opts: QueryOptions): AsyncGenerator<unknown> {
     duration_api_ms: 50,
     is_error: false,
     num_turns: 1,
-    result: `Mock response to: ${opts.prompt}`,
+    result: `Mock response to: ${promptText}`,
   };
 }
 

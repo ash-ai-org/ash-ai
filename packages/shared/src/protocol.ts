@@ -11,7 +11,8 @@
 
 export interface QueryCommand {
   cmd: 'query';
-  prompt: string;
+  /** Plain text prompt or array of content blocks (text, image, document) for multimodal input. */
+  prompt: string | Array<{ type: string; [key: string]: unknown }>;
   sessionId: string;
   includePartialMessages?: boolean;
   /** Override the model for this query. Overrides agent's .claude/settings.json. */
