@@ -1,5 +1,12 @@
 # @ash-ai/cli
 
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies [7d26aee]
+  - @ash-ai/shared@0.3.0
+
 ## 0.0.25
 
 ### Patch Changes
