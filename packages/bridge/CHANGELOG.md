@@ -1,5 +1,20 @@
 # @ash-ai/bridge
 
+## 0.1.0
+
+### Minor Changes
+
+- 7d26aee: Support file/document attachments in session messages.
+
+  - `@ash-ai/shared` — Add `TextContentBlock`, `ImageContentBlock`, `DocumentContentBlock`, and `InputContentBlock` types. `SendMessageRequest.content` now accepts `string | InputContentBlock[]`. `QueryCommand.prompt` updated to match.
+  - `@ash-ai/server` — Message endpoint accepts structured content blocks (text, image, document). Body limit increased to 50MB for document-heavy use cases. JSON schema validates both string and array-of-blocks formats.
+  - `@ash-ai/bridge` — Structured prompts converted to `SDKUserMessage` and passed via `AsyncIterable` to the Claude Code SDK's `query()`. Buffer limit increased to 50MB. Mock query handles multimodal content gracefully.
+
+### Patch Changes
+
+- Updated dependencies [7d26aee]
+  - @ash-ai/shared@0.3.0
+
 ## 0.0.23
 
 ### Patch Changes
